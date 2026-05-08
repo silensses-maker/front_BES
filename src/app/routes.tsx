@@ -2,7 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard";
 import { LandingLayout } from "@/app/layouts/landing";
 import { ProtectedRoute } from "@/features/auth";
-import { BoardPage, HomePage, ProfilePage, ResultsPage, WikiPage } from "@/pages";
+import { BoardPage, HomePage, LiveRunPage, ProfilePage, ResultsPage, WikiPage } from "@/pages";
 import { LoginPage } from "@/pages/login/login-page";
 
 export function AppRoutes() {
@@ -28,7 +28,10 @@ export function AppRoutes() {
           }
         >
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/board/simulation/:runId" element={<BoardPage />} />
+          {/* Live-run routes — both point to LiveRunPage; the page handles the
+              network-discovery / selector / run-view branching internally. */}
+          <Route path="/board/simulation/:runId" element={<LiveRunPage />} />
+          <Route path="/board/simulation/:runId/:networkId" element={<LiveRunPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

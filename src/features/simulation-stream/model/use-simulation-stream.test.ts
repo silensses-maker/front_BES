@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSimulationWsClient, useSimulationStore } from "@/entities/simulation";
+import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
@@ -9,9 +10,28 @@ import { useSimulationStream } from "./use-simulation-stream";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
-vi.mock("@/entities/simulation", () => ({
-  createSimulationWsClient: vi.fn(),
-  useSimulationStore: vi.fn(),
+// Hoisted refs so vi.mock factory (which is hoisted) can reference them.
+const { mockSetTopology, mockGetState } = vi.hoisted(() => ({
+  mockSetTopology: vi.fn(),
+  mockGetState: vi.fn(),
+}));
+
+vi.mock("@/entities/simulation", () => {
+  const useSimulationStoreMock = vi.fn() as unknown as ReturnType<typeof vi.fn> & {
+    getState: typeof mockGetState;
+  };
+  useSimulationStoreMock.getState = mockGetState;
+  return {
+    createSimulationWsClient: vi.fn(),
+    useSimulationStore: useSimulationStoreMock,
+  };
+});
+
+vi.mock("@/shared/api/backend", () => ({
+  simulationsApi: {
+    getTopology: vi.fn(),
+    getTopologyFull: vi.fn(),
+  },
 }));
 
 vi.mock("@/shared/i18n", () => ({
@@ -78,6 +98,12 @@ describe("useSimulationStream", () => {
     vi.mocked(useSimulationStore).mockImplementation((selector) =>
       selector(mockStoreState as never),
     );
+    // Set up getState() static for the proactive topology-fetch path.
+    mockGetState.mockReturnValue({
+      topology: null,
+      setTopology: mockSetTopology,
+    });
+    vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(null);
     vi.mocked(useTranslation).mockReturnValue({
       t: (key: string) => key,
     } as unknown as ReturnType<typeof useTranslation>);
@@ -98,7 +124,7 @@ describe("useSimulationStream", () => {
         renderHook(() => useSimulationStream("run-abc"));
       });
 
-      expect(createSimulationWsClient).toHaveBeenCalledWith("run-abc");
+      expect(createSimulationWsClient).toHaveBeenCalledWith("run-abc", null);
     });
 
     it("calls client.connect() after creating the client", async () => {

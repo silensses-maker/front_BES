@@ -308,6 +308,14 @@ const en = {
     panelStatistical: "Statistical charts (issue #49)",
     panelCosmograph: "Cosmograph renders here (issue #47)",
     panelLiveCharts: "Live charts (issue #49)",
+    canvas: {
+      preparingData: "Preparing data…",
+      computingLayout: "Computing layout…",
+      clusterByStrategy: "By strategy",
+      clusterByBelief: "By belief",
+      windowsClusterWarning: "Clustering may be unstable on Windows",
+      dataPrepError: "Failed to prepare data — try refreshing",
+    },
     maximizePanel: "Maximize panel",
     restorePanel: "Restore panel size",
     simulationComplete: "Simulation complete",
@@ -416,8 +424,42 @@ const en = {
     next: "Next",
     submit: "Launch simulation",
     submitting: "Launching…",
+    // ── Field-level tooltips (generated path) ───────────────────────────────
+    saveModeHint:
+      "How much simulation data is persisted. DEBUG: in-memory only (fastest, run is lost on refresh). STANDARD: round metrics in DB. FULL: per-round agent state, enables replay.",
+    numberOfNetworksHint:
+      "How many independent network instances to run with the same configuration. Each one generates its own topology and dynamics; useful to average out random variation.",
+    numberOfAgentsHint:
+      "Total agents in each network. Compute time and memory grow roughly linearly. Each agent has its own opinion and state.",
+    densityHint:
+      "Average degree per agent (number of neighbors). Higher density = more interactions per round = faster opinion spread but more compute. Must be at least 2.",
+    iterationLimitHint:
+      "Maximum simulation rounds. The run stops when this limit is hit OR when the network converges (stop threshold), whichever comes first.",
+    stopThresholdHint:
+      "Convergence criterion. The run stops when the average belief change between rounds drops below this value. Lower = stricter convergence. Typical: 0.01–0.001.",
+    seedHint:
+      "Random seed for reproducibility. Same seed produces the same topology and dynamics. Leave random for fresh exploration.",
+    // ── Field-level tooltips (agents step) ──────────────────────────────────
+    silenceStrategyHint:
+      "How an agent decides whether to express its opinion each round. DeGroot: always speaks. Majority: speaks only if a majority of neighbors agree. Threshold: requires a configurable fraction. Confidence: speaks when its own certainty exceeds a threshold.",
+    silenceEffectHint:
+      "How a silent agent influences neighbors' belief updates. DeGroot: not silent (no effect, classic model). Memory: neighbors use the agent's last expressed opinion. Memoryless: neighbors ignore the silent agent.",
+    majorityThresholdHint:
+      "Fraction of neighbors who must agree (within tolerance) for the agent to speak. 0.5 = half. Higher means harder to speak.",
+    confidenceHint:
+      "Confidence threshold for the Confidence strategy. The agent speaks when its own subjective certainty in its current opinion exceeds this value.",
+    cognitiveBiasHint:
+      "How an agent processes incoming opinions. None: pure averaging (DeGroot). Confirmation: weighs agreeing opinions more. Backfire: rejects strongly disagreeing opinions and hardens. Authority: defers to high-influence neighbors. Insular: ignores most outside opinions.",
+    agentTypesLabelHint:
+      "Distribute the total agents across silence strategy + effect combinations. The sum of counts must match the total agents field.",
+    biasTypesLabelHint:
+      "Distribute the network's edges across cognitive bias categories. The sum of counts must match the total edge count of the network (computed from agents and density).",
     errorAgentCountMismatch:
       "Agent type counts ({{actual}}) must match the total agents field ({{expected}}).",
+    errorAgentCountMismatchHint:
+      "Agent rows do not sum to the total. Adjust them in the Agents step.",
+    errorBiasCountMismatchHint:
+      "Bias rows do not match the network's edge count. Adjust them in the Agents step.",
     errorStopThreshold: "Stop threshold must be between 0 and 1 (exclusive).",
     errorIterationLimit: "Iteration limit exceeds your plan's maximum.",
     errorAgentLimit: "Total agents exceed your plan's maximum.",
@@ -491,6 +533,36 @@ const en = {
     errorUpdate: "Error updating user data.",
     errorDelete: "Error deleting user.",
   },
+  liveRun: {
+    sidebar: {
+      statusLabel: "Status",
+      roundLabel: "Round {{round}}",
+      agentCount: "{{count}} agents",
+      cancelButton: "Cancel simulation",
+      cancelConfirm: "Cancel this simulation? This action cannot be undone.",
+      cancelSuccess: "Simulation cancelled.",
+      errorCancel: "Failed to cancel simulation.",
+      errorTitle: "Simulation error",
+      backToBoard: "Back to board",
+    },
+    networkSelector: {
+      title: "Select a network",
+      description: "This run contains multiple networks. Choose one to view.",
+      networkLabel: "Network {{id}}",
+      agentCount: "{{count}} agents",
+      waitingTitle: "Waiting for topology…",
+      waitingDescription: "The simulation is starting up. You will be redirected automatically.",
+    },
+    networkPanel: {
+      title: "Networks",
+      network: "Network {{index}}",
+      waiting: "Waiting for networks…",
+    },
+    selector: {
+      title: "Select a network",
+      description: "Choose a network from the sidebar panel to view its simulation.",
+    },
+  },
   enums: {
     silenceStrategy: {
       degroot: "DeGroot",
@@ -502,6 +574,12 @@ const en = {
       degroot: "DeGroot",
       memory: "Memory",
       memoryless: "Memoryless",
+    },
+    beliefGroup: {
+      q1: "Very low (< 0.25)",
+      q2: "Low-mid (0.25–0.5)",
+      q3: "Mid-high (0.5–0.75)",
+      q4: "Very high (≥ 0.75)",
     },
     cognitiveBias: {
       degroot: "None",

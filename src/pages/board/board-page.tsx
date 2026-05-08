@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { useOutletContext } from "react-router-dom";
 import type { DashboardOutletContext } from "@/app/layouts/dashboard/dashboard-layout";
 import { useSimulationStore } from "@/entities/simulation";
 import { SimulationConfigWizard } from "@/features/simulation-config";
@@ -8,7 +8,6 @@ import {
   SimulationHistoryPanel,
   useSimulationHistory,
 } from "@/features/simulation-history";
-import { SimulationRunView } from "@/features/simulation-stream";
 import { useTranslation } from "@/shared/i18n";
 
 /**
@@ -24,9 +23,6 @@ import { useTranslation } from "@/shared/i18n";
  */
 export function BoardPage() {
   const { t } = useTranslation();
-  const { runId } = useParams<{ runId?: string }>();
-  const isRunView = Boolean(runId);
-  const navigate = useNavigate();
 
   const { activePanel, setSidebarContent } = useOutletContext<DashboardOutletContext>();
 
@@ -50,42 +46,20 @@ export function BoardPage() {
     return { [storeRunId]: storeStatus };
   }, [storeRunId, storeStatus]);
 
-  // Load history when transitioning to "my-experiments" panel or on initial run view mount
+  // Load history when transitioning to "my-experiments" panel
   const prevPanel = useRef<string | null>(null);
-  const loadedForRunView = useRef(false);
   useEffect(() => {
-    if (isRunView && !loadedForRunView.current) {
-      loadedForRunView.current = true;
-      loadInitial();
-    } else if (
-      !isRunView &&
-      activePanel === "my-experiments" &&
-      prevPanel.current !== "my-experiments"
-    ) {
+    if (activePanel === "my-experiments" && prevPanel.current !== "my-experiments") {
       loadInitial();
     }
     prevPanel.current = activePanel;
-  }, [isRunView, activePanel, loadInitial]);
+  }, [activePanel, loadInitial]);
 
-  // Navigate back to /board when the user switches panel tabs while on a run view
-  const prevActivePanel = useRef(activePanel);
-  useEffect(() => {
-    if (isRunView && prevActivePanel.current !== activePanel) {
-      navigate("/board");
-    }
-    prevActivePanel.current = activePanel;
-  }, [isRunView, activePanel, navigate]);
-
-  // On run view, selecting a run navigates to it instead of showing RunDetailCard
   const handleSelectRun = useCallback(
     (id: string) => {
-      if (isRunView) {
-        navigate(`/board/simulation/${id}`);
-      } else {
-        selectRun(id);
-      }
+      selectRun(id);
     },
-    [isRunView, navigate, selectRun],
+    [selectRun],
   );
 
   const historyPanel = useMemo(
@@ -105,20 +79,13 @@ export function BoardPage() {
   );
 
   const sidebarContent = useMemo(() => {
-    // On run view the sidebar always shows history so the user can switch runs
-    if (isRunView) return historyPanel;
     if (activePanel === "new-simulation") return <SimulationConfigWizard />;
     return historyPanel;
-  }, [isRunView, activePanel, historyPanel]);
+  }, [activePanel, historyPanel]);
 
   useEffect(() => {
     setSidebarContent(sidebarContent);
   }, [sidebarContent, setSidebarContent]);
-
-  // ── Run view ──────────────────────────────────────────────────────────────
-  if (isRunView && runId) {
-    return <SimulationRunView runId={runId} />;
-  }
 
   // ── Board panels ──────────────────────────────────────────────────────────
   if (activePanel === "new-simulation") {

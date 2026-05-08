@@ -9,6 +9,7 @@ vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
     getWsTicket: vi.fn(),
     getTopology: vi.fn(),
+    getTopologyFull: vi.fn(),
   },
 }));
 
@@ -26,6 +27,7 @@ type MockStoreActions = {
   setTopology: ReturnType<typeof vi.fn>;
   updateFrame: ReturnType<typeof vi.fn>;
   setError: ReturnType<typeof vi.fn>;
+  topology: unknown;
 };
 
 type MockWebSocket = {
@@ -76,6 +78,7 @@ describe("createSimulationWsClient", () => {
       setTopology: vi.fn(),
       updateFrame: vi.fn(),
       setError: vi.fn(),
+      topology: null,
     };
 
     vi.mocked(useSimulationStore.getState).mockReturnValue(
@@ -231,18 +234,18 @@ describe("createSimulationWsClient", () => {
       }
 
       it("calls getTopology and setTopology on topology_ready", async () => {
-        vi.mocked(simulationsApi.getTopology).mockResolvedValue(MOCK_TOPOLOGY);
+        vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
 
         await triggerMessage(
           JSON.stringify({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" }),
         );
 
-        expect(simulationsApi.getTopology).toHaveBeenCalledWith(RUN_ID, "net-1");
+        expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(RUN_ID, "net-1");
         expect(mockStore.setTopology).toHaveBeenCalledWith(MOCK_TOPOLOGY);
       });
 
       it("sends init message to worker with agentCount on topology_ready", async () => {
-        vi.mocked(simulationsApi.getTopology).mockResolvedValue(MOCK_TOPOLOGY);
+        vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
 
         await triggerMessage(
           JSON.stringify({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" }),
@@ -284,7 +287,7 @@ describe("createSimulationWsClient", () => {
 
     describe("ws.onmessage — binary frame", () => {
       async function connectAndLoadTopology() {
-        vi.mocked(simulationsApi.getTopology).mockResolvedValue(MOCK_TOPOLOGY);
+        vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
         const client = createSimulationWsClient(RUN_ID);
         await client.connect();
         await mockWs.onmessage?.({

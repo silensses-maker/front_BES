@@ -13,7 +13,21 @@ export interface SimulationWsClient {
   disconnect: () => void;
 }
 
-export function createSimulationWsClient(runId: string): SimulationWsClient {
+/**
+ * Creates a WS client for the given run.
+ *
+ * @param runId     - Identifies the simulation run.
+ * @param networkId - When provided, only `topology_ready`, `network_started`,
+ *                    and `network_converged` events matching this networkId are
+ *                    processed; events for other networks are silently dropped.
+ *                    Pass `null` to accept the first `topology_ready` event
+ *                    regardless of networkId (used in "waiting-for-topology" mode
+ *                    before the caller knows which network to watch).
+ */
+export function createSimulationWsClient(
+  runId: string,
+  networkId: string | null = null,
+): SimulationWsClient {
   let ws: WebSocket | null = null;
   let worker: Worker | null = null;
   let topologyReady = false;
@@ -71,19 +85,49 @@ export function createSimulationWsClient(runId: string): SimulationWsClient {
     };
   }
 
+  /**
+   * Returns true when the event should be processed.
+   * Per-network events are gated by networkId when one is provided.
+   * When networkId is null we accept the first topology_ready from any network.
+   */
+  function isRelevantNetworkEvent(eventNetworkId: string): boolean {
+    if (networkId === null) return true;
+    return eventNetworkId === networkId;
+  }
+
   async function handleControlEvent(msg: WsControlEvent): Promise<void> {
     switch (msg.event) {
       case "topology_ready": {
+        if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setStatus("running");
-        const topology = await simulationsApi.getTopology(msg.runId, msg.networkId);
+        // Idempotency: if useSimulationStream's proactive REST fetch already
+        // populated the topology for this network, skip the WS-driven refetch.
+        // Otherwise the second setTopology re-triggers SimulationCanvas's
+        // useEffect and the user sees the graph "restart" mid-warmup.
+        const existing = store().topology;
+        if (existing !== null && existing.networkId === msg.networkId) {
+          worker?.postMessage({ type: "init", agentCount: existing.agentCount });
+          topologyReady = true;
+          break;
+        }
+        const topology = await simulationsApi.getTopologyFull(msg.runId, msg.networkId);
         if (topology) {
-          store().setTopology(topology);
+          // Re-check after the async gap: the proactive REST fetch in
+          // useSimulationStream may have won the race and already called
+          // setTopology. Calling it again with a new object reference — even
+          // with identical data — triggers SimulationCanvas's useEffect([topology])
+          // and restarts the layout warmup from scratch.
+          const raceWinner = store().topology;
+          if (raceWinner === null || raceWinner.networkId !== msg.networkId) {
+            store().setTopology(topology);
+          }
           worker?.postMessage({ type: "init", agentCount: topology.agentCount });
           topologyReady = true;
         }
         break;
       }
       case "network_started":
+        if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setStatus("running");
         break;
       case "network_converged":
