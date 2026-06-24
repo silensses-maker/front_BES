@@ -44,6 +44,7 @@ vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
     getTopology: vi.fn(),
     getTopologyFull: vi.fn(),
+    getFrames: vi.fn(),
   },
 }));
 
@@ -68,6 +69,7 @@ vi.mock("sonner", () => ({
 type MockWsClient = {
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
+  replayBuffer: ReturnType<typeof vi.fn>;
 };
 
 type MockStoreState = {
@@ -94,6 +96,7 @@ function makeMockClient(): MockWsClient {
   return {
     connect: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn(),
+    replayBuffer: vi.fn(),
   };
 }
 
@@ -238,6 +241,127 @@ describe("useSimulationStream", () => {
       });
 
       expect(mockClient.disconnect).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("proactive topology fetch (networkId provided)", () => {
+    const topo = { runId: "run-123", networkId: "net-1", agents: [], edges: [] };
+
+    it("fetches and sets topology when none is in the store yet", async () => {
+      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(topo as never);
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith("run-123", "net-1");
+      expect(mockSetTopology).toHaveBeenCalledWith(topo);
+    });
+
+    it("does not set topology when the fetch resolves null", async () => {
+      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(null);
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite a topology already present in the store", async () => {
+      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(topo as never);
+      mockGetState.mockReturnValue({ topology: { existing: true }, setTopology: mockSetTopology });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("logs an error when the topology fetch rejects", async () => {
+      vi.mocked(simulationsApi.getTopologyFull).mockRejectedValue(new Error("boom"));
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "useSimulationStream.getTopology",
+        expect.any(Error),
+      );
+    });
+  });
+
+  describe("REST frames replay fallback", () => {
+    function withCompletedState(overrides: Record<string, unknown> = {}) {
+      const state = {
+        status: "completed",
+        runId: "run-123",
+        topology: { runId: "run-123", agents: [] },
+        currentRound: 0,
+        finalRound: 10,
+        networkId: "net-1",
+        error: null,
+        reset: mockReset,
+        ...overrides,
+      };
+      vi.mocked(useSimulationStore).mockImplementation((selector) => selector(state as never));
+    }
+
+    it("replays persisted frames for a completed run that missed live frames", async () => {
+      const buffer = new ArrayBuffer(8);
+      vi.mocked(simulationsApi.getFrames).mockResolvedValue(buffer);
+      withCompletedState();
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).toHaveBeenCalledWith("run-123", "net-1", {
+        from: 0,
+        to: 10,
+      });
+      expect(mockClient.replayBuffer).toHaveBeenCalledWith(buffer);
+    });
+
+    it("does not replay while the run is still running", async () => {
+      withCompletedState({ status: "running" });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("no-ops when getFrames returns null", async () => {
+      vi.mocked(simulationsApi.getFrames).mockResolvedValue(null);
+      withCompletedState();
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(mockClient.replayBuffer).not.toHaveBeenCalled();
+    });
+
+    it("logs an error when the frames replay fetch rejects", async () => {
+      vi.mocked(simulationsApi.getFrames).mockRejectedValue(new Error("frames boom"));
+      withCompletedState();
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "useSimulationStream.framesReplayFallback",
+        expect.any(Error),
+      );
     });
   });
 });
