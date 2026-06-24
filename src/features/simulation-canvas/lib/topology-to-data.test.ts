@@ -61,7 +61,7 @@ describe("topologyToData", () => {
       expect(rawPoints).toHaveLength(1);
       expect(rawLinks).toHaveLength(0);
 
-      const point = rawPoints[0];
+      const point = rawPoints[0]!;
       expect(point.id).toBe("0");
       expect(point.initialBelief).toBe(0.7);
       expect(point.speaking).toBe(0);
@@ -108,9 +108,9 @@ describe("topologyToData", () => {
       });
 
       const { rawPoints } = topologyToData(topology);
-      expect(rawPoints[0].id).toBe("0");
-      expect(rawPoints[1].id).toBe("42");
-      expect(rawPoints[2].id).toBe("999");
+      expect(rawPoints[0]!.id).toBe("0");
+      expect(rawPoints[1]!.id).toBe("42");
+      expect(rawPoints[2]!.id).toBe("999");
     });
 
     it("converts numeric edge source/target to string", () => {
@@ -141,8 +141,8 @@ describe("topologyToData", () => {
       });
 
       const { rawLinks } = topologyToData(topology);
-      expect(rawLinks[0].source).toBe("0");
-      expect(rawLinks[0].target).toBe("1");
+      expect(rawLinks[0]!.source).toBe("0");
+      expect(rawLinks[0]!.target).toBe("1");
     });
   });
 
@@ -173,10 +173,10 @@ describe("topologyToData", () => {
 
     it("preserves influence and bias on links", () => {
       const { rawLinks } = topologyToData(topology);
-      expect(rawLinks[0].influence).toBe(0.5);
-      expect(rawLinks[0].bias).toBe(0);
-      expect(rawLinks[1].influence).toBe(0.3);
-      expect(rawLinks[1].bias).toBe(1);
+      expect(rawLinks[0]!.influence).toBe(0.5);
+      expect(rawLinks[0]!.bias).toBe(0);
+      expect(rawLinks[1]!.influence).toBe(0.3);
+      expect(rawLinks[1]!.bias).toBe(1);
     });
 
     it("initialises speaking to 0 for every point", () => {
@@ -184,6 +184,81 @@ describe("topologyToData", () => {
       for (const point of rawPoints) {
         expect(point.speaking).toBe(0);
       }
+    });
+  });
+
+  describe("self-loop detection", () => {
+    it("marks an agent with selfLoop=1 when it has a self-referencing edge", () => {
+      const topology = makeTopology({
+        agentCount: 2,
+        agents: [
+          {
+            index: 0,
+            name: null,
+            initialBelief: 0.5,
+            toleranceRadius: 0,
+            toleranceOffset: 0,
+            silenceStrategy: 0,
+            silenceEffect: 0,
+          },
+          {
+            index: 1,
+            name: null,
+            initialBelief: 0.5,
+            toleranceRadius: 0,
+            toleranceOffset: 0,
+            silenceStrategy: 0,
+            silenceEffect: 0,
+          },
+        ],
+        edgeCount: 2,
+        edges: [
+          { source: 0, target: 0, influence: 0.5, bias: 0 },
+          { source: 0, target: 1, influence: 0.3, bias: 0 },
+        ],
+      });
+
+      const { rawPoints } = topologyToData(topology);
+      expect(rawPoints[0]!.selfLoop).toBe(1);
+      expect(rawPoints[1]!.selfLoop).toBe(0);
+    });
+
+    it("marks all agents with selfLoop=0 when no self-loops exist", () => {
+      const topology = makeTopology({
+        agentCount: 2,
+        agents: [
+          {
+            index: 0,
+            name: null,
+            initialBelief: 0.2,
+            toleranceRadius: 0,
+            toleranceOffset: 0,
+            silenceStrategy: 0,
+            silenceEffect: 0,
+          },
+          {
+            index: 1,
+            name: null,
+            initialBelief: 0.8,
+            toleranceRadius: 0,
+            toleranceOffset: 0,
+            silenceStrategy: 0,
+            silenceEffect: 0,
+          },
+        ],
+        edgeCount: 1,
+        edges: [{ source: 0, target: 1, influence: 0.5, bias: 0 }],
+      });
+
+      const { rawPoints } = topologyToData(topology);
+      for (const point of rawPoints) {
+        expect(point.selfLoop).toBe(0);
+      }
+    });
+
+    it("includes selfLoop in pointIncludeColumns", () => {
+      const { dataPrepConfig } = topologyToData(makeTopology());
+      expect(dataPrepConfig.points.pointIncludeColumns).toContain("selfLoop");
     });
   });
 
@@ -208,7 +283,7 @@ describe("topologyToData", () => {
       });
 
       const { rawPoints, dataPrepConfig } = topologyToData(topology);
-      expect(rawPoints[0]).not.toHaveProperty("name");
+      expect(rawPoints[0]!).not.toHaveProperty("name");
       expect(dataPrepConfig.points.pointIncludeColumns).not.toContain("name");
     });
 
@@ -239,8 +314,8 @@ describe("topologyToData", () => {
       });
 
       const { rawPoints, dataPrepConfig } = topologyToData(topology);
-      expect(rawPoints[0].name).toBe("Alice");
-      expect(rawPoints[1].name).toBeNull();
+      expect(rawPoints[0]!.name).toBe("Alice");
+      expect(rawPoints[1]!.name).toBeNull();
       expect(dataPrepConfig.points.pointIncludeColumns).toContain("name");
     });
   });
@@ -249,7 +324,7 @@ describe("topologyToData", () => {
     it("declares pointIncludeColumns with required downstream fields (no names)", () => {
       const { dataPrepConfig } = topologyToData(makeTopology());
       expect(dataPrepConfig.points.pointIncludeColumns).toEqual(
-        expect.arrayContaining(["initialBelief", "silenceStrategy", "silenceEffect"]),
+        expect.arrayContaining(["initialBelief", "silenceStrategy", "silenceEffect", "selfLoop"]),
       );
       // `name` only included when at least one agent has a non-null name
       expect(dataPrepConfig.points.pointIncludeColumns).not.toContain("name");

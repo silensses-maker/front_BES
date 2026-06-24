@@ -15,6 +15,9 @@ import { useSimulationConfig } from "./use-simulation-config";
 
 vi.mock("react-router-dom", () => ({ useNavigate: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("@/app/providers/simulation-ws-provider", () => ({
+  useSimulationWsManager: vi.fn(() => ({ prepareRun: vi.fn() })),
+}));
 vi.mock("@/entities/simulation", () => ({ useSimulationStore: vi.fn() }));
 vi.mock("@/entities/user", () => ({ useAuthStore: vi.fn() }));
 vi.mock("@/shared/api/backend", () => ({

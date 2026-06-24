@@ -178,4 +178,35 @@ export const simulationsApi = {
     const { data } = await backendClient.post<WsTicketResponse>(`/simulations/${runId}/ws-ticket`);
     return data;
   },
+
+  /**
+   * Fetches persisted binary frames. Body is a concatenation of slices in the
+   * same wire format the WebSocket emits — the existing worker parser handles
+   * it without changes.
+   *
+   * @returns ArrayBuffer with concatenated slices, or `null` when the run was
+   *          created without `persistFrames: true` (404 `frames_not_persisted`)
+   *          or the requested round is outside the persisted range.
+   */
+  async getFrames(
+    runId: string,
+    networkId: string,
+    query: { round: number | "last" } | { from: number; to: number },
+  ): Promise<ArrayBuffer | null> {
+    const params: Record<string, string | number> =
+      "round" in query
+        ? { round: query.round }
+        : { from: query.from, to: query.to };
+
+    const response = await backendClient.get<ArrayBuffer>(
+      `/simulations/${runId}/networks/${networkId}/frames`,
+      {
+        params,
+        responseType: "arraybuffer",
+        validateStatus: (s) => s === 200 || s === 404,
+      },
+    );
+    if (response.status === 404) return null;
+    return response.data;
+  },
 };

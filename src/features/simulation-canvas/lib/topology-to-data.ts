@@ -31,12 +31,17 @@ export interface PreparedDataInput {
 export function topologyToData(topology: TopologyResponse): PreparedDataInput {
   const hasNames = topology.agents.some((agent) => agent.name != null);
 
+  const selfLoopSet = new Set(
+    topology.edges.filter((e) => e.source === e.target).map((e) => e.source),
+  );
+
   const rawPoints: Record<string, unknown>[] = topology.agents.map((agent) => ({
     id: String(agent.index),
     initialBelief: agent.initialBelief,
     speaking: 0,
     silenceStrategy: agent.silenceStrategy,
     silenceEffect: agent.silenceEffect,
+    selfLoop: selfLoopSet.has(agent.index) ? 1 : 0,
     ...(hasNames ? { name: agent.name ?? null } : {}),
   }));
 
@@ -53,6 +58,7 @@ export function topologyToData(topology: TopologyResponse): PreparedDataInput {
     "initialBelief",
     "silenceStrategy",
     "silenceEffect",
+    "selfLoop",
     ...(hasNames ? ["name"] : []),
   ];
 

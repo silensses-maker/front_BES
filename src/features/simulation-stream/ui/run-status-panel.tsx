@@ -5,13 +5,14 @@ import type { SimulationStatus } from "@/entities/simulation";
 import { useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { logger } from "@/shared/lib/logger";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Separator } from "@/shared/ui/separator";
+import { NodeInspectorCard } from "./node-inspector-card";
 
-// ─── Status display helpers (mirrors simulation-run-view.tsx) ─────────────────
+// ─── Status display helpers ───────────────────────────────────────────────────
 
 const STATUS_DOT: Record<SimulationStatus, string> = {
   idle: "bg-muted-foreground",
@@ -41,9 +42,6 @@ interface RunStatusPanelProps {
  * Status panel injected into DashboardLayout's sidebar slot while a live-run
  * page is mounted. Reads directly from the simulation store because it is a
  * status-display primitive consumed by the layout, not a child of LiveRunPage.
- *
- * Mirrors the FSD shape of `SimulationHistoryPanel` (also a feature-slice UI
- * component injected into the same sidebar slot from the board page).
  */
 export function RunStatusPanel({ runId }: RunStatusPanelProps) {
   const { t } = useTranslation();
@@ -71,7 +69,7 @@ export function RunStatusPanel({ runId }: RunStatusPanelProps) {
             toast.success(t("liveRun.sidebar.cancelSuccess"));
             navigate("/board");
           } catch (err) {
-            logger.error("RunStatusPanel.cancel", err);
+            void err;
             toast.error(t("liveRun.sidebar.errorCancel"));
           } finally {
             setCancelling(false);
@@ -82,67 +80,89 @@ export function RunStatusPanel({ runId }: RunStatusPanelProps) {
   }, [runId, navigate, t]);
 
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      {/* Status row */}
-      <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[status])} />
-        <span className="font-sans text-sm font-medium text-foreground">
-          {t(STATUS_KEYS[status] as Parameters<typeof t>[0])}
-        </span>
+    <Card className="flex h-full flex-col overflow-hidden p-0">
+      {/* ── Fixed header ──────────────────────────────────────── */}
+      <div className="shrink-0 p-4">
+        <div className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[status])} />
+          <span className="font-sans text-sm font-medium text-foreground">
+            {t(STATUS_KEYS[status] as Parameters<typeof t>[0])}
+          </span>
+        </div>
       </div>
 
       <Separator />
 
-      {/* Round counter */}
-      {currentRound > 0 && (
-        <p className="font-sans text-xs text-muted-foreground">
-          {t("liveRun.sidebar.roundLabel", { round: String(currentRound) })}
-        </p>
-      )}
+      {/* ── Scrollable body ───────────────────────────────────── */}
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="flex flex-col gap-3 p-4">
+          {currentRound > 0 && (
+            <p className="font-sans text-xs text-muted-foreground">
+              {t("liveRun.sidebar.roundLabel", { round: String(currentRound) })}
+            </p>
+          )}
 
-      {/* Agent count */}
-      {agentCount !== null && (
-        <p className="font-sans text-xs text-muted-foreground">
-          {t("liveRun.sidebar.agentCount", { count: String(agentCount) })}
-        </p>
-      )}
+          {agentCount !== null && (
+            <p className="font-sans text-xs text-muted-foreground">
+              {t("liveRun.sidebar.agentCount", { count: String(agentCount) })}
+            </p>
+          )}
 
-      {/* Run ID chip */}
-      <p className="font-mono text-xs text-muted-foreground/60">{runId.slice(0, 8)}</p>
+          <p className="font-mono text-xs text-muted-foreground/60">{runId.slice(0, 8)}</p>
 
-      <Separator />
-
-      {/* Cancel button — only when active */}
-      {cancellable && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={cancelling}
-          onClick={handleCancel}
-        >
-          {t("liveRun.sidebar.cancelButton")}
-        </Button>
-      )}
-
-      {/* Error state */}
-      {status === "error" && (
-        <div className="flex flex-col gap-2">
-          <p className="font-sans text-xs font-medium text-destructive">
-            {t("liveRun.sidebar.errorTitle")}
-          </p>
-          {error && <p className="font-mono text-xs text-muted-foreground">{error}</p>}
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/board")}>
-            {t("liveRun.sidebar.backToBoard")}
-          </Button>
+          <NodeInspectorCard />
         </div>
-      )}
+      </ScrollArea>
 
-      {/* Back-to-board when done */}
-      {isDone && (
-        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/board")}>
-          {t("liveRun.sidebar.backToBoard")}
-        </Button>
+      {/* ── Fixed footer — action buttons ─────────────────────── */}
+      {(cancellable || isDone || status === "error") && (
+        <>
+          <Separator />
+          <div className="shrink-0 p-4">
+            {cancellable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={cancelling}
+                onClick={handleCancel}
+              >
+                {t("liveRun.sidebar.cancelButton")}
+              </Button>
+            )}
+
+            {status === "error" && (
+              <div className="flex flex-col gap-2">
+                <p className="font-sans text-xs font-medium text-destructive">
+                  {t("liveRun.sidebar.errorTitle")}
+                </p>
+                {error && <p className="font-mono text-xs text-muted-foreground">{error}</p>}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate("/board")}
+                >
+                  {t("liveRun.sidebar.backToBoard")}
+                </Button>
+              </div>
+            )}
+
+            {isDone && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => navigate("/board")}
+              >
+                {t("liveRun.sidebar.backToBoard")}
+              </Button>
+            )}
+          </div>
+        </>
       )}
     </Card>
   );

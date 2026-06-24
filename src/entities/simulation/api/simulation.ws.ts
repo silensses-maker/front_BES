@@ -1,20 +1,24 @@
 import { simulationsApi } from "@/shared/api/backend";
+import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { useSimulationStore } from "../model/simulation.store";
 import type { WsControlEvent } from "../types/simulation.types";
 
-const MAX_RECONNECT_ATTEMPTS = 3;
-
-// Codes that signal ticket rejection — do not retry
-const NO_RETRY_CODES = new Set([1000, 1008]);
-
 export interface SimulationWsClient {
   connect: () => Promise<void>;
   disconnect: () => void;
+  /**
+   * Feeds a binary buffer (one or more concatenated slices, same wire format as
+   * the WS) into the worker. Used by the REST replay fallback when frames were
+   * missed during the WS handshake window. No-op until the worker has been
+   * initialized via `topology_ready`.
+   */
+  replayBuffer: (buffer: ArrayBuffer) => void;
 }
 
 /**
- * Creates a WS client for the given run.
+ * Creates a WS handler for the given run that delegates to the singleton
+ * SimulationWsManager.
  *
  * @param runId     - Identifies the simulation run.
  * @param networkId - When provided, only `topology_ready`, `network_started`,
@@ -23,67 +27,21 @@ export interface SimulationWsClient {
  *                    Pass `null` to accept the first `topology_ready` event
  *                    regardless of networkId (used in "waiting-for-topology" mode
  *                    before the caller knows which network to watch).
+ * @param manager   - The singleton SimulationWsManager from context.
  */
 export function createSimulationWsClient(
   runId: string,
   networkId: string | null = null,
+  manager: SimulationWsManager,
 ): SimulationWsClient {
-  let ws: WebSocket | null = null;
   let worker: Worker | null = null;
   let topologyReady = false;
-  let reconnectAttempts = 0;
-  let destroyed = false;
+  // Frames that arrive before the worker is initialized (topology not yet
+  // loaded). Drained into the worker the moment topologyReady becomes true.
+  let pendingFrames: ArrayBuffer[] = [];
+  let unsubTopology: (() => void) | null = null;
 
   const store = useSimulationStore.getState;
-
-  async function openConnection(): Promise<void> {
-    const { wsTicket } = await simulationsApi.getWsTicket(runId);
-
-    const baseUrl = import.meta.env.PUBLIC_BACKEND_URL ?? "http://localhost:9000";
-    const wsBase = baseUrl.replace(/^http/, "ws");
-    const url = `${wsBase}/simulations/${runId}/stream?ticket=${wsTicket}`;
-
-    ws = new WebSocket(url);
-
-    ws.onopen = () => {
-      reconnectAttempts = 0;
-      store().setStatus("running");
-    };
-
-    ws.onmessage = async (event: MessageEvent) => {
-      if (typeof event.data === "string") {
-        handleControlEvent(JSON.parse(event.data) as WsControlEvent);
-        return;
-      }
-
-      // Drop binary frames until topology is loaded (worker is not initialized yet)
-      if (!topologyReady) return;
-
-      const buffer: ArrayBuffer =
-        event.data instanceof Blob ? await event.data.arrayBuffer() : (event.data as ArrayBuffer);
-
-      worker?.postMessage({ type: "frame", buffer }, [buffer]);
-    };
-
-    ws.onerror = () => {
-      // onclose fires right after onerror, handle reconnect there
-    };
-
-    ws.onclose = (event: CloseEvent) => {
-      if (destroyed) return;
-      if (NO_RETRY_CODES.has(event.code)) return;
-
-      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts++;
-        store().setStatus("connecting");
-        openConnection().catch(() => {
-          store().setError(`WebSocket reconnect failed after ${MAX_RECONNECT_ATTEMPTS} attempts`);
-        });
-      } else {
-        store().setError(`WebSocket closed unexpectedly (code ${event.code})`);
-      }
-    };
-  }
 
   /**
    * Returns true when the event should be processed.
@@ -95,6 +53,13 @@ export function createSimulationWsClient(
     return eventNetworkId === networkId;
   }
 
+  function drainPendingFrames(): void {
+    for (const buf of pendingFrames) {
+      worker?.postMessage({ type: "frame", buffer: buf }, [buf]);
+    }
+    pendingFrames = [];
+  }
+
   async function handleControlEvent(msg: WsControlEvent): Promise<void> {
     switch (msg.event) {
       case "topology_ready": {
@@ -102,27 +67,24 @@ export function createSimulationWsClient(
         store().setStatus("running");
         // Idempotency: if useSimulationStream's proactive REST fetch already
         // populated the topology for this network, skip the WS-driven refetch.
-        // Otherwise the second setTopology re-triggers SimulationCanvas's
-        // useEffect and the user sees the graph "restart" mid-warmup.
         const existing = store().topology;
         if (existing !== null && existing.networkId === msg.networkId) {
-          worker?.postMessage({ type: "init", agentCount: existing.agentCount });
-          topologyReady = true;
+          if (!topologyReady) {
+            worker?.postMessage({ type: "init", agentCount: existing.agentCount });
+            topologyReady = true;
+            drainPendingFrames();
+          }
           break;
         }
         const topology = await simulationsApi.getTopologyFull(msg.runId, msg.networkId);
         if (topology) {
-          // Re-check after the async gap: the proactive REST fetch in
-          // useSimulationStream may have won the race and already called
-          // setTopology. Calling it again with a new object reference — even
-          // with identical data — triggers SimulationCanvas's useEffect([topology])
-          // and restarts the layout warmup from scratch.
           const raceWinner = store().topology;
           if (raceWinner === null || raceWinner.networkId !== msg.networkId) {
             store().setTopology(topology);
           }
           worker?.postMessage({ type: "init", agentCount: topology.agentCount });
           topologyReady = true;
+          drainPendingFrames();
         }
         break;
       }
@@ -131,7 +93,9 @@ export function createSimulationWsClient(
         store().setStatus("running");
         break;
       case "network_converged":
-        // per-network event; run-level status stays 'running' until run_completed
+        if (!isRelevantNetworkEvent(msg.networkId)) break;
+        store().setNetworkId(msg.networkId);
+        store().setFinalRound(msg.finalRound);
         break;
       case "run_completed":
         store().setStatus("completed");
@@ -142,10 +106,36 @@ export function createSimulationWsClient(
     }
   }
 
+  function isFrameBinary(buffer: ArrayBuffer): boolean {
+    // Frame binary: 36-byte header + 9 × numberOfAgents bytes payload.
+    // Topology binary: 32-byte header + variable CSR payload. Both share the
+    // numberOfAgents int32 at offset 24, so we use the total-size identity from
+    // openapi.yaml § "Discriminating binaries" to tell them apart.
+    if (buffer.byteLength < 36) return false;
+    const numberOfAgents = new DataView(buffer).getInt32(24, true);
+    return buffer.byteLength === 36 + 9 * numberOfAgents;
+  }
+
+  function handleBinaryFrame(buffer: ArrayBuffer): void {
+    if (!isFrameBinary(buffer)) {
+      // WS topology binary (CSR adjacency). Agent properties (name, beliefs,
+      // strategies) still come from REST GET /topology, so we skip the CSR
+      // here. If we ever need WS-driven edges, parse it on the main thread —
+      // never feed it to the worker (the worker assumes 36-byte frame headers).
+      return;
+    }
+    if (!topologyReady) {
+      // Worker not initialized yet — buffer frame until topology arrives.
+      pendingFrames.push(buffer);
+      return;
+    }
+    worker?.postMessage({ type: "frame", buffer }, [buffer]);
+  }
+
   return {
     connect: async () => {
-      destroyed = false;
       topologyReady = false;
+      pendingFrames = [];
 
       worker = new Worker(
         new URL("../../../shared/workers/simulation-frame.worker.ts", import.meta.url),
@@ -156,16 +146,42 @@ export function createSimulationWsClient(
 
       store().setRunId(runId);
       store().setStatus("connecting");
-      await openConnection();
+
+      // Handle reconnects: topology_ready fires only once per network lifetime.
+      // If topology lands in the store from the proactive REST fetch before (or
+      // instead of) the WS event, this subscription catches it and initialises
+      // the worker so binary frames are not silently dropped.
+      unsubTopology = useSimulationStore.subscribe((state) => {
+        if (topologyReady) return;
+        const topo = state.topology;
+        if (topo === null) return;
+        if (networkId !== null && topo.networkId !== networkId) return;
+        worker?.postMessage({ type: "init", agentCount: topo.agentCount });
+        topologyReady = true;
+        drainPendingFrames();
+        unsubTopology?.();
+        unsubTopology = null;
+      });
+
+      // Register with the manager — events and binary frames come through callbacks
+      manager.subscribe(runId, (event: WsControlEvent) => {
+        handleControlEvent(event).catch(() => {});
+      }, handleBinaryFrame);
     },
 
     disconnect: () => {
-      destroyed = true;
-      ws?.close(1000);
-      ws = null;
+      unsubTopology?.();
+      unsubTopology = null;
+      manager.unsubscribe(runId);
       worker?.terminate();
       worker = null;
       topologyReady = false;
+      pendingFrames = [];
+    },
+
+    replayBuffer: (buffer: ArrayBuffer) => {
+      if (!topologyReady || !worker) return;
+      worker.postMessage({ type: "replay-buffer", buffer }, [buffer]);
     },
   };
 }

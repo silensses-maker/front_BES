@@ -31,9 +31,13 @@ const mockFrame: MergedFrame = {
 const initialState: SimulationState = {
   status: "idle",
   runId: null,
+  networkId: null,
   topology: null,
   currentRound: 0,
+  latestFrame: null,
+  finalRound: null,
   error: null,
+  selectedAgentIndex: null,
 };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

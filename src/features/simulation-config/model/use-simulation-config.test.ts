@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import { useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
@@ -29,6 +30,10 @@ import { useSimulationConfig } from "./use-simulation-config";
 
 vi.mock("react-router-dom", () => ({
   useNavigate: vi.fn(),
+}));
+
+vi.mock("@/app/providers/simulation-ws-provider", () => ({
+  useSimulationWsManager: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -81,6 +86,10 @@ vi.mock("@/shared/lib/simulation-export", () => ({
 const mockNavigate = vi.fn();
 const mockSetRunId = vi.fn();
 const mockSetStatus = vi.fn();
+const mockPrepareRun = vi.fn();
+const mockWsManager = {
+  prepareRun: mockPrepareRun,
+} as unknown as ReturnType<typeof useSimulationWsManager>;
 
 const mockSimCreated: SimCreated = {
   runId: "run-abc123",
@@ -169,6 +178,7 @@ function setupMocks(opts: { maxAgents?: number | null; maxIterations?: number | 
   const { maxAgents = null, maxIterations = null } = opts;
 
   vi.mocked(useNavigate).mockReturnValue(mockNavigate);
+  vi.mocked(useSimulationWsManager).mockReturnValue(mockWsManager);
   vi.mocked(useTranslation).mockReturnValue({
     t: (key: string) => key,
   } as unknown as ReturnType<typeof useTranslation>);

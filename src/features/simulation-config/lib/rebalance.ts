@@ -72,7 +72,7 @@ export function rebalanceCounts<T extends { count: number }>(rows: T[], newTotal
     if (i === n - 1) {
       return { ...row, count: 1 + Math.max(0, surplus - assigned) };
     }
-    const newDelta = Math.max(0, Math.round((oldDeltas[i] * surplus) / oldSurplus));
+    const newDelta = Math.max(0, Math.round(((oldDeltas[i] ?? 0) * surplus) / oldSurplus));
     assigned += newDelta;
     return { ...row, count: 1 + newDelta };
   });

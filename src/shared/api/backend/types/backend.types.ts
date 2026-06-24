@@ -6,6 +6,7 @@ export type SaveMode = 0 | 1 | 2;
 export type SilenceStrategy = 0 | 1 | 2 | 3;
 export type SilenceEffect = 0 | 1 | 2;
 export type CognitiveBias = 0 | 1 | 2 | 3 | 4;
+export type FrameRetention = "ephemeral" | "persistent";
 
 // ─── Common ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,8 @@ export interface GeneratedRunRequest {
   saveMode: SaveMode;
   agentTypes: AgentType[];
   biasTypes: BiasType[];
+  persistFrames?: boolean;
+  frameRetention?: FrameRetention;
 }
 
 export interface CustomRunRequest {
@@ -97,6 +100,8 @@ export interface CustomRunRequest {
   saveMode: SaveMode;
   agents: AgentSpec[];
   edges: EdgeSpec[];
+  persistFrames?: boolean;
+  frameRetention?: FrameRetention;
 }
 
 // ─── Simulations — response shapes ───────────────────────────────────────────

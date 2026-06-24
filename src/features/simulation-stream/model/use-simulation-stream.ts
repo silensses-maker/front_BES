@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import type { SimulationWsClient } from "@/entities/simulation";
 import { createSimulationWsClient, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
@@ -18,6 +19,7 @@ import { logger } from "@/shared/lib/logger";
  */
 export function useSimulationStream(runId: string, networkId: string | null = null) {
   const { t } = useTranslation();
+  const manager = useSimulationWsManager();
   const clientRef = useRef<SimulationWsClient | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -25,6 +27,8 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
   const storeRunId = useSimulationStore((s) => s.runId);
   const storeTopology = useSimulationStore((s) => s.topology);
   const currentRound = useSimulationStore((s) => s.currentRound);
+  const finalRound = useSimulationStore((s) => s.finalRound);
+  const storeNetworkId = useSimulationStore((s) => s.networkId);
   const error = useSimulationStore((s) => s.error);
   const reset = useSimulationStore((s) => s.reset);
 
@@ -37,7 +41,7 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
 
   useEffect(() => {
     reset();
-    clientRef.current = createSimulationWsClient(runId, networkId);
+    clientRef.current = createSimulationWsClient(runId, networkId, manager);
 
     const connect = async () => {
       setIsConnecting(true);
@@ -59,21 +63,18 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
 
     connect();
 
-    // Refresh resilience: the backend only emits `topology_ready` once per
-    // network lifetime. On page refresh / reconnect the WS will not re-fire
-    // that event, so we proactively fetch the topology if we have a networkId.
-    // The store check below guards against the race where topology_ready also
-    // triggers a fetch — see simulation.ws.ts for the symmetric post-await guard.
+    // Proactive topology fetch: the persistent WS replays topology_ready on
+    // subscribe, but a REST prefetch races it and ensures the worker is
+    // initialised even if the WS replay is delayed (page refresh, reconnect).
     let topologyCancelled = false;
     if (networkId !== null) {
       simulationsApi
         .getTopologyFull(runId, networkId)
-        .then((topology) => {
-          if (topologyCancelled || topology === null) return;
-          // Only set if the store doesn't already have it (WS may have won the race)
+        .then((topo) => {
+          if (topologyCancelled || topo === null) return;
           const current = useSimulationStore.getState().topology;
           if (current === null) {
-            useSimulationStore.getState().setTopology(topology);
+            useSimulationStore.getState().setTopology(topo);
           }
         })
         .catch((err: unknown) => {
@@ -86,11 +87,36 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
       topologyCancelled = true;
       clientRef.current?.disconnect();
       clientRef.current = null;
-      // Clear the store on unmount so the next simulation's first render
-      // doesn't read stale topology/status from this session.
       reset();
     };
-  }, [runId, networkId, reset, t]);
+  }, [runId, networkId, manager, reset, t]);
+
+  // REST fallback: when the simulation completes but currentRound is still 0,
+  // all binary frames arrived before this component mounted (race condition on
+  // small/fast simulations). Replay the full frame history via the REST endpoint
+  // so the Panel C charts are populated. Requires persistFrames:true (already
+  // hardcoded in use-simulation-config.ts). Silently no-ops on 404 (DEBUG runs
+  // without frame persistence, or ephemeral frames already expired).
+  useEffect(() => {
+    if (status !== "completed") return;
+    if (currentRound !== 0) return;
+    if (finalRound == null || finalRound === 0) return;
+    if (storeNetworkId === null) return;
+    // Only fall back if topology was received — confirms WS was live and the
+    // missed frames are due to a race, not a premature call before the run ends.
+    if (topology === null) return;
+    if (!clientRef.current) return;
+
+    const client = clientRef.current;
+    simulationsApi
+      .getFrames(runId, storeNetworkId, { from: 0, to: finalRound })
+      .then((buffer) => {
+        if (buffer !== null) client.replayBuffer(buffer);
+      })
+      .catch((err: unknown) => {
+        logger.error("useSimulationStream.framesReplayFallback", err);
+      });
+  }, [status, currentRound, finalRound, storeNetworkId, topology, runId]);
 
   return { status, topology, currentRound, error, isConnecting };
 }

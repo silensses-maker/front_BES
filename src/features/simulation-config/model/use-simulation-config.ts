@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import { useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
@@ -153,6 +154,7 @@ function enrichGeneratedPatch(
 export function useSimulationConfig() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const wsManager = useSimulationWsManager();
   const setRunId = useSimulationStore((s) => s.setRunId);
   const setStatus = useSimulationStore((s) => s.setStatus);
   const user = useAuthStore((s) => s.user);
@@ -285,6 +287,8 @@ export function useSimulationConfig() {
             biasType: row.cognitiveBias as 0 | 1 | 2 | 3,
             count: row.count,
           })),
+          persistFrames: true,
+          frameRetention: "ephemeral" as const,
         };
         result = await simulationsApi.startGenerated(body);
       } else {
@@ -321,10 +325,18 @@ export function useSimulationConfig() {
             saveMode: customValues.saveMode,
             agents: customValues.agents,
             edges: customValues.edges,
+            persistFrames: true,
+            frameRetention: "ephemeral",
           });
         }
       }
 
+      // Eager WS subscribe — closes the race window between POST returning
+      // and useSimulationStream mounting on the live-run page. The OpenAPI
+      // explicitly recommends sending subscribe before the simulation starts.
+      // Any events/binary frames that arrive in the meantime are buffered by
+      // the manager and drained when useSimulationStream calls subscribe().
+      wsManager.prepareRun(result.runId);
       setRunId(result.runId);
       setStatus("running");
       navigate(`/board/simulation/${result.runId}`);

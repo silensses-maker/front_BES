@@ -11,9 +11,22 @@ import { useSimulationStream } from "./use-simulation-stream";
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
 // Hoisted refs so vi.mock factory (which is hoisted) can reference them.
-const { mockSetTopology, mockGetState } = vi.hoisted(() => ({
+const { mockSetTopology, mockGetState, mockManager } = vi.hoisted(() => ({
   mockSetTopology: vi.fn(),
   mockGetState: vi.fn(),
+  // Stable reference: the real provider returns a singleton via useMemo, so the
+  // mock must too. Returning a fresh object per render would make `manager`
+  // change identity every render, re-firing the hook's effect (manager is in
+  // its deps) → setIsConnecting → re-render → infinite loop.
+  mockManager: {
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    prepareRun: vi.fn(),
+  },
+}));
+
+vi.mock("@/app/providers/simulation-ws-provider", () => ({
+  useSimulationWsManager: vi.fn(() => mockManager),
 }));
 
 vi.mock("@/entities/simulation", () => {
@@ -124,7 +137,7 @@ describe("useSimulationStream", () => {
         renderHook(() => useSimulationStream("run-abc"));
       });
 
-      expect(createSimulationWsClient).toHaveBeenCalledWith("run-abc", null);
+      expect(createSimulationWsClient).toHaveBeenCalledWith("run-abc", null, mockManager);
     });
 
     it("calls client.connect() after creating the client", async () => {

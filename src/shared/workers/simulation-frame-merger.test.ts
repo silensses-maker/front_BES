@@ -17,8 +17,6 @@ function makePartition(
   return {
     runId: "72057594037927936",
     networkId: "01020304-0506-0708-090a-0b0c0d0e0f10",
-    round: overrides.round,
-    startsAt: overrides.startsAt,
     agentCount: count,
     publicBelief: new Float32Array(overrides.pub ?? Array(count).fill(0.5)),
     privateBelief: new Float32Array(overrides.priv ?? Array(count).fill(0.5)),

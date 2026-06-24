@@ -8,6 +8,7 @@ import { Cosmograph, prepareCosmographData } from "@cosmograph/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { SimulationStatus } from "@/entities/simulation";
+import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
@@ -37,8 +38,12 @@ const BASE_CONFIG: CosmographConfig = {
   pointColorPalette: [...OPINION_PALETTE],
   pointSizeStrategy: "single",
   pointDefaultSize: 8,
+  pointShapeBy: "selfLoop",
   linkColorStrategy: "single",
   linkDefaultColor: "#cccccc",
+  linkGreyoutOpacity: 0.1,
+  curvedLinks: true,
+  curvedLinkWeight: 0.3,
   backgroundColor: "#0a0a0a",
   disableLogging: true,
   enableSimulation: true,
@@ -86,6 +91,12 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     [t],
   );
 
+  const setSelectedAgentIndex = useSimulationStore((s) => s.setSelectedAgentIndex);
+  const selectedAgentIndex = useSimulationStore((s) => s.selectedAgentIndex);
+  // Maps Cosmograph's sequential internal index → agent.index from topology.
+  // Rebuilt each time topology is processed (same useEffect below).
+  const agentIndexMapRef = useRef<number[]>([]);
+
   const cosmographRef = useRef<CosmographRef>(undefined);
   const layoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clusterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,6 +107,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     null,
   );
   const [clusterMode, setClusterMode] = useState<ClusterMode | null>(null);
+  const [linksHidden, setLinksHidden] = useState(false);
 
   // Declarative config overlay applied on top of BASE_CONFIG in JSX.
   // Controlled exclusively through React state — no imperative setConfig calls.
@@ -118,6 +130,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
       setPrepResult(null);
       setClusterMode(null);
       setCanvasOverride({});
+      setSelectedAgentIndex(null);
       return;
     }
 
@@ -128,6 +141,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     const run = async () => {
       try {
         const { rawPoints, rawLinks, dataPrepConfig } = topologyToData(topology);
+        agentIndexMapRef.current = topology.agents.map((a) => a.index);
         const result = await prepareCosmographData(dataPrepConfig, rawPoints, rawLinks);
         if (cancelled) return;
         if (!result) {
@@ -147,7 +161,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     return () => {
       cancelled = true;
     };
-  }, [topology]);
+  }, [topology, setSelectedAgentIndex]);
 
   // ─── Layout timer — freeze after LAYOUT_DURATION_MS ──────────────────────
 
@@ -206,6 +220,11 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
           pointClusterBy,
           showClusterLabels: true,
           preservePointPositionsOnDataUpdate: false,
+          // Pull nodes strongly towards their cluster centroid.
+          // Default simulationCluster is 0.1 which is too weak to produce
+          // visible separation; 0.7 gives tight, clearly distinct groups.
+          simulationCluster: 0.7,
+          simulationGravity: 0.25,
         });
 
         clusterStartTimerRef.current = setTimeout(() => {
@@ -222,7 +241,11 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
           clusterTimerRef.current = null;
         }, CLUSTER_REANIMATE_MS);
       } else {
-        setCanvasOverride({ ...FREEZE_FLAGS });
+        setCanvasOverride({
+          ...FREEZE_FLAGS,
+          simulationCluster: 0.1,
+          simulationGravity: BASE_CONFIG.simulationGravity,
+        });
       }
     },
     [clusterMode, prepResult],
@@ -239,6 +262,19 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
       }
     };
   }, []);
+
+  // ─── Node selection greyout ───────────────────────────────────────────────
+  // Tell Cosmograph which point is selected so it dims everything else.
+  // Works regardless of link visibility.
+  useEffect(() => {
+    if (selectedAgentIndex === null) {
+      cosmographRef.current?.selectPoint(undefined);
+      return;
+    }
+    const cosmographIndex = agentIndexMapRef.current.indexOf(selectedAgentIndex);
+    if (cosmographIndex === -1) return;
+    cosmographRef.current?.selectPoint(cosmographIndex, false, false);
+  }, [selectedAgentIndex]);
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
@@ -356,8 +392,19 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         {...(clusterMode !== null && {
           pointClusterByFn: clusterMode === "strategy" ? silenceStrategyLabel : beliefLabel,
         })}
+        // Hide links by making them transparent — keeps renderLinks=true so
+        // Cosmograph's node selection greyout still works normally.
+        {...(linksHidden && { linkDefaultColor: "rgba(204,204,204,0)" })}
         points={prepResult.points}
         links={prepResult.links}
+        onClick={(index) => {
+          if (index !== undefined) {
+            const agentIdx = agentIndexMapRef.current[index];
+            if (agentIdx !== undefined) setSelectedAgentIndex(agentIdx);
+          } else {
+            setSelectedAgentIndex(null);
+          }
+        }}
       />
 
       {/* "Computing layout…" overlay — shown only during force-layout phase */}
@@ -369,12 +416,30 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         </div>
       )}
 
-      {/* Cluster toggle — interactive only when layout is frozen */}
+      {/* Cluster toggle — top-left */}
       <ClusterToggle
         activeMode={clusterMode}
         onToggle={handleClusterMode}
         disabled={phase !== "frozen"}
       />
+
+      {/* Hide-links toggle — bottom-left, same pill style as cluster buttons */}
+      <div className="absolute bottom-2 left-2 z-10">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setLinksHidden((prev) => !prev)}
+          className={`
+            rounded-full px-3 py-1.5 text-xs font-medium transition-colors
+            ${linksHidden ? "bg-primary/10 border-primary/30 text-primary" : ""}
+          `}
+        >
+          {linksHidden
+            ? t("simulation.canvas.showLinks")
+            : t("simulation.canvas.hideLinks")}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { SimulationWsProvider } from "@/app/providers/simulation-ws-provider";
 import { cn } from "@/shared/lib/utils";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardSidebar, type SidebarPanel } from "./dashboard-sidebar";
@@ -38,6 +39,7 @@ export function DashboardLayout() {
   };
 
   return (
+    <SimulationWsProvider>
     <motion.div
       className="flex h-screen flex-col bg-background"
       initial={{ opacity: 0, y: 8 }}
@@ -98,5 +100,6 @@ export function DashboardLayout() {
         </main>
       </div>
     </motion.div>
+    </SimulationWsProvider>
   );
 }
