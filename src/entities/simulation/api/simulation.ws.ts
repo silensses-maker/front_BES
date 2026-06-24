@@ -164,9 +164,13 @@ export function createSimulationWsClient(
       });
 
       // Register with the manager — events and binary frames come through callbacks
-      manager.subscribe(runId, (event: WsControlEvent) => {
-        handleControlEvent(event).catch(() => {});
-      }, handleBinaryFrame);
+      manager.subscribe(
+        runId,
+        (event: WsControlEvent) => {
+          handleControlEvent(event).catch(() => {});
+        },
+        handleBinaryFrame,
+      );
     },
 
     disconnect: () => {

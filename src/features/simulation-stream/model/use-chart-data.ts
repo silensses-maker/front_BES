@@ -24,7 +24,9 @@ export function useChartData(
 ): ChartData {
   const topology = useSimulationStore((s) => s.topology);
 
-  const beliefTimelineRef = useRef<Array<{ round: number; meanPublic: number; meanPrivate: number }>>([]);
+  const beliefTimelineRef = useRef<
+    Array<{ round: number; meanPublic: number; meanPrivate: number }>
+  >([]);
   const speakingTimelineRef = useRef<Array<{ round: number; rate: number }>>([]);
   const histogramRef = useRef<number[]>([]);
   const rafRef = useRef<number | null>(null);

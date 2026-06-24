@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef } from "react";
-import { SimulationWsManager } from "@/shared/lib/ws-manager";
 import { logger } from "@/shared/lib/logger";
+import { SimulationWsManager } from "@/shared/lib/ws-manager";
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -51,9 +51,7 @@ export function SimulationWsProvider({ children }: SimulationWsProviderProps) {
   const contextValue = useMemo<SimulationWsContextValue>(() => ({ manager }), [manager]);
 
   useEffect(() => {
-    manager
-      .connect()
-      .catch((err: unknown) => logger.error("SimulationWsProvider.connect", err));
+    manager.connect().catch((err: unknown) => logger.error("SimulationWsProvider.connect", err));
 
     return () => {
       manager.destroy();

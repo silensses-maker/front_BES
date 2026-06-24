@@ -11,8 +11,16 @@ const MAX_AGENTS = 50;
 const MAX_HISTORY = 500;
 
 const AGENT_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#6366f1",
+  "#84cc16",
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -40,7 +48,9 @@ export function BeliefEvolutionChart({
   // Per-agent history: globalIndex → [round, belief][]
   const agentHistoryRef = useRef<Map<number, Array<[number, number]>>>(new Map());
   const rafRef = useRef<number | null>(null);
-  const lastFrameRef = useRef<import("@/shared/workers/simulation-frame-merger").MergedFrame | null>(null);
+  const lastFrameRef = useRef<
+    import("@/shared/workers/simulation-frame-merger").MergedFrame | null
+  >(null);
 
   const [series, setSeries] = useState<AgentSeries[]>([]);
 
@@ -58,7 +68,9 @@ export function BeliefEvolutionChart({
     }
     setSeries([]);
 
-    function processFrame(frame: import("@/shared/workers/simulation-frame-merger").MergedFrame): void {
+    function processFrame(
+      frame: import("@/shared/workers/simulation-frame-merger").MergedFrame,
+    ): void {
       if (frame === lastFrameRef.current) return;
       lastFrameRef.current = frame;
 
@@ -84,21 +96,21 @@ export function BeliefEvolutionChart({
       if (rafRef.current === null) {
         rafRef.current = requestAnimationFrame(() => {
           rafRef.current = null;
-          const snapshot: AgentSeries[] = Array.from(
-            agentHistoryRef.current.entries(),
-          ).map(([agentIdx, data], i) => ({
-            type: "line" as const,
-            name: `${t("simulation.charts.agent")} ${agentIdx}`,
-            data: [...data],
-            showSymbol: false,
-            animation: false,
-            lineStyle: {
-              color: AGENT_COLORS[i % AGENT_COLORS.length] ?? "#888",
-              width: 1,
-              opacity: 0.75,
-            },
-            emphasis: { disabled: true },
-          }));
+          const snapshot: AgentSeries[] = Array.from(agentHistoryRef.current.entries()).map(
+            ([agentIdx, data], i) => ({
+              type: "line" as const,
+              name: `${t("simulation.charts.agent")} ${agentIdx}`,
+              data: [...data],
+              showSymbol: false,
+              animation: false,
+              lineStyle: {
+                color: AGENT_COLORS[i % AGENT_COLORS.length] ?? "#888",
+                width: 1,
+                opacity: 0.75,
+              },
+              emphasis: { disabled: true },
+            }),
+          );
           setSeries(snapshot);
         });
       }
@@ -140,9 +152,7 @@ export function BeliefEvolutionChart({
             .map(
               (p) =>
                 `<span style="color:${p.color}">●</span> ${p.seriesName}: ${
-                  Array.isArray(p.value)
-                    ? Number(p.value[1]).toFixed(3)
-                    : "—"
+                  Array.isArray(p.value) ? Number(p.value[1]).toFixed(3) : "—"
                 }`,
             )
             .join("<br/>");
@@ -173,16 +183,10 @@ export function BeliefEvolutionChart({
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       {series.length > 0 ? (
-        <ReactECharts
-          option={option}
-          notMerge={false}
-          style={{ width: "100%", height: "100%" }}
-        />
+        <ReactECharts option={option} notMerge={false} style={{ width: "100%", height: "100%" }} />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
-          <p className="font-sans text-sm text-muted-foreground">
-            {t("simulation.charts.noData")}
-          </p>
+          <p className="font-sans text-sm text-muted-foreground">{t("simulation.charts.noData")}</p>
         </div>
       )}
       <MaximizeButton

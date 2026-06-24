@@ -1,6 +1,6 @@
+import type { WsControlEvent } from "@/entities/simulation/types/simulation.types";
 import { auth } from "@/shared/api/firebase";
 import { logger } from "@/shared/lib/logger";
-import type { WsControlEvent } from "@/entities/simulation/types/simulation.types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

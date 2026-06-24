@@ -120,8 +120,7 @@ export function NodeInspectorCard() {
       </div>
 
       <p className="font-sans text-xs font-medium text-foreground">
-        {agent.name ??
-          t("liveRun.sidebar.nodeInspector.agent", { index: String(agent.index) })}
+        {agent.name ?? t("liveRun.sidebar.nodeInspector.agent", { index: String(agent.index) })}
       </p>
 
       <Separator />

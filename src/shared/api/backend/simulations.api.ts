@@ -194,9 +194,7 @@ export const simulationsApi = {
     query: { round: number | "last" } | { from: number; to: number },
   ): Promise<ArrayBuffer | null> {
     const params: Record<string, string | number> =
-      "round" in query
-        ? { round: query.round }
-        : { from: query.from, to: query.to };
+      "round" in query ? { round: query.round } : { from: query.from, to: query.to };
 
     const response = await backendClient.get<ArrayBuffer>(
       `/simulations/${runId}/networks/${networkId}/frames`,

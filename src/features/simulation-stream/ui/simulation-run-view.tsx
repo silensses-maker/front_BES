@@ -5,7 +5,7 @@ import { SimulationCanvas } from "@/features/simulation-canvas";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/shared/ui/resizable";
-import { useChartData, type ChartData } from "../model/use-chart-data";
+import { type ChartData, useChartData } from "../model/use-chart-data";
 import { useSimulationStream } from "../model/use-simulation-stream";
 import { BeliefEvolutionChart } from "./belief-evolution-chart";
 import { StrategyCharts } from "./strategy-charts";
