@@ -37,6 +37,11 @@ export function topologyToData(topology: TopologyResponse): PreparedDataInput {
 
   const rawPoints: Record<string, unknown>[] = topology.agents.map((agent) => ({
     id: String(agent.index),
+    // Numeric agent index kept as a column so the Final view's pointColorByFn /
+    // pointSizeByFn (#99) can read the frame buffers by index. Cosmograph passes
+    // the column *value* to the accessor reliably (the optional 2nd `index` arg
+    // is not), so the lookup key must live in the data, not the callback index.
+    agentIndex: agent.index,
     initialBelief: agent.initialBelief,
     speaking: 0,
     silenceStrategy: agent.silenceStrategy,
@@ -55,6 +60,7 @@ export function topologyToData(topology: TopologyResponse): PreparedDataInput {
   // Cosmograph DataKit drops columns that are all-null and emits a warning.
   // Only declare `name` in the schema when at least one agent has a non-null name.
   const pointIncludeColumns = [
+    "agentIndex",
     "initialBelief",
     "silenceStrategy",
     "silenceEffect",

@@ -12,11 +12,14 @@ import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
-import { OPINION_PALETTE } from "@/shared/lib/opinion-palette";
+import { interpolateOpinion, OPINION_PALETTE } from "@/shared/lib/opinion-palette";
 import { Button } from "@/shared/ui/button";
 import { topologyToData } from "../lib/topology-to-data";
+import { CanvasLegend } from "./canvas-legend";
 import type { ClusterMode } from "./cluster-toggle";
 import { ClusterToggle } from "./cluster-toggle";
+import type { CanvasView } from "./view-toggle";
+import { ViewToggle } from "./view-toggle";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,9 +96,50 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
 
   const setSelectedAgentIndex = useSimulationStore((s) => s.setSelectedAgentIndex);
   const selectedAgentIndex = useSimulationStore((s) => s.selectedAgentIndex);
+  // The merged final frame — populated by the live stream during the run and,
+  // for cold-loaded completed runs, by the REST replay fallback in
+  // use-simulation-stream.ts. Drives the Final view's per-agent color/size (#99).
+  const latestFrame = useSimulationStore((s) => s.latestFrame);
   // Maps Cosmograph's sequential internal index → agent.index from topology.
   // Rebuilt each time topology is processed (same useEffect below).
   const agentIndexMapRef = useRef<number[]>([]);
+
+  // ─── Initial / Final view toggle (#99) ────────────────────────────────────
+  const [viewMode, setViewMode] = useState<CanvasView>("initial");
+  // Final is available once the run has converged and the final frame is in the
+  // store for THIS network (guards against a stale frame from a previous run).
+  const finalAvailable =
+    status === "completed" && latestFrame !== null && latestFrame.networkId === topology?.networkId;
+  // One-shot auto-switch to Final when it first becomes available, unless the
+  // researcher already picked a view manually (don't yank them away mid-look).
+  const autoSelectedRef = useRef(false);
+  const userTouchedRef = useRef(false);
+
+  const handleViewChange = useCallback((next: CanvasView) => {
+    userTouchedRef.current = true;
+    setViewMode(next);
+  }, []);
+
+  // Reads the final frame by the `agentIndex` column value (Cosmograph passes
+  // the column value reliably; the optional 2nd `index` arg is not dependable).
+  const finalColorByFn = useCallback(
+    (value: unknown): string => {
+      const agentIdx = Number(value);
+      if (latestFrame === null || !Number.isFinite(agentIdx)) return OPINION_PALETTE[1];
+      const belief = latestFrame.publicBelief[agentIdx];
+      return belief === undefined ? OPINION_PALETTE[1] : interpolateOpinion(belief);
+    },
+    [latestFrame],
+  );
+
+  const finalSizeByFn = useCallback(
+    (value: unknown): number => {
+      const agentIdx = Number(value);
+      if (latestFrame === null || !Number.isFinite(agentIdx)) return 8;
+      return latestFrame.speaking[agentIdx] ? 14 : 8;
+    },
+    [latestFrame],
+  );
 
   const cosmographRef = useRef<CosmographRef>(undefined);
   const layoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,6 +175,9 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
       setClusterMode(null);
       setCanvasOverride({});
       setSelectedAgentIndex(null);
+      setViewMode("initial");
+      autoSelectedRef.current = false;
+      userTouchedRef.current = false;
       return;
     }
 
@@ -276,6 +323,24 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     cosmographRef.current?.selectPoint(cosmographIndex, false, false);
   }, [selectedAgentIndex]);
 
+  // ─── Auto-select Final view once it becomes available ──────────────────────
+  // Fires for both cold-loaded completed runs and a live run reaching
+  // convergence, but only if the researcher hasn't already chosen a view.
+  // Gated on `frozen` so the heavy first render (force-layout warmup) always
+  // happens in the cheap Initial view — never with the per-point Final closure
+  // running on an unstable, still-simulating graph.
+  useEffect(() => {
+    if (
+      phase === "frozen" &&
+      finalAvailable &&
+      !autoSelectedRef.current &&
+      !userTouchedRef.current
+    ) {
+      autoSelectedRef.current = true;
+      setViewMode("final");
+    }
+  }, [phase, finalAvailable]);
+
   // ─── Render helpers ────────────────────────────────────────────────────────
 
   // Non-running status branches — rendered when topology isn't the concern.
@@ -392,6 +457,18 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         {...(clusterMode !== null && {
           pointClusterByFn: clusterMode === "strategy" ? silenceStrategyLabel : beliefLabel,
         })}
+        // Final view (#99): swap the static initialBelief coloring for per-agent
+        // final publicBelief + speaking, read from the merged frame by index.
+        // Setting the strategies to undefined activates the *ByFn overrides.
+        // One-shot config change (not per-tick) — orthogonal to cluster/freeze.
+        {...(viewMode === "final" && {
+          pointColorBy: "agentIndex",
+          pointColorStrategy: undefined,
+          pointColorByFn: finalColorByFn,
+          pointSizeBy: "agentIndex",
+          pointSizeStrategy: undefined,
+          pointSizeByFn: finalSizeByFn,
+        })}
         // Hide links by making them transparent — keeps renderLinks=true so
         // Cosmograph's node selection greyout still works normally.
         {...(linksHidden && { linkDefaultColor: "rgba(204,204,204,0)" })}
@@ -423,6 +500,12 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         disabled={phase !== "frozen"}
       />
 
+      {/* Initial / Final view toggle — top-right */}
+      <ViewToggle view={viewMode} onChange={handleViewChange} finalEnabled={finalAvailable} />
+
+      {/* Belief / size legend — bottom-right */}
+      <CanvasLegend view={viewMode} />
+
       {/* Hide-links toggle — bottom-left, same pill style as cluster buttons */}
       <div className="absolute bottom-2 left-2 z-10">
         <Button
@@ -435,9 +518,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
             ${linksHidden ? "bg-primary/10 border-primary/30 text-primary" : ""}
           `}
         >
-          {linksHidden
-            ? t("simulation.canvas.showLinks")
-            : t("simulation.canvas.hideLinks")}
+          {linksHidden ? t("simulation.canvas.showLinks") : t("simulation.canvas.hideLinks")}
         </Button>
       </div>
     </div>
