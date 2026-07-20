@@ -88,6 +88,13 @@ describe("useSimulationStore", () => {
     });
   });
 
+  describe("setNetworkId", () => {
+    it("updates networkId to the provided value", () => {
+      useSimulationStore.getState().setNetworkId("net-xyz-999");
+      expect(useSimulationStore.getState().networkId).toBe("net-xyz-999");
+    });
+  });
+
   describe("setTopology", () => {
     it("updates topology to the provided TopologyResponse object", () => {
       useSimulationStore.getState().setTopology(mockTopology);
@@ -102,6 +109,13 @@ describe("useSimulationStore", () => {
     });
   });
 
+  describe("setFinalRound", () => {
+    it("updates finalRound to the provided value", () => {
+      useSimulationStore.getState().setFinalRound(10);
+      expect(useSimulationStore.getState().finalRound).toBe(10);
+    });
+  });
+
   describe("setError", () => {
     it("sets status to error", () => {
       useSimulationStore.getState().setError("Connection lost");
@@ -111,6 +125,19 @@ describe("useSimulationStore", () => {
     it("sets error to the provided message", () => {
       useSimulationStore.getState().setError("Connection lost");
       expect(useSimulationStore.getState().error).toBe("Connection lost");
+    });
+  });
+
+  describe("setSelectedAgentIndex", () => {
+    it("updates selectedAgentIndex to the provided number", () => {
+      useSimulationStore.getState().setSelectedAgentIndex(2);
+      expect(useSimulationStore.getState().selectedAgentIndex).toBe(2);
+    });
+
+    it("updates selectedAgentIndex to null", () => {
+      useSimulationStore.setState({ selectedAgentIndex: 2 });
+      useSimulationStore.getState().setSelectedAgentIndex(null);
+      expect(useSimulationStore.getState().selectedAgentIndex).toBeNull();
     });
   });
 

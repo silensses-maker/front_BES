@@ -130,6 +130,14 @@ describe("SimulationWsManager", () => {
       expect(manager.getAuthState()).toBe("auth_failed");
       expect(logger.error).toHaveBeenCalled();
     });
+
+    it("onerror is a no-op (reconnect handling happens in onclose)", async () => {
+      const manager = new SimulationWsManager();
+      await manager.connect();
+      const ws = lastWs();
+
+      expect(() => ws.onerror?.()).not.toThrow();
+    });
   });
 
   describe("auth handshake", () => {
@@ -163,6 +171,22 @@ describe("SimulationWsManager", () => {
       expect(manager.getAuthState()).toBe("auth_ok");
       expect(logger.error).toHaveBeenCalled();
     });
+
+    it("broadcasts a control message with no matching runId to every subscription", async () => {
+      const { manager, ws } = await connectAndAuth();
+      const onEvent1 = vi.fn();
+      const onEvent2 = vi.fn();
+      manager.subscribe("run-1", onEvent1, vi.fn());
+      manager.subscribe("run-2", onEvent2, vi.fn());
+
+      // An unrecognized "type" (not auth_ok/error) with no runId falls through
+      // to the generic WsControlEvent broadcast path.
+      const globalMsg = { type: "server_notice", detail: "maintenance window" };
+      ws.onmessage?.({ data: JSON.stringify(globalMsg) } as MessageEvent);
+
+      expect(onEvent1).toHaveBeenCalledWith(globalMsg);
+      expect(onEvent2).toHaveBeenCalledWith(globalMsg);
+    });
   });
 
   describe("subscribe() / unsubscribe()", () => {
@@ -172,6 +196,26 @@ describe("SimulationWsManager", () => {
       manager.subscribe("run-1", vi.fn(), vi.fn());
 
       expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "subscribe", runId: "run-1" }));
+    });
+
+    it("does not send subscribe when not yet authenticated and no buffer exists", async () => {
+      const manager = new SimulationWsManager();
+      await manager.connect(); // authState is "connecting", not "auth_ok"
+      const ws = lastWs();
+
+      manager.subscribe("run-1", vi.fn(), vi.fn());
+
+      expect(ws.send).not.toHaveBeenCalled();
+    });
+
+    it("does not send a message when the socket is not open", async () => {
+      const { manager, ws } = await connectAndAuth();
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.send.mockClear();
+
+      manager.subscribe("run-1", vi.fn(), vi.fn());
+
+      expect(ws.send).not.toHaveBeenCalled();
     });
 
     it("routes control events to the matching subscription", async () => {
@@ -197,6 +241,12 @@ describe("SimulationWsManager", () => {
       const received = onBinary.mock.calls[0]![0] as ArrayBuffer;
       expect(received.byteLength).toBe(8);
       expect(received).not.toBe(buffer); // copy, not the same reference
+    });
+
+    it("drops a binary frame when there are no subscriptions or buffered runs", async () => {
+      const { ws } = await connectAndAuth();
+
+      expect(() => ws.onmessage?.({ data: new ArrayBuffer(4) } as MessageEvent)).not.toThrow();
     });
 
     it("sends unsubscribe and stops routing after unsubscribe()", async () => {
@@ -262,6 +312,17 @@ describe("SimulationWsManager", () => {
       ws.send.mockClear();
 
       manager.prepareRun("run-1");
+
+      expect(ws.send).not.toHaveBeenCalled();
+    });
+
+    it("does not send subscribe/unsubscribe for prepared runs before auth_ok", async () => {
+      const manager = new SimulationWsManager();
+      await manager.connect(); // authState is "connecting", not "auth_ok"
+      const ws = lastWs();
+
+      manager.prepareRun("run-old");
+      manager.prepareRun("run-new"); // triggers the stale-buffer cleanup path
 
       expect(ws.send).not.toHaveBeenCalled();
     });
@@ -342,6 +403,41 @@ describe("SimulationWsManager", () => {
 
       expect(MockWebSocket.instances).toHaveLength(countAfterDestroy);
       expect(manager.getAuthState()).toBe("idle");
+    });
+
+    it("ignores a stale onclose that fires after destroy() (no reconnect scheduled)", () => {
+      const manager = new SimulationWsManager();
+      manager.connect();
+      const ws = lastWs();
+
+      manager.destroy();
+      ws.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(60_000);
+
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(manager.getAuthState()).toBe("idle");
+    });
+
+    it("logs an error when the reconnect's own connect() attempt throws", async () => {
+      const manager = new SimulationWsManager();
+      manager.connect();
+      const ws = lastWs();
+
+      ws.onclose?.({ code: 1006 } as CloseEvent);
+
+      // Make the socket construction inside the scheduled connect() reject.
+      vi.stubGlobal(
+        "WebSocket",
+        class {
+          constructor() {
+            throw new Error("boom");
+          }
+        },
+      );
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(logger.error).toHaveBeenCalledWith("SimulationWsManager.reconnect", expect.any(Error));
     });
   });
 

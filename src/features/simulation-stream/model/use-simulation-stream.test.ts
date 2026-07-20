@@ -291,6 +291,33 @@ describe("useSimulationStream", () => {
         expect.any(Error),
       );
     });
+
+    it("does not log a topology fetch error once the component has unmounted", async () => {
+      let rejectTopology!: (err: unknown) => void;
+      const pending = new Promise<never>((_, reject) => {
+        rejectTopology = reject;
+      });
+      vi.mocked(simulationsApi.getTopologyFull).mockReturnValue(pending as never);
+
+      let unmount!: () => void;
+      await act(async () => {
+        ({ unmount } = renderHook(() => useSimulationStream("run-123", "net-1")));
+      });
+
+      act(() => {
+        unmount();
+      });
+
+      await act(async () => {
+        rejectTopology(new Error("boom"));
+        await pending.catch(() => {});
+      });
+
+      expect(logger.error).not.toHaveBeenCalledWith(
+        "useSimulationStream.getTopology",
+        expect.any(Error),
+      );
+    });
   });
 
   describe("REST frames replay fallback", () => {
@@ -362,6 +389,73 @@ describe("useSimulationStream", () => {
         "useSimulationStream.framesReplayFallback",
         expect.any(Error),
       );
+    });
+
+    it("does not replay when currentRound has already advanced past 0", async () => {
+      withCompletedState({ currentRound: 5 });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("does not replay when finalRound is not yet known", async () => {
+      withCompletedState({ finalRound: null });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("does not replay when finalRound is 0", async () => {
+      withCompletedState({ finalRound: 0 });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("does not replay when the store has no networkId yet", async () => {
+      withCompletedState({ networkId: null });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("does not replay when topology has not been received yet", async () => {
+      withCompletedState({ topology: null });
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
+    });
+
+    it("does not replay when there is no active ws client", async () => {
+      vi.mocked(createSimulationWsClient).mockReturnValue(null as never);
+      withCompletedState();
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+      await act(async () => {});
+
+      expect(simulationsApi.getFrames).not.toHaveBeenCalled();
     });
   });
 });

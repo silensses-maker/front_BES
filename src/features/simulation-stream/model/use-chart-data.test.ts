@@ -176,4 +176,96 @@ describe("useChartData", () => {
 
     expect(result.current.beliefTimeline).toEqual([]);
   });
+
+  it("computes zero means, rate, and an all-zero histogram for a frame with no agents", () => {
+    setTopology(makeTopology([{ silenceStrategy: 0, silenceEffect: 0 }]));
+    const { result } = renderHook(() => useChartData(strategyLabel, effectLabel));
+
+    const emptyFrame: MergedFrame = {
+      runId: "run-1",
+      networkId: "net-1",
+      round: 9,
+      publicBelief: new Float32Array([]),
+      privateBelief: new Float32Array([]),
+      speaking: new Uint8Array([]),
+    };
+
+    act(() => {
+      storeListener?.({ latestFrame: emptyFrame });
+    });
+
+    expect(result.current.beliefTimeline).toEqual([{ round: 9, meanPublic: 0, meanPrivate: 0 }]);
+    expect(result.current.speakingTimeline).toEqual([{ round: 9, rate: 0 }]);
+    expect(result.current.beliefHistogram).toHaveLength(20);
+    expect(result.current.beliefHistogram.every((v) => v === 0)).toBe(true);
+  });
+
+  it("treats missing per-agent entries as 0 and drops out-of-range beliefs into an unfilled bucket", () => {
+    setTopology(makeTopology([{ silenceStrategy: 0, silenceEffect: 0 }]));
+    const { result } = renderHook(() => useChartData(strategyLabel, effectLabel));
+
+    // Deliberately malformed frame (real merger output always has three
+    // equal-length arrays — see simulation-frame-merger.ts) to exercise the
+    // `?? 0` guards: index 0 of publicBelief is missing entirely, and
+    // privateBelief/speaking are shorter than publicBelief so their last
+    // index is missing too. publicBelief[1] is negative, which is outside
+    // the [0, 1) domain real beliefs live in and produces a negative bucket
+    // index — a defensive edge case for upstream data glitches.
+    const malformedFrame: MergedFrame = {
+      runId: "run-1",
+      networkId: "net-1",
+      round: 11,
+      publicBelief: [undefined, -0.1, 0.3, 0.9] as unknown as Float32Array,
+      privateBelief: new Float32Array([0.2, 0.4, 0.6]),
+      speaking: new Uint8Array([1, 0, 1]),
+    };
+
+    act(() => {
+      storeListener?.({ latestFrame: malformedFrame });
+    });
+
+    expect(result.current.beliefTimeline).toEqual([
+      { round: 11, meanPublic: expect.closeTo(0.275, 5), meanPrivate: expect.closeTo(0.3, 5) },
+    ]);
+    expect(result.current.speakingTimeline).toEqual([{ round: 11, rate: expect.closeTo(0.5, 5) }]);
+    // 3 of the 4 belief values land in-range (buckets 0, 6, 18); the negative
+    // value's bucket falls outside the 20-slot histogram and is not visible here.
+    expect(result.current.beliefHistogram).toHaveLength(20);
+    expect(result.current.beliefHistogram[0]).toBe(1);
+    expect(result.current.beliefHistogram[6]).toBe(1);
+    expect(result.current.beliefHistogram[18]).toBe(1);
+    expect(result.current.beliefHistogram.reduce((a, b) => a + b, 0)).toBe(3);
+  });
+
+  it("caps each timeline at 500 rounds by dropping the oldest entry", () => {
+    // A real rAF only invokes its callback later (on the next paint), never
+    // synchronously. Capture it instead of auto-firing so rafRef stays
+    // "pending" across pushes, matching production and letting us assert on
+    // the fully-accumulated ref state via a single manual flush.
+    let pendingCb: FrameRequestCallback | null = null;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      pendingCb = cb;
+      return 1;
+    });
+
+    setTopology(makeTopology([{ silenceStrategy: 0, silenceEffect: 0 }]));
+    const { result } = renderHook(() => useChartData(strategyLabel, effectLabel));
+
+    act(() => {
+      for (let round = 1; round <= 501; round++) {
+        storeListener?.({ latestFrame: makeFrame(round) });
+      }
+    });
+
+    act(() => {
+      pendingCb?.(0);
+    });
+
+    expect(result.current.beliefTimeline).toHaveLength(500);
+    expect(result.current.beliefTimeline[0]?.round).toBe(2);
+    expect(result.current.beliefTimeline[499]?.round).toBe(501);
+    expect(result.current.speakingTimeline).toHaveLength(500);
+    expect(result.current.speakingTimeline[0]?.round).toBe(2);
+    expect(result.current.speakingTimeline[499]?.round).toBe(501);
+  });
 });

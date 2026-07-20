@@ -60,6 +60,16 @@ describe("rebalanceCounts", () => {
     expect(result.map((r) => r.count)).toEqual([4, 3, 3]);
   });
 
+  it("spreads surplus evenly when oldSurplus is 0 but oldTotal > 0 (all rows already at floor)", () => {
+    // Every row already at count=1, so oldDeltas (count - 1) are all 0 even
+    // though oldTotal=3 (the oldTotal===0 branch above is NOT taken here).
+    // Falls back to the same even-split logic as the oldTotal===0 case.
+    const result = rebalanceCounts(rows([1, 1, 1]), 10);
+    // surplus = 10 - 3 = 7; 7/3 = 2 base, remainder 1 → first row gets +1.
+    expect(result.map((r) => r.count)).toEqual([4, 3, 3]);
+    expect(result.reduce((s, r) => s + r.count, 0)).toBe(10);
+  });
+
   it("scatters 1s across first `newTotal` rows when oldTotal=0 and newTotal < rows.length", () => {
     const result = rebalanceCounts(rows([0, 0, 0, 0, 0]), 2);
     expect(result.map((r) => r.count)).toEqual([1, 1, 0, 0, 0]);
