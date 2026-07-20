@@ -302,8 +302,8 @@ const es = {
     statusIdle: "Inactivo",
     statusConnecting: "Conectando...",
     statusRunning: "Ejecutando",
-    statusConverged: "Convergido",
     statusCompleted: "Completado",
+    statusCancelled: "Cancelado",
     statusError: "Error",
     roundLabel: "Ronda {{round}}",
     agentCount: "{{count}} agentes",
@@ -312,6 +312,40 @@ const es = {
     panelStatistical: "Gráficos estadísticos (issue #49)",
     panelCosmograph: "Aquí se renderiza Cosmograph (issue #47)",
     panelLiveCharts: "Gráficos en vivo (issue #49)",
+    canvas: {
+      preparingData: "Preparando datos…",
+      computingLayout: "Calculando layout…",
+      clusterByStrategy: "Por estrategia",
+      clusterByBelief: "Por creencia",
+      windowsClusterWarning: "El agrupamiento puede ser inestable en Windows",
+      dataPrepError: "Error al preparar datos — intenta refrescar",
+      hideLinks: "Ocultar aristas",
+      showLinks: "Mostrar aristas",
+      viewInitial: "Inicial",
+      viewFinal: "Final",
+      finalUnavailableTooltip: "Disponible tras la convergencia",
+      legendTitleInitial: "Creencia inicial",
+      legendTitleFinal: "Creencia pública final",
+      legendLowBelief: "0",
+      legendHighBelief: "1",
+      legendSpeaking: "Hablando",
+      legendSilent: "En silencio",
+      legendCollapse: "Colapsar leyenda",
+      legendExpand: "Expandir leyenda",
+    },
+    charts: {
+      strategyPie: "Estrategia",
+      effectPie: "Efecto",
+      beliefHistogram: "Dist. creencias",
+      meanBeliefLine: "Creencia media",
+      speakingRateLine: "Tasa de participación",
+      seriesMeanPublic: "Pública",
+      seriesMeanPrivate: "Privada",
+      noData: "Esperando datos…",
+      beliefEvolution: "Evolución de creencias",
+      belief: "Creencia",
+      agent: "Agente",
+    },
     maximizePanel: "Maximizar panel",
     restorePanel: "Restaurar tamaño",
     simulationComplete: "Simulación completada",
@@ -422,8 +456,42 @@ const es = {
     next: "Siguiente",
     submit: "Lanzar simulación",
     submitting: "Lanzando…",
+    // ── Tooltips por campo (path generated) ────────────────────────────────
+    saveModeHint:
+      "Cuánto se persiste de la simulación. DEBUG: solo en memoria (más rápido, se pierde al refrescar). ESTÁNDAR: métricas por ronda en BD. COMPLETO: estado por agente cada ronda, permite replay.",
+    numberOfNetworksHint:
+      "Cuántas instancias de red independientes ejecutar con la misma configuración. Cada una genera su propia topología y dinámica; útil para promediar variación aleatoria.",
+    numberOfAgentsHint:
+      "Total de agentes en cada red. El tiempo de cómputo y la memoria crecen aproximadamente lineal. Cada agente tiene su propia opinión y estado.",
+    densityHint:
+      "Grado promedio por agente (número de vecinos). Mayor densidad = más interacciones por ronda = difusión más rápida pero más cómputo. Mínimo 2.",
+    iterationLimitHint:
+      "Máximo de rondas. La simulación se detiene al alcanzar este límite O al converger (umbral de parada), lo que pase primero.",
+    stopThresholdHint:
+      "Criterio de convergencia. La simulación se detiene cuando el cambio promedio de creencias entre rondas baja de este valor. Menor = convergencia más estricta. Típico: 0.01–0.001.",
+    seedHint:
+      "Semilla aleatoria para reproducibilidad. La misma semilla produce la misma topología y dinámica. Déjala aleatoria para exploración libre.",
+    // ── Tooltips por campo (paso de agentes) ───────────────────────────────
+    silenceStrategyHint:
+      "Cómo decide un agente si expresa su opinión cada ronda. DeGroot: siempre habla. Mayoría: habla solo si la mayoría de vecinos está de acuerdo. Umbral: requiere una fracción configurable. Confianza: habla cuando su propia certeza supera un umbral.",
+    silenceEffectHint:
+      "Cómo influye un agente silencioso en la actualización de sus vecinos. DeGroot: no hay silencio (modelo clásico). Memoria: los vecinos usan la última opinión expresada del agente. Sin memoria: los vecinos ignoran al agente silencioso.",
+    majorityThresholdHint:
+      "Fracción de vecinos que deben estar de acuerdo (dentro de la tolerancia) para que el agente hable. 0.5 = mitad. Mayor implica más difícil hablar.",
+    confidenceHint:
+      "Umbral de confianza para la estrategia de Confianza. El agente habla cuando su certeza subjetiva en su opinión actual supera este valor.",
+    cognitiveBiasHint:
+      "Cómo procesa un agente las opiniones entrantes. Ninguno: promedio puro (DeGroot). Confirmación: pondera más las opiniones que confirman. Backfire: rechaza opiniones muy distintas y endurece la propia. Autoridad: defiere a vecinos de alta influencia. Insular: ignora la mayoría de opiniones externas.",
+    agentTypesLabelHint:
+      "Distribuye el total de agentes entre combinaciones de estrategia + efecto de silencio. La suma de cantidades debe coincidir con el total de agentes.",
+    biasTypesLabelHint:
+      "Distribuye las aristas de la red entre categorías de sesgo cognitivo. La suma de cantidades debe coincidir con el total de aristas de la red (calculado a partir de agentes y densidad).",
     errorAgentCountMismatch:
       "La suma de tipos de agente ({{actual}}) debe coincidir con el total de agentes ({{expected}}).",
+    errorAgentCountMismatchHint:
+      "Los tipos de agente no suman el total. Ajústalos en el paso de Agentes.",
+    errorBiasCountMismatchHint:
+      "Los tipos de sesgo no coinciden con el número de aristas. Ajústalos en el paso de Agentes.",
     errorStopThreshold: "El umbral de parada debe estar entre 0 y 1 (exclusivo).",
     errorIterationLimit: "El límite de iteraciones supera el máximo de tu plan.",
     errorAgentLimit: "El total de agentes supera el máximo de tu plan.",
@@ -501,6 +569,80 @@ const es = {
     errorCreate: "Error al crear el perfil de usuario.",
     errorUpdate: "Error al actualizar los datos del usuario.",
     errorDelete: "Error al eliminar el usuario.",
+  },
+  liveRun: {
+    sidebar: {
+      statusLabel: "Estado",
+      roundLabel: "Ronda {{round}}",
+      agentCount: "{{count}} agentes",
+      cancelButton: "Cancelar simulación",
+      cancelConfirm: "¿Cancelar esta simulación? Esta acción no se puede deshacer.",
+      cancelSuccess: "Simulación cancelada.",
+      errorCancel: "Error al cancelar la simulación.",
+      errorTitle: "Error en la simulación",
+      backToBoard: "Volver al tablero",
+      nodeInspector: {
+        title: "Nodo seleccionado",
+        agent: "Agente {{index}}",
+        initialBelief: "Creencia inicial",
+        toleranceRadius: "Radio de tolerancia",
+        toleranceOffset: "Desplazamiento de tolerancia",
+        silenceStrategy: "Estrategia",
+        silenceEffect: "Efecto",
+        selfLoop: "Auto-bucle",
+        outgoing: "Influye en ({{count}})",
+        incoming: "Influenciado por ({{count}})",
+        noConnections: "Sin conexiones",
+      },
+    },
+    networkSelector: {
+      title: "Seleccionar una red",
+      description: "Esta ejecución contiene múltiples redes. Elige una para visualizar.",
+      networkLabel: "Red {{id}}",
+      agentCount: "{{count}} agentes",
+      waitingTitle: "Esperando la topología…",
+      waitingDescription: "La simulación está iniciando. Serás redirigido automáticamente.",
+    },
+    networkPanel: {
+      title: "Redes",
+      network: "Red {{index}}",
+      waiting: "Esperando redes…",
+    },
+    selector: {
+      title: "Selecciona una red",
+      description: "Elige una red del panel lateral para ver su simulación.",
+    },
+  },
+  enums: {
+    silenceStrategy: {
+      degroot: "DeGroot",
+      majority: "Mayoría",
+      threshold: "Umbral",
+      confidence: "Confianza",
+    },
+    silenceEffect: {
+      degroot: "DeGroot",
+      memory: "Memoria",
+      memoryless: "Sin memoria",
+    },
+    beliefGroup: {
+      q1: "Muy baja (< 0.25)",
+      q2: "Baja-media (0.25–0.5)",
+      q3: "Media-alta (0.5–0.75)",
+      q4: "Muy alta (≥ 0.75)",
+    },
+    cognitiveBias: {
+      degroot: "Ninguno",
+      confirmation: "Confirmación",
+      backfire: "Efecto rebote",
+      authority: "Autoridad",
+      insular: "Insular",
+    },
+    saveMode: {
+      full: "Completo",
+      standard: "Estándar",
+      debug: "Depuración",
+    },
   },
 } as const;
 

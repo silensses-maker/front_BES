@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
@@ -122,7 +123,10 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
       {/* Agent types section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{t("simulationConfig.agentTypesLabel")}</h3>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            {t("simulationConfig.agentTypesLabel")}
+            <InfoTooltip>{t("simulationConfig.agentTypesLabelHint")}</InfoTooltip>
+          </h3>
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               agentsComplete
@@ -177,8 +181,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                   <div className="flex items-end gap-6">
                     <div className="flex gap-2">
                       <div className="w-36 shrink-0 space-y-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.silenceStrategy")}
+                          <InfoTooltip>{t("simulationConfig.silenceStrategyHint")}</InfoTooltip>
                         </p>
                         <Select
                           value={String(row.silenceStrategy)}
@@ -202,8 +207,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                       </div>
 
                       <div className="w-36 shrink-0 space-y-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.silenceEffect")}
+                          <InfoTooltip>{t("simulationConfig.silenceEffectHint")}</InfoTooltip>
                         </p>
                         <Select
                           value={String(row.silenceEffect)}
@@ -227,8 +233,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
                     {(row.silenceStrategy === 1 || row.silenceStrategy === 2) && (
                       <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.majorityThreshold")}
+                          <InfoTooltip>{t("simulationConfig.majorityThresholdHint")}</InfoTooltip>
                         </p>
                         <Input
                           type="number"
@@ -246,8 +253,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
                     {row.silenceStrategy === 3 && (
                       <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.confidence")}
+                          <InfoTooltip>{t("simulationConfig.confidenceHint")}</InfoTooltip>
                         </p>
                         <Input
                           type="number"
@@ -305,7 +313,10 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
       {/* Bias types section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{t("simulationConfig.biasTypesLabel")}</h3>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            {t("simulationConfig.biasTypesLabel")}
+            <InfoTooltip>{t("simulationConfig.biasTypesLabelHint")}</InfoTooltip>
+          </h3>
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               biasComplete
@@ -351,8 +362,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
                 <CardContent className="space-y-4">
                   <div className="w-36 shrink-0 space-y-1">
-                    <p className="text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {t("simulationConfig.cognitiveBias")}
+                      <InfoTooltip>{t("simulationConfig.cognitiveBiasHint")}</InfoTooltip>
                     </p>
                     <Select
                       value={String(row.cognitiveBias)}

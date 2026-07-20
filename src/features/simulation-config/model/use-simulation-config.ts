@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import { useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
@@ -18,7 +19,8 @@ import {
   parseEnvelope,
   readJsonFile,
 } from "@/shared/lib/simulation-export";
-import { customSimSchema, generatedSimSchema } from "../lib/validation";
+import { rebalanceCounts } from "../lib/rebalance";
+import { computeMaxEdges, customSimSchema, generatedSimSchema } from "../lib/validation";
 import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
@@ -114,9 +116,45 @@ function hasErrors(errors: SimConfigValidationErrors): boolean {
   return Object.values(errors).some(Boolean);
 }
 
+/**
+ * When network-level params change (`numberOfAgents`, `density`), rebalance
+ * `agentTypes` / `biasTypes` row counts so they keep summing to the new totals.
+ *
+ * Only runs when the user did NOT also explicitly patch `agentTypes` /
+ * `biasTypes` in the same update — the explicit edit always wins.
+ *
+ * Without this, changing `numberOfAgents` from 100 → 500 in step "Network"
+ * leaves `agentTypes[0].count = 100` and the schema's `superRefine` then emits
+ * `agentCountMismatch` / `biasCountMismatch` errors that are only visible in
+ * the "Agents" / "Review" steps — leaving the launch button silently disabled.
+ */
+function enrichGeneratedPatch(
+  patch: Partial<GeneratedSimFormValues>,
+  current: GeneratedSimFormValues,
+): Partial<GeneratedSimFormValues> {
+  const next = { ...patch };
+
+  const numberOfAgentsChanged = patch.numberOfAgents !== undefined;
+  const densityChanged = patch.density !== undefined;
+
+  if (numberOfAgentsChanged && patch.agentTypes === undefined) {
+    next.agentTypes = rebalanceCounts(current.agentTypes, patch.numberOfAgents ?? 0);
+  }
+
+  if ((numberOfAgentsChanged || densityChanged) && patch.biasTypes === undefined) {
+    const newAgents = patch.numberOfAgents ?? current.numberOfAgents;
+    const newDensity = patch.density ?? current.density;
+    const newMaxEdges = computeMaxEdges(newDensity, newAgents);
+    next.biasTypes = rebalanceCounts(current.biasTypes, newMaxEdges);
+  }
+
+  return next;
+}
+
 export function useSimulationConfig() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const wsManager = useSimulationWsManager();
   const setRunId = useSimulationStore((s) => s.setRunId);
   const setStatus = useSimulationStore((s) => s.setStatus);
   const user = useAuthStore((s) => s.user);
@@ -150,7 +188,17 @@ export function useSimulationConfig() {
 
   const updateValues = (patch: Partial<GeneratedSimFormValues> | Partial<CustomSimFormValues>) => {
     if (networkType === "generated") {
-      storeUpdateGeneratedValues(patch as Partial<GeneratedSimFormValues>);
+      const enriched = enrichGeneratedPatch(
+        patch as Partial<GeneratedSimFormValues>,
+        generatedValues,
+      );
+      storeUpdateGeneratedValues(enriched);
+      // Any user-driven edit means the values no longer strictly match a
+      // template — clear the active selection so the quick-start pills
+      // accurately reflect "no template applied".
+      if (activeTemplate !== null) {
+        storeSetActiveTemplate(null);
+      }
     } else {
       storeUpdateCustomValues(patch as Partial<CustomSimFormValues>);
     }
@@ -239,6 +287,8 @@ export function useSimulationConfig() {
             biasType: row.cognitiveBias as 0 | 1 | 2 | 3,
             count: row.count,
           })),
+          persistFrames: true,
+          frameRetention: "ephemeral" as const,
         };
         result = await simulationsApi.startGenerated(body);
       } else {
@@ -275,10 +325,18 @@ export function useSimulationConfig() {
             saveMode: customValues.saveMode,
             agents: customValues.agents,
             edges: customValues.edges,
+            persistFrames: true,
+            frameRetention: "ephemeral",
           });
         }
       }
 
+      // Eager WS subscribe — closes the race window between POST returning
+      // and useSimulationStream mounting on the live-run page. The OpenAPI
+      // explicitly recommends sending subscribe before the simulation starts.
+      // Any events/binary frames that arrive in the meantime are buffered by
+      // the manager and drained when useSimulationStream calls subscribe().
+      wsManager.prepareRun(result.runId);
       setRunId(result.runId);
       setStatus("running");
       navigate(`/board/simulation/${result.runId}`);

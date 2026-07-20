@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import { useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
@@ -29,6 +30,10 @@ import { useSimulationConfig } from "./use-simulation-config";
 
 vi.mock("react-router-dom", () => ({
   useNavigate: vi.fn(),
+}));
+
+vi.mock("@/app/providers/simulation-ws-provider", () => ({
+  useSimulationWsManager: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -81,6 +86,10 @@ vi.mock("@/shared/lib/simulation-export", () => ({
 const mockNavigate = vi.fn();
 const mockSetRunId = vi.fn();
 const mockSetStatus = vi.fn();
+const mockPrepareRun = vi.fn();
+const mockWsManager = {
+  prepareRun: mockPrepareRun,
+} as unknown as ReturnType<typeof useSimulationWsManager>;
 
 const mockSimCreated: SimCreated = {
   runId: "run-abc123",
@@ -169,6 +178,7 @@ function setupMocks(opts: { maxAgents?: number | null; maxIterations?: number | 
   const { maxAgents = null, maxIterations = null } = opts;
 
   vi.mocked(useNavigate).mockReturnValue(mockNavigate);
+  vi.mocked(useSimulationWsManager).mockReturnValue(mockWsManager);
   vi.mocked(useTranslation).mockReturnValue({
     t: (key: string) => key,
   } as unknown as ReturnType<typeof useTranslation>);
@@ -252,6 +262,83 @@ describe("useSimulationConfig", () => {
         originalNetworks,
       );
     });
+
+    it("auto-rebalances agentTypes and biasTypes when only numberOfAgents is patched", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ numberOfAgents: 20 });
+      });
+
+      const values = result.current.values as GeneratedSimFormValues;
+      const agentSum = values.agentTypes.reduce((s, r) => s + r.count, 0);
+      const biasSum = values.biasTypes.reduce((s, r) => s + r.count, 0);
+
+      // density stayed at its default (2) — maxEdges(2, 20) = 2*1 + 18*2*2 = 74
+      expect(values.numberOfAgents).toBe(20);
+      expect(agentSum).toBe(20);
+      expect(biasSum).toBe(74);
+    });
+
+    it("treats a null numberOfAgents patch as 0 when auto-rebalancing agentTypes (defensive fallback)", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({
+          numberOfAgents: null,
+        } as unknown as Partial<GeneratedSimFormValues>);
+      });
+
+      const values = result.current.values as GeneratedSimFormValues;
+      const agentSum = values.agentTypes.reduce((s, r) => s + r.count, 0);
+
+      expect(agentSum).toBe(0);
+    });
+
+    it("leaves agentTypes untouched but rebalances biasTypes when only density is patched", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+      const { result: baseline } = renderHook(() => useSimulationConfig());
+      const originalAgentTypes = (baseline.current.values as GeneratedSimFormValues).agentTypes;
+
+      act(() => {
+        result.current.updateValues({ density: 5 });
+      });
+
+      const values = result.current.values as GeneratedSimFormValues;
+      const biasSum = values.biasTypes.reduce((s, r) => s + r.count, 0);
+
+      // numberOfAgents stayed at its default (10) — maxEdges(5, 10) = 5*4 + 5*2*5 = 70
+      expect(values.density).toBe(5);
+      expect(values.agentTypes).toEqual(originalAgentTypes);
+      expect(biasSum).toBe(70);
+    });
+
+    it("clears activeTemplate when the user edits a value after applying a template", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+      expect(result.current.activeTemplate).toBe("polarization");
+
+      act(() => {
+        result.current.updateValues({ iterationLimit: 555 });
+      });
+
+      expect(result.current.activeTemplate).toBeNull();
+    });
+
+    it("does not touch activeTemplate when it is already null", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      expect(result.current.activeTemplate).toBeNull();
+
+      act(() => {
+        result.current.updateValues({ iterationLimit: 555 });
+      });
+
+      expect(result.current.activeTemplate).toBeNull();
+    });
   });
 
   // ── goToStep ──────────────────────────────────────────────────────────────
@@ -330,6 +417,80 @@ describe("useSimulationConfig", () => {
 
         expect(valid).toBe(false);
         expect(result.current.errors.agentLimitExceeded).toBe(true);
+      });
+
+      it("sets agentCountMismatch when agentTypes counts don't sum to numberOfAgents", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            numberOfAgents: 10,
+            agentTypes: [{ id: "a0", count: 3, silenceStrategy: 0, silenceEffect: 0 }],
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.agentCountMismatch).toBe(true);
+      });
+
+      it("sets stopThresholdOutOfRange when schema validation catches an out-of-range stopThreshold", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            stopThreshold: 0,
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.stopThresholdOutOfRange).toBe(true);
+      });
+
+      it("sets countsInvalid when a field other than the count/stopThreshold checks fails schema validation", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            numberOfNetworks: 0,
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.countsInvalid).toBe(true);
+      });
+
+      it("returns true immediately without validating when networkType is 'load'", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("load");
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(true);
+        expect(result.current.errors).toEqual({});
       });
     });
 
@@ -590,6 +751,75 @@ describe("useSimulationConfig", () => {
         expect(valid).toBe(false);
         expect(result.current.errors.customEdgeDuplicate).toBe(true);
       });
+
+      it("sets customNetworkNameEmpty when schema validation catches an empty networkName at the 'agents' step", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+          result.current.goToStep("agents");
+        });
+        act(() => {
+          result.current.updateValues({
+            ...validCustomValues,
+            networkName: "",
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.customNetworkNameEmpty).toBe(true);
+      });
+
+      it("sets stopThresholdOutOfRange when schema validation catches an out-of-range stopThreshold at the 'agents' step", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+          result.current.goToStep("agents");
+        });
+        act(() => {
+          result.current.updateValues({
+            ...validCustomValues,
+            stopThreshold: 0,
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.stopThresholdOutOfRange).toBe(true);
+      });
+
+      it("sets countsInvalid when a scalar field other than networkName/stopThreshold/agents/edges fails schema validation", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+          result.current.goToStep("agents");
+        });
+        act(() => {
+          result.current.updateValues({
+            ...validCustomValues,
+            iterationLimit: 0,
+          });
+        });
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(false);
+        expect(result.current.errors.countsInvalid).toBe(true);
+      });
     });
   });
 
@@ -675,6 +905,51 @@ describe("useSimulationConfig", () => {
         expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
         expect(simulationsApi.startCustom).not.toHaveBeenCalled();
         expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("custom network — validation guard", () => {
+      it("does not call any API when the custom form has errors", async () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+        });
+        act(() => {
+          result.current.updateValues({
+            ...validCustomValues,
+            agents: [],
+          });
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
+        expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+        expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+        expect(result.current.errors.customNoAgents).toBe(true);
+      });
+    });
+
+    describe("networkType 'load' guard", () => {
+      it("shows errorLoadNotReady toast and never calls an API", async () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("load");
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(toast.error).toHaveBeenCalledWith("simulationConfig.errorLoadNotReady");
+        expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
+        expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+        expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+        expect(result.current.loading).toBe(false);
       });
     });
 
@@ -873,6 +1148,23 @@ describe("useSimulationConfig", () => {
         });
 
         expect(toast.error).toHaveBeenCalledWith("simulationConfig.errorLimitExceeded");
+      });
+
+      it("defaults limit and requested to 0 when the error response omits them", async () => {
+        const limitError = { isAxiosError: true };
+        vi.mocked(simulationsApi.startGenerated).mockRejectedValue(limitError);
+        vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "usage_limit_exceeded");
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues(validGeneratedValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(result.current.usageLimitError).toEqual({ limit: 0, requested: 0 });
       });
     });
   });
@@ -1211,6 +1503,48 @@ describe("useSimulationConfig", () => {
 
       expect(result.current.errors.importInvalid).toBe(true);
       expect(toast.error).toHaveBeenCalledWith("simulationConfig.importError");
+    });
+  });
+
+  // ── loadFileAndAdvance ────────────────────────────────────────────────────
+
+  describe("loadFileAndAdvance", () => {
+    const dummyFile = new File(["{}"], "config.json", { type: "application/json" });
+
+    it("advances the step to 'agents' after a successful import", async () => {
+      vi.mocked(readJsonFile).mockResolvedValue(validGeneratedValues);
+      vi.mocked(parseEnvelope).mockReturnValue({
+        createdAt: "2024-01-01T00:00:00.000Z",
+        appVersion: "1.0.0",
+        payload: validGeneratedValues as unknown as Record<string, unknown>,
+      });
+
+      const { result } = renderHook(() => useSimulationConfig());
+
+      await act(async () => {
+        await result.current.loadFileAndAdvance(dummyFile);
+      });
+
+      expect(result.current.networkType).toBe("generated");
+      expect(result.current.step).toBe("agents");
+    });
+
+    it("does not advance the step when the import fails and networkType stays 'load'", async () => {
+      vi.mocked(readJsonFile).mockRejectedValue(new SyntaxError("bad json"));
+
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("load");
+      });
+      expect(result.current.step).toBe("load");
+
+      await act(async () => {
+        await result.current.loadFileAndAdvance(dummyFile);
+      });
+
+      expect(result.current.networkType).toBe("load");
+      expect(result.current.step).toBe("load");
     });
   });
 });

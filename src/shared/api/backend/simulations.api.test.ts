@@ -47,6 +47,7 @@ const mockRunSummary: RunSummary = {
   id: "run-001",
   type: "generated",
   name: null,
+  status: "completed",
   networkCount: 3,
   iterationLimit: 100,
   stopThreshold: 0.01,

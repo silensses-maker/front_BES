@@ -1,184 +1,141 @@
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import type { SimulationStatus } from "@/entities/simulation";
 import { SimulationCanvas } from "@/features/simulation-canvas";
-import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { logger } from "@/shared/lib/logger";
-import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/shared/ui/resizable";
+import { type ChartData, useChartData } from "../model/use-chart-data";
 import { useSimulationStream } from "../model/use-simulation-stream";
-
-const STATUS_DOT: Record<SimulationStatus, string> = {
-  idle: "bg-muted-foreground",
-  connecting: "bg-yellow-500 animate-pulse",
-  running: "bg-primary animate-pulse",
-  converged: "bg-green-500",
-  completed: "bg-green-500",
-  error: "bg-destructive",
-};
-
-const STATUS_KEYS: Record<SimulationStatus, string> = {
-  idle: "simulation.statusIdle",
-  connecting: "simulation.statusConnecting",
-  running: "simulation.statusRunning",
-  converged: "simulation.statusConverged",
-  completed: "simulation.statusCompleted",
-  error: "simulation.statusError",
-};
+import { BeliefEvolutionChart } from "./belief-evolution-chart";
+import { StrategyCharts } from "./strategy-charts";
+import { TimelineCharts } from "./timeline-charts";
 
 const PANEL_DEFAULTS = {
-  a: 25,
-  right: 75,
-  b: 70,
+  top: 70,
   c: 30,
+  a: 25,
+  b: 75,
 } as const;
 
 type MaximizedPanel = "a" | "b" | "c" | null;
 
 interface SimulationRunViewProps {
   runId: string;
+  networkId: string;
 }
 
-export function SimulationRunView({ runId }: SimulationRunViewProps) {
+/**
+ * SimulationRunView — owns only the three-panel resizable layout.
+ *
+ * Status display (dot, round counter, agent count, cancel button) has moved
+ * to <LiveRunSidebar> which is injected by LiveRunPage into the dashboard
+ * sidebar slot. This component's sole responsibility is the canvas layout
+ * and the maximize/restore mechanics.
+ */
+export function SimulationRunView({ runId, networkId }: SimulationRunViewProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { status, topology, currentRound } = useSimulationStream(runId);
+  const { status, topology } = useSimulationStream(runId, networkId);
 
+  const panelTopRef = useRef<PanelImperativeHandle | null>(null);
   const panelARef = useRef<PanelImperativeHandle | null>(null);
-  const panelRightRef = useRef<PanelImperativeHandle | null>(null);
   const panelBRef = useRef<PanelImperativeHandle | null>(null);
   const panelCRef = useRef<PanelImperativeHandle | null>(null);
 
   const [maximized, setMaximized] = useState<MaximizedPanel>(null);
-  const [cancelling, setCancelling] = useState(false);
 
-  const agentCount = topology?.agentCount ?? null;
-  const cancellable = status === "connecting" || status === "running" || status === "converged";
+  const strategyLabel = useCallback(
+    (v: number): string => {
+      const map: Record<number, string> = {
+        0: t("enums.silenceStrategy.degroot"),
+        1: t("enums.silenceStrategy.majority"),
+        2: t("enums.silenceStrategy.threshold"),
+        3: t("enums.silenceStrategy.confidence"),
+      };
+      return map[v] ?? String(v);
+    },
+    [t],
+  );
+
+  const effectLabel = useCallback(
+    (v: number): string => {
+      const map: Record<number, string> = {
+        0: t("enums.silenceEffect.degroot"),
+        1: t("enums.silenceEffect.memory"),
+        2: t("enums.silenceEffect.memoryless"),
+      };
+      return map[v] ?? String(v);
+    },
+    [t],
+  );
+
+  const chartData = useChartData(strategyLabel, effectLabel);
 
   const handleMaximize = useCallback(
     (target: "a" | "b" | "c") => {
       if (maximized === target) {
         if (target === "a") {
-          panelRightRef.current?.expand();
+          panelBRef.current?.expand();
+          panelCRef.current?.expand();
         } else if (target === "b") {
           panelARef.current?.expand();
           panelCRef.current?.expand();
         } else {
-          panelARef.current?.expand();
-          panelBRef.current?.expand();
+          panelTopRef.current?.expand();
         }
         setMaximized(null);
         return;
       }
 
       if (target === "a") {
-        panelRightRef.current?.collapse();
+        panelBRef.current?.collapse();
+        panelCRef.current?.collapse();
       } else if (target === "b") {
         panelARef.current?.collapse();
         panelCRef.current?.collapse();
       } else {
-        panelARef.current?.collapse();
-        panelBRef.current?.collapse();
+        panelTopRef.current?.collapse();
       }
       setMaximized(target);
     },
     [maximized],
   );
 
-  const handleCancel = useCallback(() => {
-    toast.warning(t("simulation.cancelConfirm"), {
-      action: {
-        label: t("common.cancel"),
-        onClick: async () => {
-          setCancelling(true);
-          try {
-            await simulationsApi.cancel(runId);
-            toast.success(t("simulation.cancelSuccess"));
-            navigate("/board");
-          } catch (err) {
-            logger.error("SimulationRunView.cancel", err);
-            toast.error(t("simulation.errorCancel"));
-          } finally {
-            setCancelling(false);
-          }
-        },
-      },
-    });
-  }, [runId, navigate, t]);
-
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      {/* Header bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[status])} />
-          <span className="font-sans text-sm font-medium text-foreground">
-            {t(STATUS_KEYS[status] as Parameters<typeof t>[0])}
-          </span>
-          {currentRound > 0 && (
-            <span className="font-sans text-xs text-muted-foreground">
-              {t("simulation.roundLabel", { round: String(currentRound) })}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {agentCount !== null && (
-            <span className="font-sans text-xs text-muted-foreground">
-              {t("simulation.agentCount", { count: String(agentCount) })}
-            </span>
-          )}
-          <span className="font-mono text-xs text-muted-foreground/60">{runId.slice(0, 8)}</span>
-          {cancellable && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={cancelling}
-              onClick={handleCancel}
-            >
-              {t("common.cancel")}
-            </Button>
-          )}
-        </div>
-      </div>
-
+    <div className="flex h-full flex-col p-4">
       {/* Three-panel resizable layout */}
       <div className="flex-1 overflow-hidden rounded-lg border border-border">
-        <ResizablePanelGroup orientation="horizontal">
+        {/* Outer: vertical split — top area (A + B) above, Panel C full-width below */}
+        <ResizablePanelGroup orientation="vertical">
           <ResizablePanel
-            panelRef={panelARef}
-            id="panel-a"
-            defaultSize={PANEL_DEFAULTS.a}
-            minSize={15}
+            panelRef={panelTopRef}
+            id="panel-top"
+            defaultSize={PANEL_DEFAULTS.top}
+            minSize={20}
             collapsible
             collapsedSize={0}
           >
-            <PanelPlaceholder
-              label={t("simulation.panelStatistical")}
-              maximized={maximized === "a"}
-              onToggleMaximize={() => handleMaximize("a")}
-              maximizeLabel={t("simulation.maximizePanel")}
-              restoreLabel={t("simulation.restorePanel")}
-            />
-          </ResizablePanel>
+            {/* Inner: horizontal split — Panel A (stats) left, Panel B (canvas) right */}
+            <ResizablePanelGroup orientation="horizontal">
+              <ResizablePanel
+                panelRef={panelARef}
+                id="panel-a"
+                defaultSize={PANEL_DEFAULTS.a}
+                minSize={15}
+                collapsible
+                collapsedSize={0}
+              >
+                <StrategyCharts
+                  chartData={chartData}
+                  maximized={maximized === "a"}
+                  onToggleMaximize={() => handleMaximize("a")}
+                  maximizeLabel={t("simulation.maximizePanel")}
+                  restoreLabel={t("simulation.restorePanel")}
+                />
+              </ResizablePanel>
 
-          <ResizableHandle withHandle />
+              <ResizableHandle withHandle />
 
-          <ResizablePanel
-            panelRef={panelRightRef}
-            id="panel-right"
-            defaultSize={PANEL_DEFAULTS.right}
-            minSize={30}
-            collapsible
-            collapsedSize={0}
-          >
-            <ResizablePanelGroup orientation="vertical">
               <ResizablePanel
                 panelRef={panelBRef}
                 id="panel-b"
@@ -188,7 +145,7 @@ export function SimulationRunView({ runId }: SimulationRunViewProps) {
                 collapsedSize={0}
               >
                 <div className="relative h-full w-full">
-                  <SimulationCanvas status={status} />
+                  <SimulationCanvas status={status} topology={topology} />
                   <MaximizeButton
                     maximized={maximized === "b"}
                     onClick={() => handleMaximize("b")}
@@ -197,26 +154,27 @@ export function SimulationRunView({ runId }: SimulationRunViewProps) {
                   />
                 </div>
               </ResizablePanel>
-
-              <ResizableHandle withHandle />
-
-              <ResizablePanel
-                panelRef={panelCRef}
-                id="panel-c"
-                defaultSize={PANEL_DEFAULTS.c}
-                minSize={15}
-                collapsible
-                collapsedSize={0}
-              >
-                <PanelPlaceholder
-                  label={t("simulation.panelLiveCharts")}
-                  maximized={maximized === "c"}
-                  onToggleMaximize={() => handleMaximize("c")}
-                  maximizeLabel={t("simulation.maximizePanel")}
-                  restoreLabel={t("simulation.restorePanel")}
-                />
-              </ResizablePanel>
             </ResizablePanelGroup>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Panel C — full width, timeline charts */}
+          <ResizablePanel
+            panelRef={panelCRef}
+            id="panel-c"
+            defaultSize={PANEL_DEFAULTS.c}
+            minSize={15}
+            collapsible
+            collapsedSize={0}
+          >
+            <PanelCContent
+              chartData={chartData}
+              maximized={maximized === "c"}
+              onToggleMaximize={() => handleMaximize("c")}
+              maximizeLabel={t("simulation.maximizePanel")}
+              restoreLabel={t("simulation.restorePanel")}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
@@ -224,30 +182,45 @@ export function SimulationRunView({ runId }: SimulationRunViewProps) {
   );
 }
 
-interface PanelPlaceholderProps {
-  label: string;
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface PanelCContentProps {
+  chartData: ChartData;
   maximized: boolean;
   onToggleMaximize: () => void;
   maximizeLabel: string;
   restoreLabel: string;
 }
 
-function PanelPlaceholder({
-  label,
+function PanelCContent({
+  chartData,
   maximized,
   onToggleMaximize,
   maximizeLabel,
   restoreLabel,
-}: PanelPlaceholderProps) {
+}: PanelCContentProps) {
   return (
-    <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
-      <p className="font-sans text-sm text-muted-foreground">{label}</p>
-      <MaximizeButton
-        maximized={maximized}
-        onClick={onToggleMaximize}
-        maximizeLabel={maximizeLabel}
-        restoreLabel={restoreLabel}
-      />
+    <div className="flex h-full w-full flex-col">
+      <div className={maximized ? "h-1/2" : "h-full"}>
+        <BeliefEvolutionChart
+          maximized={maximized}
+          onToggleMaximize={onToggleMaximize}
+          maximizeLabel={maximizeLabel}
+          restoreLabel={restoreLabel}
+        />
+      </div>
+      {maximized && (
+        <div className="h-1/2 border-t border-border">
+          <TimelineCharts
+            chartData={chartData}
+            maximized={false}
+            onToggleMaximize={() => {}}
+            maximizeLabel=""
+            restoreLabel=""
+            showMaximizeButton={false}
+          />
+        </div>
+      )}
     </div>
   );
 }

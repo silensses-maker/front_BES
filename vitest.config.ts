@@ -18,6 +18,7 @@ export default defineConfig({
         "src/entities/**/*.ts",
         "src/features/**/*.ts",
         "src/shared/lib/**/*.ts",
+        "src/shared/workers/**/*.ts",
       ],
       exclude: [
         "**/*.d.ts",

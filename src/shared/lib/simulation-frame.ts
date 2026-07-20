@@ -1,48 +1,70 @@
-export interface SimulationFrame {
+/**
+ * Binary frame format — per openapi.yaml §L913-948, all values little-endian.
+ *
+ * Header (36 bytes):
+ *   0-7   int64  networkId.mostSigBits  (Java UUID long)
+ *   8-15  int64  networkId.leastSigBits (Java UUID long)
+ *   16-23 int64  runId (Snowflake ID)
+ *   24-27 int32  numberOfAgents (this partition)
+ *   28-31 int32  round
+ *   32-35 int32  startsAt (global index of first agent in this partition)
+ *
+ * Belief data (numberOfAgents × 8 bytes):
+ *   [publicBelief (float32), privateBelief (float32)] × n  — interleaved
+ *
+ * Speaking data (numberOfAgents × 1 byte):
+ *   [isSpeaking (uint8)] × n
+ *
+ * Partitioning: a single round may emit multiple frames with different startsAt
+ * values. Each frame covers [startsAt, startsAt + agentCount). The client must
+ * merge partitions keyed by (runId, networkId, round, startsAt).
+ */
+
+export interface SimulationFramePartition {
+  /** Snowflake ID as decimal string — matches the runId returned by REST endpoints. */
   runId: string;
+  /** UUID v4 string reconstructed from Java UUID.getMostSignificantBits() / getLeastSignificantBits(). */
   networkId: string;
   round: number;
-  agents: Array<{
-    agentId: number;
-    belief: number;
-    speaking: boolean;
-  }>;
+  /** Global index of the first agent in this partition. Agent at position i maps to global index startsAt + i. */
+  startsAt: number;
+  agentCount: number;
+  publicBelief: Float32Array;
+  privateBelief: Float32Array;
+  speaking: Uint8Array;
 }
 
-// UUID: 4 groups separated by hyphens (8-4-4-4-12 hex chars)
-function bytesToUuid(view: DataView, offset: number): string {
-  const hex = Array.from({ length: 16 }, (_, i) =>
-    view
-      .getUint8(offset + i)
-      .toString(16)
-      .padStart(2, "0"),
-  );
-  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
-}
-
-// Header: 16 (runId) + 16 (networkId) + 4 (round) = 36 bytes
-// Each agent record: 4 (agentId) + 4 (belief) + 1 (speaking) = 9 bytes
 const HEADER_BYTES = 36;
-const AGENT_RECORD_BYTES = 9;
 
-export function parseSimulationFrame(buffer: ArrayBuffer): SimulationFrame {
+function int64ToHex16(n: bigint): string {
+  return BigInt.asUintN(64, n).toString(16).padStart(16, "0");
+}
+
+function reconstructUuid(msb: bigint, lsb: bigint): string {
+  const m = int64ToHex16(msb);
+  const l = int64ToHex16(lsb);
+  return `${m.slice(0, 8)}-${m.slice(8, 12)}-${m.slice(12, 16)}-${l.slice(0, 4)}-${l.slice(4)}`;
+}
+
+export function parseSimulationFrame(buffer: ArrayBuffer): SimulationFramePartition {
   const view = new DataView(buffer);
 
-  const runId = bytesToUuid(view, 0);
-  const networkId = bytesToUuid(view, 16);
-  const round = view.getUint32(32, false); // big-endian
+  const networkId = reconstructUuid(view.getBigInt64(0, true), view.getBigInt64(8, true));
+  const runId = BigInt.asUintN(64, view.getBigInt64(16, true)).toString();
+  const agentCount = view.getInt32(24, true);
+  const round = view.getInt32(28, true);
+  const startsAt = view.getInt32(32, true);
 
-  const agentCount = (buffer.byteLength - HEADER_BYTES) / AGENT_RECORD_BYTES;
-  const agents: SimulationFrame["agents"] = [];
+  const publicBelief = new Float32Array(agentCount);
+  const privateBelief = new Float32Array(agentCount);
 
   for (let i = 0; i < agentCount; i++) {
-    const base = HEADER_BYTES + i * AGENT_RECORD_BYTES;
-    agents.push({
-      agentId: view.getUint32(base, false),
-      belief: view.getFloat32(base + 4, false),
-      speaking: view.getUint8(base + 8) !== 0,
-    });
+    publicBelief[i] = view.getFloat32(HEADER_BYTES + i * 8, true);
+    privateBelief[i] = view.getFloat32(HEADER_BYTES + i * 8 + 4, true);
   }
 
-  return { runId, networkId, round, agents };
+  // .slice() detaches from the original ArrayBuffer so it can be transferred in Phase 2
+  const speaking = new Uint8Array(buffer, HEADER_BYTES + agentCount * 8, agentCount).slice();
+
+  return { runId, networkId, round, startsAt, agentCount, publicBelief, privateBelief, speaking };
 }

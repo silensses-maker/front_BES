@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { SidebarShell } from "@/shared/ui/sidebar-shell";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { CONSENSUS_PURSUIT_TEMPLATE, POLARIZATION_TEMPLATE } from "../lib/templates";
 import { useSimulationConfig } from "../model/use-simulation-config";
 import type { WizardStep } from "../types/simulation-config.types";
@@ -106,45 +106,43 @@ export function SimulationConfigWizard() {
         </div>
 
         {networkType !== "load" && (
-          <TooltipProvider>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {t("simulationConfig.quickStart")}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={activeTemplate === "consensus-pursuit" ? "default" : "outline"}
-                    size="xs"
-                    className="rounded-full"
-                    onClick={() => applyTemplate("consensus-pursuit", CONSENSUS_PURSUIT_TEMPLATE)}
-                  >
-                    {t("simulationConfig.templateConsensusPursuit")}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {t("simulationConfig.templateConsensusPursuitTooltip")}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={activeTemplate === "polarization" ? "default" : "outline"}
-                    size="xs"
-                    className="rounded-full"
-                    onClick={() => applyTemplate("polarization", POLARIZATION_TEMPLATE)}
-                  >
-                    {t("simulationConfig.templatePolarization")}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {t("simulationConfig.templatePolarizationTooltip")}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </TooltipProvider>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {t("simulationConfig.quickStart")}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={activeTemplate === "consensus-pursuit" ? "default" : "outline"}
+                  size="xs"
+                  className="rounded-full"
+                  onClick={() => applyTemplate("consensus-pursuit", CONSENSUS_PURSUIT_TEMPLATE)}
+                >
+                  {t("simulationConfig.templateConsensusPursuit")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t("simulationConfig.templateConsensusPursuitTooltip")}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={activeTemplate === "polarization" ? "default" : "outline"}
+                  size="xs"
+                  className="rounded-full"
+                  onClick={() => applyTemplate("polarization", POLARIZATION_TEMPLATE)}
+                >
+                  {t("simulationConfig.templatePolarization")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t("simulationConfig.templatePolarizationTooltip")}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         )}
 
         <div>

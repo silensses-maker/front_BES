@@ -34,6 +34,7 @@ const makeRun = (id: string): RunSummary => ({
   id,
   type: "generated",
   name: null,
+  status: "completed",
   networkCount: 1,
   iterationLimit: 100,
   stopThreshold: 0.01,

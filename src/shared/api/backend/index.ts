@@ -9,6 +9,7 @@ export type {
   CognitiveBias,
   CustomRunRequest,
   EdgeSpec,
+  FrameRetention,
   GeneratedRunRequest,
   NetworkListResponse,
   PaginationParams,

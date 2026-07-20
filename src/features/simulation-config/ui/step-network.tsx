@@ -1,5 +1,6 @@
 import { useTranslation } from "@/shared/i18n";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -38,7 +39,10 @@ export function StepNetwork({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="saveMode">{t("simulationConfig.saveMode")}</Label>
+        <Label htmlFor="saveMode" className="flex items-center gap-1.5">
+          {t("simulationConfig.saveMode")}
+          <InfoTooltip>{t("simulationConfig.saveModeHint")}</InfoTooltip>
+        </Label>
         <Select
           value={String(gen.saveMode)}
           onValueChange={(v) =>
@@ -57,7 +61,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="numberOfNetworks">{t("simulationConfig.numberOfNetworks")}</Label>
+        <Label htmlFor="numberOfNetworks" className="flex items-center gap-1.5">
+          {t("simulationConfig.numberOfNetworks")}
+          <InfoTooltip>{t("simulationConfig.numberOfNetworksHint")}</InfoTooltip>
+        </Label>
         <Input
           id="numberOfNetworks"
           type="number"
@@ -70,7 +77,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="numberOfAgents">{t("simulationConfig.numberOfAgents")}</Label>
+        <Label htmlFor="numberOfAgents" className="flex items-center gap-1.5">
+          {t("simulationConfig.numberOfAgents")}
+          <InfoTooltip>{t("simulationConfig.numberOfAgentsHint")}</InfoTooltip>
+        </Label>
         <Input
           id="numberOfAgents"
           type="number"
@@ -84,7 +94,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="density">{t("simulationConfig.density")}</Label>
+        <Label htmlFor="density" className="flex items-center gap-1.5">
+          {t("simulationConfig.density")}
+          <InfoTooltip>{t("simulationConfig.densityHint")}</InfoTooltip>
+        </Label>
         <Input
           id="density"
           type="number"
@@ -96,7 +109,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="iterationLimit">{t("simulationConfig.iterationLimit")}</Label>
+        <Label htmlFor="iterationLimit" className="flex items-center gap-1.5">
+          {t("simulationConfig.iterationLimit")}
+          <InfoTooltip>{t("simulationConfig.iterationLimitHint")}</InfoTooltip>
+        </Label>
         <Input
           id="iterationLimit"
           type="number"
@@ -114,7 +130,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="stopThreshold">{t("simulationConfig.stopThreshold")}</Label>
+        <Label htmlFor="stopThreshold" className="flex items-center gap-1.5">
+          {t("simulationConfig.stopThreshold")}
+          <InfoTooltip>{t("simulationConfig.stopThresholdHint")}</InfoTooltip>
+        </Label>
         <Input
           id="stopThreshold"
           type="number"
@@ -132,7 +151,10 @@ export function StepNetwork({
       </div>
 
       <div className="space-y-2">
-        <Label>{t("simulationConfig.seed")}</Label>
+        <Label className="flex items-center gap-1.5">
+          {t("simulationConfig.seed")}
+          <InfoTooltip>{t("simulationConfig.seedHint")}</InfoTooltip>
+        </Label>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Checkbox
@@ -156,6 +178,31 @@ export function StepNetwork({
           )}
         </div>
       </div>
+
+      {/* Cross-step validation errors that would otherwise silently disable Next */}
+      {(errors?.agentCountMismatch ||
+        errors?.biasCountMismatch ||
+        errors?.countsInvalid ||
+        errors?.agentLimitExceeded) && (
+        <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+          {errors.agentCountMismatch && (
+            <p className="text-xs text-destructive">
+              {t("simulationConfig.errorAgentCountMismatchHint")}
+            </p>
+          )}
+          {errors.biasCountMismatch && (
+            <p className="text-xs text-destructive">
+              {t("simulationConfig.errorBiasCountMismatchHint")}
+            </p>
+          )}
+          {errors.countsInvalid && (
+            <p className="text-xs text-destructive">{t("simulationConfig.errorCountsInvalid")}</p>
+          )}
+          {errors.agentLimitExceeded && (
+            <p className="text-xs text-destructive">{t("simulationConfig.errorAgentLimit")}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
