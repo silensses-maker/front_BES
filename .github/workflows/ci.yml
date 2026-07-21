@@ -32,7 +32,12 @@ jobs:
         run: bunx vitest run
 
   check-version:
-    name: Version Bump Check
+    # OJO: el display name DEBE ser exactamente "check-version" — el ruleset
+    # de main exige un status check con ese contexto (heredado del workflow
+    # viejo check_version.yml) y la cuenta actual no tiene admin para
+    # cambiar la regla. Si algún día un admin actualiza el ruleset, este
+    # nombre puede volver a ser descriptivo.
+    name: check-version
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
 
