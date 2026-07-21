@@ -129,7 +129,12 @@ export class SimulationWsManager {
     this.setAuthState("connecting");
 
     const baseUrl = import.meta.env.PUBLIC_BACKEND_URL ?? "http://localhost:9000";
-    const wsBase = baseUrl.replace(/^https/, "wss").replace(/^http/, "ws");
+    // Base absoluta (http/https) o relativa ("/api"): la relativa se resuelve
+    // contra el origen de la página, así el mismo build funciona con IP pura o
+    // dominio, http o https (ws/wss se deriva del protocolo de la página).
+    const wsBase = baseUrl.startsWith("http")
+      ? baseUrl.replace(/^https/, "wss").replace(/^http/, "ws")
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${baseUrl}`;
     const url = `${wsBase}/ws`;
 
     this.ws = new WebSocket(url);

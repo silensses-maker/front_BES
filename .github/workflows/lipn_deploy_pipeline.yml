@@ -1,0 +1,59 @@
+# Despliegue a producción (servidor LIPN) vía Docker Hub:
+#   1. Buildea la imagen del front (bun + rsbuild → nginx) y la pushea.
+#      La config queda inlineada desde .env.production (PUBLIC_BACKEND_URL=/api
+#      relativo — la misma imagen sirve para cualquier host).
+#   2. SOLO si el push salió bien, dispara el pipeline GitLab del LIPN
+#      (proyecto 975), que hace `docker compose pull` + `up -d` en el server.
+# El server NO clona este repo: solo consume la imagen.
+#
+# Secrets requeridos: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (Docker Hub →
+# Account Settings → Security → New Access Token, permiso Read/Write),
+# GITLAB_TRIGGER_TOKEN.
+name: Deploy LIPN (build, push & trigger)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FRONTEND_IMAGE: silenssesmaker/bes-frontend
+
+concurrency:
+  group: lipn-deploy
+  cancel-in-progress: false
+
+jobs:
+  build_push_trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger LIPN pipeline
+        uses: eic/trigger-gitlab-ci@v1
+        with:
+          url: https://depot.lipn.univ-paris13.fr
+          token: ${{ secrets.GITLAB_TRIGGER_TOKEN }}
+          project_id: 975

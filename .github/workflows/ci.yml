@@ -100,9 +100,11 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # ── Build ──────────────────────────────────────────────────────────────────
-  # Runs type checking (tsc) and Rsbuild. Uses vercel pull to fetch Firebase
-  # env vars from the Vercel project — no need to duplicate them in GitHub
-  # Secrets. Uploads the Vercel output as an artifact for the deploy job.
+  # Type check (tsc) + build vía Vercel CLI (trae las env vars del proyecto
+  # Vercel — no hace falta duplicarlas en GitHub Secrets). En PRs construye
+  # el target preview (lo consume el job de deploy preview); en push a main
+  # solo valida que el build de producción compila — producción real vive en
+  # el servidor del LIPN (ver lipn_deploy_pipeline.yml).
   #
   # Required GitHub Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
   # (obtain from: vercel.com/account/tokens and `vercel link` locally)
@@ -131,10 +133,10 @@ jobs:
         run: bunx tsc --noEmit
 
       - name: Pull Vercel env & config
-        run: bunx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+        run: bunx vercel pull --yes --environment=${{ github.event_name == 'pull_request' && 'preview' || 'production' }} --token=$VERCEL_TOKEN
 
       - name: Build
-        run: bunx vercel build --prod --token=$VERCEL_TOKEN
+        run: bunx vercel build ${{ github.event_name != 'pull_request' && '--prod' || '' }} --token=$VERCEL_TOKEN
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -143,20 +145,22 @@ jobs:
           path: .vercel/output/
           retention-days: 1
 
-  # ── Deploy ─────────────────────────────────────────────────────────────────
-  # Deploys the prebuilt artifact to Vercel production.
-  # Only runs on direct push to main (not on PRs).
+  # ── Deploy Preview ─────────────────────────────────────────────────────────
+  # Despliega un preview a Vercel SOLO en pull requests, para revisar cambios.
+  # Producción ya NO se despliega a Vercel: vive en el servidor del LIPN
+  # (lipn_deploy_pipeline.yml dispara el pipeline GitLab en cada push a main).
   deploy:
-    name: Deploy to Production
+    name: Deploy Preview (Vercel)
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/refactor'
+    if: github.event_name == 'pull_request'
 
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+    # Se conserva el environment por si los secrets VERCEL_* están scoped a él.
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
@@ -169,7 +173,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Pull Vercel project config
-        run: bunx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+        run: bunx vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -180,5 +184,5 @@ jobs:
       - name: Deploy
         id: deploy
         run: |
-          url=$(bunx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN)
+          url=$(bunx vercel deploy --prebuilt --token=$VERCEL_TOKEN)
           echo "url=$url" >> "$GITHUB_OUTPUT"

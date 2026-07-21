@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/silensses-maker/front_BES/compare/v1.0.0...v2.0.0) (2026-07-21)
+
+Primera versión estable de la 2.x (release manual; release-please sigue
+desactivado — ver issue #78).
+
+### Highlights
+
+* Refactor completo: migración a Bun + Rsbuild + React 19 con arquitectura
+  Feature-Sliced Design.
+* Streaming en vivo de simulaciones por websocket, con replay REST de
+  respaldo.
+* Autenticación Firebase con roles y límites de uso.
+* Internacionalización (i18next), UI nueva (Tailwind 4 + Radix), gráficas
+  ECharts y visualización de redes con Cosmograph.
+* Producción desplegada en el servidor del LIPN vía Docker + nginx; Vercel
+  queda solo para previews de PR.
+
+*(El detalle de la fase alpha está en las entradas siguientes.)*
+
 ## [2.0.1-alpha.14](https://github.com/silensses-maker/front_BES/compare/front_bes-v2.0.0-alpha.14...front_bes-v2.0.1-alpha.14) (2026-04-13)
 
 

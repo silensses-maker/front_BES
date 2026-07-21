@@ -1,0 +1,28 @@
+# Dependencias y artefactos
+node_modules
+dist
+coverage
+.rsbuild
+
+# Git / CI
+.git
+.github
+.vercel
+
+# Envs locales (el build usa .env.production, que SÍ entra al contexto)
+.env
+.env.local
+.env.*.local
+
+# Secretos reales — NUNCA al contexto de build
+serviceAccount.json
+
+# Tooling local
+.claude
+.context
+.agents
+.vscode
+scripts
+example.tsx
+skills-lock.json
+*.md
