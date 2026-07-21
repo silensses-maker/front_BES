@@ -1,21 +1,28 @@
-# Ignore local node modules (CRITICAL)
+# Dependencias y artefactos
 node_modules
-
-# Ignore git history (reduces build context size)
-.git
-
-# Ignore local build artifacts
 dist
-build
-.next
+coverage
+.rsbuild
 
-# Ignore local environment files (secrets should be passed via docker-compose)
-# .env
-# .env.local
-.env.example
-.env.compose.example
+# Git / CI
+.git
+.github
+.vercel
 
-# Ignore Docker related files
-Dockerfile
-Dockerfile_front
-docker-compose.yml
+# Envs locales (el build usa .env.production, que SÍ entra al contexto)
+.env
+.env.local
+.env.*.local
+
+# Secretos reales — NUNCA al contexto de build
+serviceAccount.json
+
+# Tooling local
+.claude
+.context
+.agents
+.vscode
+scripts
+example.tsx
+skills-lock.json
+*.md

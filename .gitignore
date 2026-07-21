@@ -1,33 +1,64 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
+# dependencies (bun install)
 node_modules
+
+# output
+out
 dist
-dist-ssr
-*.local
+*.tgz
+.rsbuild
 
-# Editor directories and files
-.vscode/*
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# code coverage
+coverage
+*.lcov
 
-public/csv/graph_data_*.csv
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
-
-venv/*
-
+# dotenv environment variable files
 .env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-tsconfig.app.tsbuildinfo
-tsconfig.node.tsbuildinfo
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Rsdoctor
+.rsdoctor
+
+# Testing
+coverage
+
+.vscode/
+
+serviceAccount.json
+.vercel/
+
+skills-lock.json
+.context/
+.vercel
+.env*.local
+
+# Claude Code — local settings only
+.claude/settings.local.json
+
+# Skills — evals y workspaces no van al repo (muchos archivos generados)
+# Skills genéricos (shadcn, frontend-design, github-actions-docs) tampoco —
+# son herramientas opcionales que cada dev instala por su cuenta.
+.agents/skills/*-workspace/
+.agents/skills/**/evals/
+.agents/skills/skill-creator/
+.agents/skills/shadcn/
+.agents/skills/frontend-design/
+.agents/skills/github-actions-docs/

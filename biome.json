@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -22,7 +22,8 @@
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "warn",
-        "useJsxKeyInIterable": "warn"
+        "useJsxKeyInIterable": "warn",
+        "useExhaustiveDependencies": "warn"
       },
       "nursery": {},
       "style": {
@@ -34,10 +35,13 @@
         "noDuplicateParameters": "error",
         "noDuplicateJsxProps": "error",
         "noExplicitAny": "warn",
-        "noConsole": { "level": "warn", "options": { "allow": ["log"] } }
+        "noConsole": { "level": "warn", "options": { "allow": ["log"] } },
+        "noArrayIndexKey": "warn"
       },
       "a11y": {
-        "useAltText": "warn"
+        "useAltText": "warn",
+        "useButtonType": "error",
+        "noAccessKey": "error"
       }
     }
   },
@@ -46,7 +50,7 @@
     "formatWithErrors": false,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 80
+    "lineWidth": 100
   },
   "javascript": {
     "formatter": {
@@ -60,6 +64,18 @@
       "quoteStyle": "double"
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/logger.ts", "**/logger/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ],
   "json": {
     "formatter": {
       "trailingCommas": "none"

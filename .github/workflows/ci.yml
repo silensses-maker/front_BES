@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main, refactor]
+  pull_request:
+    branches: [main, refactor]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint (Biome)
+        run: bun run lint
+
+      - name: Run tests
+        run: bunx vitest run
+
+  check-version:
+    # OJO: el display name DEBE ser exactamente "check-version" — el ruleset
+    # de main exige un status check con ese contexto (heredado del workflow
+    # viejo check_version.yml) y la cuenta actual no tiene admin para
+    # cambiar la regla. Si algún día un admin actualiza el ruleset, este
+    # nombre puede volver a ser descriptivo.
+    name: check-version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get current version
+        id: current
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Get base version
+        id: base
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          echo "version=$(git show origin/${{ github.base_ref }}:package.json | jq -r .version)" >> "$GITHUB_OUTPUT"
+
+      - name: Compare versions
+        run: |
+          BASE="${{ steps.base.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+
+          echo "Base version: $BASE"
+          echo "Current version: $CURRENT"
+
+          if [ "$BASE" = "$CURRENT" ]; then
+            echo "::error::Version not bumped. Update version in package.json (current: $CURRENT)"
+            exit 1
+          fi
+
+          HIGHER=$(echo -e "$BASE\n$CURRENT" | sort -V | tail -1)
+
+          if [ "$HIGHER" != "$CURRENT" ]; then
+            echo "::error::Version must be higher than $BASE (got: $CURRENT)"
+            exit 1
+          fi
+
+          echo "Version bumped: $BASE → $CURRENT"
+
+  # ── SonarCloud ─────────────────────────────────────────────────────────────
+  sonar:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests with coverage
+        run: bun run test:coverage
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ── Build ──────────────────────────────────────────────────────────────────
+  # Type check (tsc) + build vía Vercel CLI (trae las env vars del proyecto
+  # Vercel — no hace falta duplicarlas en GitHub Secrets). En PRs construye
+  # el target preview (lo consume el job de deploy preview); en push a main
+  # solo valida que el build de producción compila — producción real vive en
+  # el servidor del LIPN (ver lipn_deploy_pipeline.yml).
+  #
+  # Required GitHub Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+  # (obtain from: vercel.com/account/tokens and `vercel link` locally)
+  build:
+    name: Type Check & Build
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    environment: production
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Pull Vercel env & config
+        run: bunx vercel pull --yes --environment=${{ github.event_name == 'pull_request' && 'preview' || 'production' }} --token=$VERCEL_TOKEN
+
+      - name: Build
+        run: bunx vercel build ${{ github.event_name != 'pull_request' && '--prod' || '' }} --token=$VERCEL_TOKEN
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-output
+          path: .vercel/output/
+          retention-days: 1
+
+  # ── Deploy Preview ─────────────────────────────────────────────────────────
+  # Despliega un preview a Vercel SOLO en pull requests, para revisar cambios.
+  # Producción ya NO se despliega a Vercel: vive en el servidor del LIPN
+  # (lipn_deploy_pipeline.yml dispara el pipeline GitLab en cada push a main).
+  deploy:
+    name: Deploy Preview (Vercel)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    # Se conserva el environment por si los secrets VERCEL_* están scoped a él.
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Pull Vercel project config
+        run: bunx vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vercel-output
+          path: .vercel/output/
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(bunx vercel deploy --prebuilt --token=$VERCEL_TOKEN)
+          echo "url=$url" >> "$GITHUB_OUTPUT"

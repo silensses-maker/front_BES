@@ -1,0 +1,39 @@
+# ── Release Please ─────────────────────────────────────────────────────────────
+# DESACTIVADO — La versión se maneja manualmente mientras el proyecto está en
+# fase alpha (2.0.0-alpha.x). release-please bumpeaba el patch en vez del
+# número de alpha, lo que no corresponde al esquema de versioning del proyecto.
+#
+# Para activar cuando se esté cerca de la release estable 2.0.0:
+#   1. Descomentar el workflow completo.
+#   2. Asegurarse de que release-please-config.json y
+#      .release-please-manifest.json reflejen la versión actual.
+#   3. Verificar que GitHub Actions tenga permiso para crear PRs:
+#      Settings → Actions → General → "Allow GitHub Actions to create and
+#      approve pull requests".
+#   4. El primer PR de release generará el CHANGELOG.md automáticamente.
+#
+# Ver issue #78 para el tracking de esta activación.
+# ───────────────────────────────────────────────────────────────────────────────
+
+# name: Release Please
+#
+# on:
+#   push:
+#     branches: [refactor]
+#
+# permissions:
+#   contents: write
+#   pull-requests: write
+#
+# jobs:
+#   release-please:
+#     name: Release Please
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - uses: googleapis/release-please-action@v4
+#         with:
+#           token: ${{ secrets.GITHUB_TOKEN }}
+#           target-branch: refactor
+#           config-file: release-please-config.json
+#           manifest-file: .release-please-manifest.json

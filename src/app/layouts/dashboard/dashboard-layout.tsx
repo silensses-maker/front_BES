@@ -1,0 +1,108 @@
+import { AnimatePresence, motion } from "motion/react";
+import { type ReactNode, useState } from "react";
+import { Outlet } from "react-router-dom";
+import { SimulationWsProvider } from "@/app/providers/simulation-ws-provider";
+import { cn } from "@/shared/lib/utils";
+import { DashboardHeader } from "./dashboard-header";
+import { DashboardSidebar, type SidebarPanel } from "./dashboard-sidebar";
+
+/** Shape passed to child pages via React Router OutletContext */
+export interface DashboardOutletContext {
+  activePanel: SidebarPanel;
+  /** Page calls this to inject content into the sidebar panel slot */
+  setSidebarContent: (content: ReactNode) => void;
+}
+
+/**
+ * DashboardLayout — three-region shell: Sidebar (left) + Header (top) + MainContent.
+ *
+ * State managed here (single source of truth for the shell):
+ *  - sidebarCollapsed: whether the sidebar is in icon-only mode
+ *  - activePanel:      which panel the sidebar renders ("new-simulation" | "my-experiments")
+ *  - fullscreen:       whether the sidebar is completely hidden for visualization focus
+ *  - sidebarContent:  ReactNode injected by the page via OutletContext.setSidebarContent
+ *
+ * No business logic lives here — only structural toggle mechanics.
+ */
+export function DashboardLayout() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activePanel, setActivePanel] = useState<SidebarPanel>("new-simulation");
+  const [fullscreen, setFullscreen] = useState(false);
+  const [sidebarContent, setSidebarContent] = useState<ReactNode>(null);
+
+  const handleSidebarToggle = () => setSidebarCollapsed((prev) => !prev);
+  const handleFullscreenToggle = () => setFullscreen((prev) => !prev);
+
+  const outletContext: DashboardOutletContext = {
+    activePanel,
+    setSidebarContent,
+  };
+
+  return (
+    <SimulationWsProvider>
+      <motion.div
+        className="flex h-screen flex-col bg-background"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
+        {/* ── Top header (full width, sticky) ──────────────────── */}
+        <DashboardHeader
+          activePanel={activePanel}
+          onPanelChange={setActivePanel}
+          fullscreen={fullscreen}
+          onFullscreenToggle={handleFullscreenToggle}
+        />
+
+        {/* ── Body row: Sidebar + MainContent ──────────────────── */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar — slides out when entering fullscreen mode */}
+          <AnimatePresence initial={false}>
+            {!fullscreen && (
+              <motion.div
+                key="sidebar"
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="shrink-0 self-stretch"
+              >
+                <DashboardSidebar
+                  collapsed={sidebarCollapsed}
+                  activePanel={activePanel}
+                  onToggle={handleSidebarToggle}
+                  panelContent={sidebarContent}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Main content — disappears instantly, reappears after layout settles */}
+          <main
+            id="dashboard-main-content"
+            tabIndex={-1}
+            className={cn(
+              "flex-1 overflow-auto p-4 focus-visible:outline-none md:p-6",
+              fullscreen && "p-0 md:p-0",
+            )}
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={fullscreen ? "fullscreen" : "normal"}
+                className="h-full"
+                initial={{ opacity: 0 }}
+                animate={{
+                  opacity: 1,
+                  transition: { duration: 0.25, ease: "easeOut", delay: 0.2 },
+                }}
+                exit={{ opacity: 0, transition: { duration: 0.05 } }}
+              >
+                <Outlet context={outletContext} />
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
+      </motion.div>
+    </SimulationWsProvider>
+  );
+}

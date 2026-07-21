@@ -1,14 +1,22 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import { AuthProvider } from "./components/AuthProvider.tsx";
+import { AppProviders } from "@/app/providers";
+import { AppRoutes } from "@/app/routes";
+import { useAuthStore } from "./entities/user";
+import "./shared/styles/globals.css";
 
-import "./index.css";
+useAuthStore.getState().observeAuthState();
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <AppProviders>
+      <AppRoutes />
+    </AppProviders>
   </StrictMode>,
 );
