@@ -596,6 +596,10 @@ const en = {
       title: "Networks",
       network: "Network {{index}}",
       waiting: "Waiting for networks…",
+      consensusPending: "Waiting…",
+      consensusReached: "Consensus",
+      consensusNotReached: "No consensus",
+      summary: "{{count}} / {{total}} reached consensus",
     },
     selector: {
       title: "Select a network",
