@@ -607,6 +607,10 @@ const es = {
       title: "Redes",
       network: "Red {{index}}",
       waiting: "Esperando redes…",
+      consensusPending: "Esperando…",
+      consensusReached: "Consenso",
+      consensusNotReached: "Sin consenso",
+      summary: "{{count}} / {{total}} en consenso",
     },
     selector: {
       title: "Selecciona una red",
