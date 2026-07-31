@@ -42,11 +42,18 @@ export function NetworkListPanel({ runId, networkIds }: NetworkListPanelProps) {
   }
 
   return (
-    <Card className="flex flex-col gap-2 p-4">
+    <Card className="flex max-h-full flex-col gap-2 p-4">
       <p className="font-sans text-xs font-medium text-muted-foreground">
         {t("liveRun.networkPanel.title")}
       </p>
-      <div className="flex flex-col gap-0.5">
+      <p className="font-sans text-xs text-muted-foreground">
+        {t("liveRun.networkPanel.summary", {
+          count: String(consensusCount),
+          total: String(networkIds.length),
+        })}
+      </p>
+      <Separator />
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
         {networkIds.map((id, index) => {
           const status = consensus[id]?.status ?? "pending";
           return (
@@ -55,7 +62,7 @@ export function NetworkListPanel({ runId, networkIds }: NetworkListPanelProps) {
               type="button"
               variant="ghost"
               size="sm"
-              className="h-auto w-full justify-between gap-2 px-2 py-1.5"
+              className="h-auto w-full shrink-0 justify-between gap-2 px-2 py-1.5"
               onClick={() => navigate(`/board/simulation/${runId}/${id}`)}
             >
               <span className="flex items-center gap-2">
@@ -74,13 +81,6 @@ export function NetworkListPanel({ runId, networkIds }: NetworkListPanelProps) {
           );
         })}
       </div>
-      <Separator />
-      <p className="font-sans text-xs text-muted-foreground">
-        {t("liveRun.networkPanel.summary", {
-          count: String(consensusCount),
-          total: String(networkIds.length),
-        })}
-      </p>
     </Card>
   );
 }
