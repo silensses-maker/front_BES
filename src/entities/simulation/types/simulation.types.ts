@@ -9,18 +9,9 @@ export type SimulationStatus =
   | "cancelled"
   | "error";
 
-export type WsControlEvent =
-  | { event: "topology_ready"; runId: string; networkId: string }
-  | { event: "network_started"; runId: string; networkId: string }
-  | {
-      event: "network_converged";
-      runId: string;
-      networkId: string;
-      finalRound: number;
-      consensus: boolean;
-    }
-  | { event: "run_completed"; runId: string }
-  | { event: "error"; message: string };
+// Wire-protocol event types live with the WS transport in shared/lib/ws-manager;
+// re-exported here so domain consumers keep importing from the entity.
+export type { WsControlEvent } from "@/shared/lib/ws-manager";
 
 export interface SimulationState {
   status: SimulationStatus;

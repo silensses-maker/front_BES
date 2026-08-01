@@ -25,7 +25,7 @@ const { mockSetTopology, mockGetState, mockManager } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/app/providers/simulation-ws-provider", () => ({
+vi.mock("@/shared/lib/ws-manager", () => ({
   useSimulationWsManager: vi.fn(() => mockManager),
 }));
 

@@ -2,8 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
-import { useSimulationStore } from "@/entities/simulation";
+import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import type { SimCreated } from "@/shared/api/backend/types/backend.types";
@@ -22,6 +21,7 @@ import {
   parseEnvelope,
   readJsonFile,
 } from "@/shared/lib/simulation-export";
+import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import type { CustomSimFormValues, GeneratedSimFormValues } from "../types/simulation-config.types";
 import { useSimulationConfigStore } from "./simulation-config.store";
 import { useSimulationConfig } from "./use-simulation-config";
@@ -32,7 +32,7 @@ vi.mock("react-router-dom", () => ({
   useNavigate: vi.fn(),
 }));
 
-vi.mock("@/app/providers/simulation-ws-provider", () => ({
+vi.mock("@/shared/lib/ws-manager", () => ({
   useSimulationWsManager: vi.fn(),
 }));
 
@@ -40,9 +40,14 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn() },
 }));
 
-vi.mock("@/entities/simulation", () => ({
-  useSimulationStore: vi.fn(),
-}));
+// Real last-run store (imported by file path to avoid the entity index pulling
+// the WS client → backend API → Firebase chain into the test environment).
+vi.mock("@/entities/simulation", async () => {
+  const { useLastRunStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/last-run.store")
+  >("@/entities/simulation/model/last-run.store");
+  return { useSimulationStore: vi.fn(), useLastRunStore };
+});
 
 vi.mock("@/entities/user", () => ({
   useAuthStore: vi.fn(),
@@ -856,6 +861,27 @@ describe("useSimulationConfig", () => {
 
         expect(mockSetRunId).toHaveBeenCalledWith(mockSimCreated.runId);
         expect(mockSetStatus).toHaveBeenCalledWith("running");
+      });
+
+      it("registers the run in the last-run store on launch", async () => {
+        useLastRunStore.getState().clear();
+        vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues(validGeneratedValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const lastRun = useLastRunStore.getState();
+        expect(lastRun.runId).toBe(mockSimCreated.runId);
+        expect(lastRun.status).toBe("running");
+        // Generated runs have no user-facing name
+        expect(lastRun.name).toBeNull();
+        expect(lastRun.networkCount).toBe(mockSimCreated.networkCount);
       });
 
       it("navigates to the simulation board route after success", async () => {

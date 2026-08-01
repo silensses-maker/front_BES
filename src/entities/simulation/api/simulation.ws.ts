@@ -1,6 +1,7 @@
 import { simulationsApi } from "@/shared/api/backend";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
+import { useLastRunStore } from "../model/last-run.store";
 import { useSimulationStore } from "../model/simulation.store";
 import type { WsControlEvent } from "../types/simulation.types";
 
@@ -42,6 +43,13 @@ export function createSimulationWsClient(
   let unsubTopology: (() => void) | null = null;
 
   const store = useSimulationStore.getState;
+
+  /** Mirrors run-level lifecycle into the persisted last-run store (header
+   *  chip / rail dot), guarded so a stale client can't clobber a newer run. */
+  function mirrorLastRunStatus(status: "completed" | "error"): void {
+    const lastRun = useLastRunStore.getState();
+    if (lastRun.runId === runId) lastRun.setStatus(status);
+  }
 
   /**
    * Returns true when the event should be processed.
@@ -99,9 +107,11 @@ export function createSimulationWsClient(
         break;
       case "run_completed":
         store().setStatus("completed");
+        mirrorLastRunStatus("completed");
         break;
       case "error":
         store().setError(msg.message);
+        mirrorLastRunStatus("error");
         break;
     }
   }
@@ -142,6 +152,8 @@ export function createSimulationWsClient(
       );
       worker.onmessage = (event: MessageEvent<MergedFrame>) => {
         store().updateFrame(event.data);
+        const lastRun = useLastRunStore.getState();
+        if (lastRun.runId === runId) lastRun.setRound(event.data.round);
       };
 
       store().setRunId(runId);

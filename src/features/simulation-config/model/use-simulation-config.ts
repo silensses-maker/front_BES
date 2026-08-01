@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
-import { useSimulationStore } from "@/entities/simulation";
+import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
@@ -19,6 +18,7 @@ import {
   parseEnvelope,
   readJsonFile,
 } from "@/shared/lib/simulation-export";
+import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import { rebalanceCounts } from "../lib/rebalance";
 import { computeMaxEdges, customSimSchema, generatedSimSchema } from "../lib/validation";
 import type {
@@ -337,6 +337,11 @@ export function useSimulationConfig() {
       // Any events/binary frames that arrive in the meantime are buffered by
       // the manager and drained when useSimulationStream calls subscribe().
       wsManager.prepareRun(result.runId);
+      useLastRunStore.getState().startRun({
+        runId: result.runId,
+        name: networkType === "custom" ? customValues.networkName : null,
+        networkCount: result.networkCount ?? null,
+      });
       setRunId(result.runId);
       setStatus("running");
       navigate(`/board/simulation/${result.runId}`);

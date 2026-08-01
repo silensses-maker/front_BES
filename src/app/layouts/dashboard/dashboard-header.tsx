@@ -1,7 +1,10 @@
+import { Maximize2, Minimize2, Moon, PanelLeft, PanelLeftClose, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
+import { useWsAuthState } from "@/shared/lib/ws-manager";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,6 +16,7 @@ import {
 import { Logo } from "@/shared/ui/logo";
 import { Separator } from "@/shared/ui/separator";
 import { SettingsDropdown } from "@/widgets/settings-dropdown";
+import { DashboardRunChip } from "./dashboard-run-chip";
 import type { SidebarPanel } from "./dashboard-sidebar";
 import { useDashboardBreadcrumb } from "./use-dashboard-breadcrumb";
 
@@ -25,33 +29,47 @@ interface DashboardHeaderProps {
   fullscreen: boolean;
   /** Toggles fullscreen mode on/off */
   onFullscreenToggle: () => void;
+  /** Whether the sidebar is collapsed to its rail */
+  sidebarCollapsed: boolean;
+  /** Toggles the sidebar collapsed state */
+  onSidebarToggle: () => void;
 }
 
+const ICON_BUTTON_CLASS = cn(
+  "flex size-8 items-center justify-center rounded-md",
+  "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+);
+
 /**
- * DashboardHeader — top bar of the dashboard layout shell.
+ * DashboardHeader — top bar of the dashboard layout shell (56px).
  *
- * Left side:  Logo (links to /) → vertical separator → Breadcrumb (auto-built
- *             from current route via useDashboardBreadcrumb)
- * Center:     Navigation tabs ("New Simulation" / "My Experiments") that signal
- *             the sidebar what panel to render.
- * Right side: Fullscreen toggle + existing SettingsDropdown.
- *
- * Placement: app/layouts/dashboard — structural shell, no business logic.
+ * Left:   Logo (→ /home) · Breadcrumb (run-aware via the last-run store).
+ * Center: Panel tabs ("New Simulation" / "My Experiments").
+ * Right:  Run chip · WS reconnecting chip · theme toggle · fullscreen toggle ·
+ *         sidebar collapse toggle · SettingsDropdown.
  */
 export function DashboardHeader({
   activePanel,
   onPanelChange,
   fullscreen,
   onFullscreenToggle,
+  sidebarCollapsed,
+  onSidebarToggle,
 }: DashboardHeaderProps) {
   const { t } = useTranslation();
   const breadcrumbs = useDashboardBreadcrumb();
+  const wsAuthState = useWsAuthState();
+  const { resolvedTheme, setTheme } = useTheme();
+
+  const FullscreenIcon = fullscreen ? Minimize2 : Maximize2;
+  const SidebarIcon = sidebarCollapsed ? PanelLeft : PanelLeftClose;
+  const ThemeIcon = resolvedTheme === "dark" ? Sun : Moon;
 
   return (
     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border bg-background px-4 md:px-6">
       {/* ── Left slot: Logo + Separator + Breadcrumb ─────────── */}
       <div className="flex items-center gap-3">
-        {/* Logo — links to public landing */}
         <Link
           to="/home"
           aria-label={t("dashboard.logoHomeLink")}
@@ -83,11 +101,8 @@ export function DashboardHeader({
         </Breadcrumb>
       </div>
 
-      {/* ── Center: Action tabs ───────────────────────────────── */}
-      <nav
-        aria-label={t("dashboard.tabNewSimulation")}
-        className="hidden items-center gap-1 md:flex"
-      >
+      {/* ── Center: Panel tabs ────────────────────────────────── */}
+      <nav aria-label={t("nav.board")} className="hidden items-center gap-1 md:flex">
         {(
           [
             {
@@ -118,59 +133,53 @@ export function DashboardHeader({
         ))}
       </nav>
 
-      {/* ── Right slot: Fullscreen toggle + Settings ─────────── */}
+      {/* ── Right slot ────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
-        {/* Fullscreen / sidebar-hidden toggle */}
+        <DashboardRunChip />
+
+        {wsAuthState === "reconnecting" && (
+          <span className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 font-sans text-xs text-muted-foreground">
+            <span
+              className="size-1.5 shrink-0 animate-pulse rounded-full bg-destructive"
+              aria-hidden="true"
+            />
+            {t("dashboard.wsReconnecting")}
+          </span>
+        )}
+
+        {/* Theme toggle — quick light/dark swap; the 3-way radio (incl. system)
+            remains available in SettingsDropdown */}
+        <button
+          type="button"
+          aria-label={t("dashboard.themeToggle")}
+          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          className={ICON_BUTTON_CLASS}
+        >
+          <ThemeIcon className="size-4" aria-hidden="true" />
+        </button>
+
         <button
           type="button"
           aria-label={fullscreen ? t("dashboard.fullscreenExit") : t("dashboard.fullscreenEnter")}
           aria-pressed={fullscreen}
           onClick={onFullscreenToggle}
-          className={cn(
-            "flex size-8 items-center justify-center rounded-md",
-            "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          )}
+          className={ICON_BUTTON_CLASS}
         >
-          {fullscreen ? (
-            /* Minimize icon */
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="4 14 10 14 10 20" />
-              <polyline points="20 10 14 10 14 4" />
-              <line x1="10" y1="14" x2="3" y2="21" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-            </svg>
-          ) : (
-            /* Maximize icon */
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          )}
+          <FullscreenIcon className="size-4" aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          aria-label={
+            sidebarCollapsed
+              ? t("dashboard.sidebarToggleExpand")
+              : t("dashboard.sidebarToggleCollapse")
+          }
+          aria-pressed={!sidebarCollapsed}
+          onClick={onSidebarToggle}
+          className={ICON_BUTTON_CLASS}
+        >
+          <SidebarIcon className="size-4" aria-hidden="true" />
         </button>
 
         <SettingsDropdown />

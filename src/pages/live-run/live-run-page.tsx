@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import type { DashboardOutletContext } from "@/app/layouts/dashboard/dashboard-layout";
 import { ReplayDock } from "@/features/simulation-replay";
 import { RunStatusPanel, SimulationRunView } from "@/features/simulation-stream";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
+import type { DashboardOutletContext } from "@/shared/types/dashboard";
 import { NetworkListPanel } from "./network-list-panel";
 import { NetworkSelectorWaiting } from "./network-selector";
 

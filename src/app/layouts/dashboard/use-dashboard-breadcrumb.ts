@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { useLastRunStore } from "@/entities/simulation";
 import { useTranslation } from "@/shared/i18n";
 
 export interface BreadcrumbSegment {
@@ -18,6 +19,8 @@ export interface BreadcrumbSegment {
 export function useDashboardBreadcrumb(): BreadcrumbSegment[] {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const lastRunId = useLastRunStore((s) => s.runId);
+  const lastRunName = useLastRunStore((s) => s.name);
 
   const segmentKeyMap: Record<string, string> = {
     board: t("dashboard.breadcrumbBoard"),
@@ -34,7 +37,12 @@ export function useDashboardBreadcrumb(): BreadcrumbSegment[] {
     const to = "/" + parts.slice(0, index + 1).join("/");
     const isLast = index === parts.length - 1;
     const mapped = segmentKeyMap[segment];
-    const label = mapped ?? (segment.length > 12 ? segment.slice(0, 8) : segment);
+    let label = mapped ?? (segment.length > 12 ? segment.slice(0, 8) : segment);
+    // The last-run's segment gets its human name (mockup: "Tablero › {run} › …").
+    // Other runs keep the truncated id — no per-navigation fetch.
+    if (mapped === undefined && segment === lastRunId) {
+      label = `${lastRunName ?? t("simulationHistory.runNameFallback")} · ${segment.slice(0, 8)}`;
+    }
     return {
       label,
       to: isLast ? undefined : to,

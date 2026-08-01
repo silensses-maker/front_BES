@@ -42,6 +42,8 @@ type MockWorker = {
 
 const RUN_ID = "run-abc-123";
 
+import { useLastRunStore } from "../model/last-run.store";
+
 const MOCK_TOPOLOGY = {
   runId: RUN_ID,
   networkId: "net-1",
@@ -633,6 +635,53 @@ describe("createSimulationWsClient", () => {
       expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: "replay-buffer", buffer }, [
         buffer,
       ]);
+    });
+  });
+
+  describe("last-run store mirroring", () => {
+    async function connectAndGetEvent(): Promise<(data: unknown) => Promise<void>> {
+      const client = createSimulationWsClient(RUN_ID, null, mockManager);
+      await client.connect();
+      const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
+      return onEvent as (data: unknown) => Promise<void>;
+    }
+
+    it("mirrors run_completed to the last-run store when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "run_completed", runId: RUN_ID });
+
+      expect(useLastRunStore.getState().status).toBe("completed");
+    });
+
+    it("mirrors error events to the last-run store when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "error", message: "boom" });
+
+      expect(useLastRunStore.getState().status).toBe("error");
+    });
+
+    it("does not touch the last-run store when it tracks a different run", async () => {
+      useLastRunStore.getState().startRun({ runId: "other-run", name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "run_completed", runId: RUN_ID });
+
+      expect(useLastRunStore.getState().status).toBe("running");
+    });
+
+    it("mirrors the frame round from the worker when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const client = createSimulationWsClient(RUN_ID, null, mockManager);
+      await client.connect();
+
+      mockWorker.onmessage?.({ data: { round: 57 } } as MessageEvent);
+
+      expect(useLastRunStore.getState().round).toBe(57);
+      expect(mockStore.updateFrame).toHaveBeenCalled();
     });
   });
 });

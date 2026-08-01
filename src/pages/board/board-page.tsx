@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
-import type { DashboardOutletContext } from "@/app/layouts/dashboard/dashboard-layout";
-import { useSimulationStore } from "@/entities/simulation";
 import { SimulationConfigWizard } from "@/features/simulation-config";
 import {
   RunDetailCard,
@@ -9,6 +7,7 @@ import {
   useSimulationHistory,
 } from "@/features/simulation-history";
 import { useTranslation } from "@/shared/i18n";
+import type { DashboardOutletContext } from "@/shared/types/dashboard";
 
 /**
  * BoardPage — smart connector for the /board route.
@@ -16,35 +15,34 @@ import { useTranslation } from "@/shared/i18n";
  * This is the only component in this slice that reads Zustand stores and
  * instantiates feature hooks. UI components it renders are all dumb (props-only).
  *
- * Pattern:
- *  - Reads `activePanel` and `setSidebarContent` from DashboardOutletContext.
- *  - On each render, injects the correct sidebar content via `setSidebarContent`.
- *  - Main content area renders context-appropriate empty states or the run detail.
+ * All history UI state (search, filter, pending cancel) lives inside
+ * useSimulationHistory, so the memoized panel element below can churn identity
+ * without losing anything.
  */
 export function BoardPage() {
   const { t } = useTranslation();
 
   const { activePanel, setSidebarContent } = useOutletContext<DashboardOutletContext>();
 
-  const storeRunId = useSimulationStore((s) => s.runId);
-  const storeStatus = useSimulationStore((s) => s.status);
-
   const {
-    runs,
+    filteredRuns,
     loading,
     hasMore,
     selectedRunId,
     selectedRun: activeRun,
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    setStatusFilter,
+    statusCounts,
+    pendingCancelRun,
+    requestCancel,
+    dismissCancel,
+    confirmCancel,
     loadInitial,
     loadMore,
     selectRun,
-    deleteRun,
   } = useSimulationHistory();
-
-  const statusMap = useMemo<Record<string, string>>(() => {
-    if (!storeRunId || storeStatus === "idle") return {};
-    return { [storeRunId]: storeStatus };
-  }, [storeRunId, storeStatus]);
 
   // Load history when transitioning to "my-experiments" panel
   const prevPanel = useRef<string | null>(null);
@@ -55,27 +53,43 @@ export function BoardPage() {
     prevPanel.current = activePanel;
   }, [activePanel, loadInitial]);
 
-  const handleSelectRun = useCallback(
-    (id: string) => {
-      selectRun(id);
-    },
-    [selectRun],
-  );
-
   const historyPanel = useMemo(
     () => (
       <SimulationHistoryPanel
-        runs={runs}
+        runs={filteredRuns}
         loading={loading}
         hasMore={hasMore}
         selectedRunId={selectedRunId}
-        statusMap={statusMap}
-        onSelectRun={handleSelectRun}
-        onDeleteRun={deleteRun}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        statusFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        statusCounts={statusCounts}
+        pendingCancelRun={pendingCancelRun}
+        onRequestCancel={requestCancel}
+        onDismissCancel={dismissCancel}
+        onConfirmCancel={confirmCancel}
+        onSelectRun={selectRun}
         onLoadMore={loadMore}
       />
     ),
-    [runs, loading, hasMore, selectedRunId, statusMap, handleSelectRun, deleteRun, loadMore],
+    [
+      filteredRuns,
+      loading,
+      hasMore,
+      selectedRunId,
+      searchQuery,
+      setSearchQuery,
+      statusFilter,
+      setStatusFilter,
+      statusCounts,
+      pendingCancelRun,
+      requestCancel,
+      dismissCancel,
+      confirmCancel,
+      selectRun,
+      loadMore,
+    ],
   );
 
   const sidebarContent = useMemo(() => {

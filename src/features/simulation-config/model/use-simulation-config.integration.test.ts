@@ -15,10 +15,17 @@ import { useSimulationConfig } from "./use-simulation-config";
 
 vi.mock("react-router-dom", () => ({ useNavigate: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
-vi.mock("@/app/providers/simulation-ws-provider", () => ({
+vi.mock("@/shared/lib/ws-manager", () => ({
   useSimulationWsManager: vi.fn(() => ({ prepareRun: vi.fn() })),
 }));
-vi.mock("@/entities/simulation", () => ({ useSimulationStore: vi.fn() }));
+// Real last-run store (imported by file path to avoid the entity index pulling
+// the WS client → backend API → Firebase chain into the test environment).
+vi.mock("@/entities/simulation", async () => {
+  const { useLastRunStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/last-run.store")
+  >("@/entities/simulation/model/last-run.store");
+  return { useSimulationStore: vi.fn(), useLastRunStore };
+});
 vi.mock("@/entities/user", () => ({ useAuthStore: vi.fn() }));
 vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {

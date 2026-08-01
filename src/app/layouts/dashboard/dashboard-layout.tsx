@@ -3,15 +3,13 @@ import { type ReactNode, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { SimulationWsProvider } from "@/app/providers/simulation-ws-provider";
 import { cn } from "@/shared/lib/utils";
+import type { DashboardOutletContext, SidebarPanel } from "@/shared/types/dashboard";
 import { DashboardHeader } from "./dashboard-header";
-import { DashboardSidebar, type SidebarPanel } from "./dashboard-sidebar";
+import { DashboardSidebar } from "./dashboard-sidebar";
 
-/** Shape passed to child pages via React Router OutletContext */
-export interface DashboardOutletContext {
-  activePanel: SidebarPanel;
-  /** Page calls this to inject content into the sidebar panel slot */
-  setSidebarContent: (content: ReactNode) => void;
-}
+/** Shape passed to child pages via React Router OutletContext — lives in
+ *  shared/types so pages import it downward instead of reaching into app. */
+export type { DashboardOutletContext } from "@/shared/types/dashboard";
 
 /**
  * DashboardLayout — three-region shell: Sidebar (left) + Header (top) + MainContent.
@@ -52,6 +50,8 @@ export function DashboardLayout() {
           onPanelChange={setActivePanel}
           fullscreen={fullscreen}
           onFullscreenToggle={handleFullscreenToggle}
+          sidebarCollapsed={sidebarCollapsed}
+          onSidebarToggle={handleSidebarToggle}
         />
 
         {/* ── Body row: Sidebar + MainContent ──────────────────── */}
@@ -71,6 +71,7 @@ export function DashboardLayout() {
                   collapsed={sidebarCollapsed}
                   activePanel={activePanel}
                   onToggle={handleSidebarToggle}
+                  onPanelChange={setActivePanel}
                   panelContent={sidebarContent}
                 />
               </motion.div>

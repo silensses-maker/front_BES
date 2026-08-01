@@ -10,8 +10,17 @@ import { useSimulationHistory } from "./use-simulation-history";
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
+
+// Real last-run store (imported by file path to avoid the entity index pulling
+// the WS client → backend API → Firebase chain into the test environment).
+vi.mock("@/entities/simulation", async () => {
+  const { useLastRunStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/last-run.store")
+  >("@/entities/simulation/model/last-run.store");
+  return { useLastRunStore };
+});
 
 vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
@@ -30,7 +39,7 @@ vi.mock("@/shared/lib/logger", () => ({
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const makeRun = (id: string): RunSummary => ({
+const makeRun = (id: string, overrides: Partial<RunSummary> = {}): RunSummary => ({
   id,
   type: "generated",
   name: null,
@@ -39,11 +48,11 @@ const makeRun = (id: string): RunSummary => ({
   iterationLimit: 100,
   stopThreshold: 0.01,
   createdAt: "2026-01-01T00:00:00Z",
+  ...overrides,
 });
 
 const run1 = makeRun("run-1");
 const run2 = makeRun("run-2");
-const run3 = makeRun("run-3");
 
 function setupMocks() {
   vi.mocked(useTranslation).mockReturnValue({
@@ -389,199 +398,179 @@ describe("useSimulationHistory", () => {
     });
   });
 
-  // ── deleteRun ─────────────────────────────────────────────────────────────
+  // ── cancel flow ──────────────────────────────────────────────────────────
 
-  describe("deleteRun", () => {
-    it("optimistically removes the run from the list before the API responds", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2, run3],
-        limit: 20,
-        offset: 0,
-      });
-      let resolveCancel!: (val: { runId: string; cancelled: boolean }) => void;
-      vi.mocked(simulationsApi.cancel).mockReturnValue(
-        new Promise((res) => {
-          resolveCancel = res;
-        }),
-      );
-
-      const { result } = renderHook(() => useSimulationHistory());
-
+  describe("cancel flow", () => {
+    async function loadRuns(result: { current: ReturnType<typeof useSimulationHistory> }) {
       await act(async () => {
         await result.current.loadInitial();
       });
+    }
 
-      // Start delete but don't await
+    const runningRun = makeRun("run-run", { status: "running" });
+
+    it("requestCancel exposes the pending run; dismissCancel clears it", async () => {
+      vi.mocked(simulationsApi.listMine).mockResolvedValue({
+        runs: [runningRun, run2],
+        limit: 20,
+        offset: 0,
+      });
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadRuns(result);
+
       act(() => {
-        void result.current.deleteRun("run-2");
+        result.current.requestCancel("run-run");
+      });
+      expect(result.current.pendingCancelRun?.id).toBe("run-run");
+
+      act(() => {
+        result.current.dismissCancel();
+      });
+      expect(result.current.pendingCancelRun).toBeNull();
+    });
+
+    it("confirmCancel marks the run cancelled IN PLACE without removing it", async () => {
+      vi.mocked(simulationsApi.listMine).mockResolvedValue({
+        runs: [runningRun, run2],
+        limit: 20,
+        offset: 0,
+      });
+      vi.mocked(simulationsApi.cancel).mockResolvedValue({ runId: "run-run", cancelled: true });
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadRuns(result);
+
+      act(() => {
+        result.current.selectRun("run-run");
+        result.current.requestCancel("run-run");
+      });
+      await act(async () => {
+        await result.current.confirmCancel();
       });
 
-      // run-2 should already be gone optimistically
-      expect(result.current.runs.find((r) => r.id === "run-2")).toBeUndefined();
+      expect(simulationsApi.cancel).toHaveBeenCalledWith("run-run");
       expect(result.current.runs).toHaveLength(2);
-
-      // Resolve so cleanup can finish
-      await act(async () => {
-        resolveCancel({ runId: "run-2", cancelled: true });
-      });
+      expect(result.current.runs.find((r) => r.id === "run-run")?.status).toBe("cancelled");
+      // Selection is preserved — the row is still there
+      expect(result.current.selectedRunId).toBe("run-run");
+      expect(toast.success).toHaveBeenCalledWith("simulationHistory.cancelSuccess");
+      expect(result.current.pendingCancelRun).toBeNull();
     });
 
-    it("calls simulationsApi.cancel with the run id", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2],
-        limit: 20,
-        offset: 0,
-      });
-      vi.mocked(simulationsApi.cancel).mockResolvedValue({ runId: "run-1", cancelled: true });
-
+    it("confirmCancel without a pending id is a no-op", async () => {
       const { result } = renderHook(() => useSimulationHistory());
 
       await act(async () => {
-        await result.current.loadInitial();
+        await result.current.confirmCancel();
       });
 
-      await act(async () => {
-        await result.current.deleteRun("run-1");
-      });
-
-      expect(simulationsApi.cancel).toHaveBeenCalledWith("run-1");
+      expect(simulationsApi.cancel).not.toHaveBeenCalled();
     });
 
-    it("clears selectedRunId when the deleted run was selected", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2],
-        limit: 20,
-        offset: 0,
-      });
-      vi.mocked(simulationsApi.cancel).mockResolvedValue({ runId: "run-1", cancelled: true });
-
-      const { result } = renderHook(() => useSimulationHistory());
-
-      await act(async () => {
-        await result.current.loadInitial();
-      });
-
-      act(() => {
-        result.current.selectRun("run-1");
-      });
-
-      expect(result.current.selectedRunId).toBe("run-1");
-
-      await act(async () => {
-        await result.current.deleteRun("run-1");
-      });
-
-      expect(result.current.selectedRunId).toBeNull();
-    });
-
-    it("does not clear selectedRunId when a different run is deleted", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2],
-        limit: 20,
-        offset: 0,
-      });
-      vi.mocked(simulationsApi.cancel).mockResolvedValue({ runId: "run-2", cancelled: true });
-
-      const { result } = renderHook(() => useSimulationHistory());
-
-      await act(async () => {
-        await result.current.loadInitial();
-      });
-
-      act(() => {
-        result.current.selectRun("run-1");
-      });
-
-      await act(async () => {
-        await result.current.deleteRun("run-2");
-      });
-
-      expect(result.current.selectedRunId).toBe("run-1");
-    });
-
-    it("restores the original runs snapshot on API error", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2, run3],
-        limit: 20,
-        offset: 0,
-      });
-      vi.mocked(simulationsApi.cancel).mockRejectedValue(new Error("cancel fail"));
-
-      const { result } = renderHook(() => useSimulationHistory());
-
-      await act(async () => {
-        await result.current.loadInitial();
-      });
-
-      await act(async () => {
-        await result.current.deleteRun("run-2");
-      });
-
-      expect(result.current.runs).toEqual([run1, run2, run3]);
-    });
-
-    it("calls toast.error with simulationHistory.errorDelete on API error", async () => {
-      vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2],
-        limit: 20,
-        offset: 0,
-      });
-      vi.mocked(simulationsApi.cancel).mockRejectedValue(new Error("cancel fail"));
-
-      const { result } = renderHook(() => useSimulationHistory());
-
-      await act(async () => {
-        await result.current.loadInitial();
-      });
-
-      await act(async () => {
-        await result.current.deleteRun("run-1");
-      });
-
-      expect(toast.error).toHaveBeenCalledWith("simulationHistory.errorDelete");
-    });
-
-    it("logs the error with logger.error on API error", async () => {
+    it("keeps the run status untouched and toasts on API error", async () => {
       const error = new Error("cancel fail");
       vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1, run2],
+        runs: [runningRun],
         limit: 20,
         offset: 0,
       });
       vi.mocked(simulationsApi.cancel).mockRejectedValue(error);
-
       const { result } = renderHook(() => useSimulationHistory());
+      await loadRuns(result);
 
+      act(() => {
+        result.current.requestCancel("run-run");
+      });
       await act(async () => {
-        await result.current.loadInitial();
+        await result.current.confirmCancel();
       });
 
-      await act(async () => {
-        await result.current.deleteRun("run-1");
-      });
-
-      expect(logger.error).toHaveBeenCalledWith("useSimulationHistory.deleteRun", error);
+      expect(result.current.runs[0]?.status).toBe("running");
+      expect(logger.error).toHaveBeenCalledWith("useSimulationHistory.confirmCancel", error);
+      expect(toast.error).toHaveBeenCalledWith("simulationHistory.errorCancel");
     });
+  });
 
-    it("sets loading to false in the finally block after error", async () => {
+  // ── filtering, search & counts ────────────────────────────────────────────
+
+  describe("filtering, search and counts", () => {
+    const sample = [
+      makeRun("aaa-1", { name: "Polarización 180", status: "completed" }),
+      makeRun("bbb-2", { name: "Barrido largo", status: "running" }),
+      makeRun("ccc-3", { name: null, status: "error" }),
+      makeRun("ddd-4", { name: "Umbral 0.6", status: "cancelled" }),
+    ];
+
+    async function loadSample(result: { current: ReturnType<typeof useSimulationHistory> }) {
       vi.mocked(simulationsApi.listMine).mockResolvedValue({
-        runs: [run1],
+        runs: sample,
         limit: 20,
         offset: 0,
       });
-      vi.mocked(simulationsApi.cancel).mockRejectedValue(new Error("fail"));
-
-      const { result } = renderHook(() => useSimulationHistory());
-
       await act(async () => {
         await result.current.loadInitial();
       });
+    }
 
-      await act(async () => {
-        await result.current.deleteRun("run-1");
+    it("statusCounts tallies loaded runs per status", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      expect(result.current.statusCounts).toEqual({
+        all: 4,
+        running: 1,
+        completed: 1,
+        cancelled: 1,
+        error: 1,
+      });
+    });
+
+    it("statusFilter narrows filteredRuns", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setStatusFilter("cancelled");
       });
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["ddd-4"]);
+    });
+
+    it("search matches name case-insensitively and is safe with null names", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setSearchQuery("polariza");
+      });
+
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["aaa-1"]);
+    });
+
+    it("search matches by id substring", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setSearchQuery("ccc");
+      });
+
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["ccc-3"]);
+    });
+
+    it("status filter and search compose", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setStatusFilter("running");
+        result.current.setSearchQuery("barrido");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["bbb-2"]);
+
+      act(() => {
+        result.current.setSearchQuery("polariza");
+      });
+      expect(result.current.filteredRuns).toEqual([]);
     });
   });
 });

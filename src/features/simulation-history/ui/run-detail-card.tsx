@@ -5,10 +5,28 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Separator } from "@/shared/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 interface RunDetailCardProps {
   run: RunSummary;
 }
+
+const STATUS_BADGE_VARIANT: Record<
+  RunSummary["status"],
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  running: "default",
+  completed: "secondary",
+  error: "destructive",
+  cancelled: "outline",
+};
+
+const STATUS_LABEL_KEY = {
+  running: "simulationHistory.statusRunning",
+  completed: "simulationHistory.statusCompleted",
+  error: "simulationHistory.statusError",
+  cancelled: "simulationHistory.statusCancelled",
+} as const;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -45,13 +63,27 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
             <p className="font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               {t("simulationHistory.runDetailTitle")}
             </p>
-            <h2 className="mt-0.5 truncate font-sans text-base font-semibold text-foreground">
-              {displayName}
-            </h2>
+            <div className="mt-0.5 flex items-center gap-2">
+              <h2 className="truncate font-sans text-base font-semibold text-foreground">
+                {displayName}
+              </h2>
+              <Badge variant={STATUS_BADGE_VARIANT[run.status]} className="shrink-0">
+                {t(STATUS_LABEL_KEY[run.status])}
+              </Badge>
+            </div>
           </div>
-          <Badge variant="secondary" className="shrink-0">
-            {run.id.slice(0, 8)}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="shrink-0 font-mono">
+                {run.id.slice(0, 8)}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="text-xs">
+                {t("simulationHistory.fullIdTooltip")}: <span className="font-mono">{run.id}</span>
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         <Separator />
@@ -65,6 +97,10 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
             </div>
           ))}
         </dl>
+
+        <p className="font-sans text-xs text-muted-foreground">
+          {t("simulationHistory.retentionNote")}
+        </p>
 
         <Separator />
 
