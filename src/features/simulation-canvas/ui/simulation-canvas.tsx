@@ -44,10 +44,10 @@ const DECLUSTER_ANIMATE_MS = 2_000;
 
 /**
  * Wait before playback actually starts when play is pressed with clustering
- * active (user decision): the de-cluster animation runs ~80% before rounds
+ * active (user decision): the FULL de-cluster animation runs before rounds
  * begin to advance, so the two motions never overlap.
  */
-export const DECLUSTER_PLAY_DELAY_MS = Math.round(DECLUSTER_ANIMATE_MS * 0.8);
+export const DECLUSTER_PLAY_DELAY_MS = DECLUSTER_ANIMATE_MS;
 
 /** Categorical palette for "Colorear por estrategia" (mockup PAL). */
 const STRATEGY_COLORS = ["#4f6bd8", "#7cb342", "#f59e0b", "#ec4899", "#8b5cf6"] as const;
