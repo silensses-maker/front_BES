@@ -104,6 +104,7 @@ export function createSimulationWsClient(
         if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setNetworkId(msg.networkId);
         store().setFinalRound(msg.finalRound);
+        store().setConsensus(msg.consensus);
         break;
       case "run_completed":
         store().setStatus("completed");
@@ -151,7 +152,8 @@ export function createSimulationWsClient(
         new URL("../../../shared/workers/simulation-frame.worker.ts", import.meta.url),
       );
       worker.onmessage = (event: MessageEvent<MergedFrame>) => {
-        store().updateFrame(event.data);
+        // Live path: advances the "recibidas" cursor; renders only in follow mode
+        store().ingestLiveFrame(event.data);
         const lastRun = useLastRunStore.getState();
         if (lastRun.runId === runId) lastRun.setRound(event.data.round);
       };

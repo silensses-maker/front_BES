@@ -18,9 +18,19 @@ export interface SimulationState {
   runId: string | null;
   networkId: string | null;
   topology: TopologyResponse | null;
+  /** Round currently on screen (viewed round — follows the timeline cursor). */
   currentRound: number;
+  /** Frame currently on screen — drives the canvas, agent table and histogram. */
   latestFrame: MergedFrame | null;
+  /** Latest frame ARRIVED from the live stream, regardless of what's viewed. */
+  receivedFrame: MergedFrame | null;
+  /** Highest round received from the live stream (the "recibidas" cursor). */
+  receivedRound: number;
+  /** True while the viewed round is pinned to the live tail. */
+  follow: boolean;
   finalRound: number | null;
+  /** Verdict from WS network_converged (null until it arrives). */
+  consensus: boolean | null;
   error: string | null;
   selectedAgentIndex: number | null;
 }

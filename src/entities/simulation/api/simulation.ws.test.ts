@@ -26,8 +26,9 @@ type MockStoreActions = {
   setStatus: ReturnType<typeof vi.fn>;
   setNetworkId: ReturnType<typeof vi.fn>;
   setTopology: ReturnType<typeof vi.fn>;
-  updateFrame: ReturnType<typeof vi.fn>;
+  ingestLiveFrame: ReturnType<typeof vi.fn>;
   setFinalRound: ReturnType<typeof vi.fn>;
+  setConsensus: ReturnType<typeof vi.fn>;
   setError: ReturnType<typeof vi.fn>;
   topology: unknown;
 };
@@ -91,8 +92,9 @@ describe("createSimulationWsClient", () => {
       setStatus: vi.fn(),
       setNetworkId: vi.fn(),
       setTopology: vi.fn(),
-      updateFrame: vi.fn(),
+      ingestLiveFrame: vi.fn(),
       setFinalRound: vi.fn(),
+      setConsensus: vi.fn(),
       setError: vi.fn(),
       topology: null,
     };
@@ -160,7 +162,7 @@ describe("createSimulationWsClient", () => {
       );
     });
 
-    it("worker onmessage forwards merged frame to store", async () => {
+    it("worker onmessage forwards merged frame to store via the live-ingest path", async () => {
       const client = createSimulationWsClient(RUN_ID, null, mockManager);
       await client.connect();
 
@@ -174,7 +176,7 @@ describe("createSimulationWsClient", () => {
       };
       mockWorker.onmessage?.({ data: mergedFrame } as MessageEvent);
 
-      expect(mockStore.updateFrame).toHaveBeenCalledWith(mergedFrame);
+      expect(mockStore.ingestLiveFrame).toHaveBeenCalledWith(mergedFrame);
     });
 
     describe("onEvent callback — control events", () => {
@@ -263,6 +265,20 @@ describe("createSimulationWsClient", () => {
 
         expect(mockStore.setNetworkId).toHaveBeenCalledWith("net-1");
         expect(mockStore.setFinalRound).toHaveBeenCalledWith(42);
+      });
+
+      it("stores the consensus verdict on network_converged", async () => {
+        const onEvent = await getEventCallback();
+
+        await onEvent({
+          event: "network_converged",
+          runId: RUN_ID,
+          networkId: "net-1",
+          finalRound: 42,
+          consensus: false,
+        });
+
+        expect(mockStore.setConsensus).toHaveBeenCalledWith(false);
       });
 
       describe("topology_ready idempotency (store already populated)", () => {
@@ -681,7 +697,7 @@ describe("createSimulationWsClient", () => {
       mockWorker.onmessage?.({ data: { round: 57 } } as MessageEvent);
 
       expect(useLastRunStore.getState().round).toBe(57);
-      expect(mockStore.updateFrame).toHaveBeenCalled();
+      expect(mockStore.ingestLiveFrame).toHaveBeenCalled();
     });
   });
 });

@@ -5,6 +5,7 @@ import type {
   CosmographRef,
 } from "@cosmograph/react";
 import { Cosmograph, prepareCosmographData } from "@cosmograph/react";
+import { Maximize, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { SimulationStatus } from "@/entities/simulation";
@@ -12,14 +13,19 @@ import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
-import { interpolateOpinion, OPINION_PALETTE } from "@/shared/lib/opinion-palette";
+import {
+  interpolateDivergence,
+  interpolateOpinion,
+  OPINION_PALETTE,
+} from "@/shared/lib/opinion-palette";
 import { Button } from "@/shared/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { topologyToData } from "../lib/topology-to-data";
 import { CanvasLegend } from "./canvas-legend";
 import type { ClusterMode } from "./cluster-toggle";
 import { ClusterToggle } from "./cluster-toggle";
-import type { CanvasView } from "./view-toggle";
-import { ViewToggle } from "./view-toggle";
+import type { ColorBy } from "./color-by-select";
+import { ColorBySelect } from "./color-by-select";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +38,9 @@ const LAYOUT_DURATION_MS = 5_000;
 
 /** Duration (ms) the clustering re-run executes before re-freezing. */
 const CLUSTER_REANIMATE_MS = 4_000;
+
+/** Categorical palette for "Colorear por estrategia" (mockup PAL). */
+const STRATEGY_COLORS = ["#4f6bd8", "#7cb342", "#f59e0b", "#ec4899", "#8b5cf6"] as const;
 
 // ─── Base config (layouting defaults) ────────────────────────────────────────
 
@@ -70,11 +79,21 @@ const FREEZE_FLAGS: CosmographConfig = {
 export interface SimulationCanvasProps {
   status: SimulationStatus;
   topology: TopologyResponse | null;
+  /**
+   * True while the playback auto-advances rounds. Belief clustering is
+   * suspended during playback (per-frame cluster reassignment is what lags);
+   * manual round stepping keeps it available and animates at the user's pace.
+   */
+  playbackActive?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
+export function SimulationCanvas({
+  status,
+  topology,
+  playbackActive = false,
+}: SimulationCanvasProps) {
   const { t } = useTranslation();
 
   // Maps numeric SilenceStrategy values → localized names for cluster labels.
@@ -96,49 +115,75 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
 
   const setSelectedAgentIndex = useSimulationStore((s) => s.setSelectedAgentIndex);
   const selectedAgentIndex = useSimulationStore((s) => s.selectedAgentIndex);
-  // The merged final frame — populated by the live stream during the run and,
-  // for cold-loaded completed runs, by the REST replay fallback in
-  // use-simulation-stream.ts. Drives the Final view's per-agent color/size (#99).
+  // The VIEWED frame — live tail while following, or whatever round the
+  // playback engine rendered. Drives per-agent color/size (#99 mechanism).
   const latestFrame = useSimulationStore((s) => s.latestFrame);
+  const currentRound = useSimulationStore((s) => s.currentRound);
   // Maps Cosmograph's sequential internal index → agent.index from topology.
   // Rebuilt each time topology is processed (same useEffect below).
   const agentIndexMapRef = useRef<number[]>([]);
 
-  // ─── Initial / Final view toggle (#99) ────────────────────────────────────
-  const [viewMode, setViewMode] = useState<CanvasView>("initial");
-  // Final is available once the run has converged and the final frame is in the
-  // store for THIS network (guards against a stale frame from a previous run).
-  const finalAvailable =
-    status === "completed" && latestFrame !== null && latestFrame.networkId === topology?.networkId;
-  // One-shot auto-switch to Final when it first becomes available, unless the
-  // researcher already picked a view manually (don't yank them away mid-look).
-  const autoSelectedRef = useRef(false);
-  const userTouchedRef = useRef(false);
+  // ─── "Colorear por" (replaces the Initial/Final toggle — round 0 = initial) ─
+  const [colorBy, setColorBy] = useState<ColorBy>("pub");
+  // Guard against a stale frame from a previous run/network
+  const frame =
+    latestFrame !== null && latestFrame.networkId === topology?.networkId ? latestFrame : null;
 
-  const handleViewChange = useCallback((next: CanvasView) => {
-    userTouchedRef.current = true;
-    setViewMode(next);
-  }, []);
+  const strategyByIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    if (topology) {
+      for (const agent of topology.agents) map.set(agent.index, agent.silenceStrategy);
+    }
+    return map;
+  }, [topology]);
 
-  // Reads the final frame by the `agentIndex` column value (Cosmograph passes
-  // the column value reliably; the optional 2nd `index` arg is not dependable).
-  const finalColorByFn = useCallback(
+  const initialBeliefByIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    if (topology) {
+      for (const agent of topology.agents) map.set(agent.index, agent.initialBelief);
+    }
+    return map;
+  }, [topology]);
+
+  const strategyLegendEntries = useMemo(() => {
+    if (!topology) return [];
+    const present = [...new Set(topology.agents.map((a) => a.silenceStrategy))].sort(
+      (a, b) => a - b,
+    );
+    return present.map((strategy) => ({
+      label: silenceStrategyLabel(strategy),
+      color: STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? "#888888",
+    }));
+  }, [topology, silenceStrategyLabel]);
+
+  // Reads by the `agentIndex` column value (Cosmograph passes the column value
+  // reliably; the optional 2nd `index` arg is not dependable). Without a frame
+  // (layout warm-up, round 0 not yet rendered) beliefs fall back to initial.
+  const colorByFn = useCallback(
     (value: unknown): string => {
       const agentIdx = Number(value);
-      if (latestFrame === null || !Number.isFinite(agentIdx)) return OPINION_PALETTE[1];
-      const belief = latestFrame.publicBelief[agentIdx];
-      return belief === undefined ? OPINION_PALETTE[1] : interpolateOpinion(belief);
+      if (!Number.isFinite(agentIdx)) return OPINION_PALETTE[1];
+      if (colorBy === "estr") {
+        const strategy = strategyByIndex.get(agentIdx) ?? 0;
+        return STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? OPINION_PALETTE[1];
+      }
+      const fallback = initialBeliefByIndex.get(agentIdx) ?? 0.5;
+      const pub = frame?.publicBelief[agentIdx] ?? fallback;
+      const priv = frame?.privateBelief[agentIdx] ?? fallback;
+      if (colorBy === "pub") return interpolateOpinion(pub);
+      if (colorBy === "priv") return interpolateOpinion(priv);
+      return interpolateDivergence(Math.abs(pub - priv));
     },
-    [latestFrame],
+    [colorBy, frame, strategyByIndex, initialBeliefByIndex],
   );
 
-  const finalSizeByFn = useCallback(
+  const speakingSizeByFn = useCallback(
     (value: unknown): number => {
       const agentIdx = Number(value);
-      if (latestFrame === null || !Number.isFinite(agentIdx)) return 8;
-      return latestFrame.speaking[agentIdx] ? 14 : 8;
+      if (frame === null || !Number.isFinite(agentIdx)) return 8;
+      return frame.speaking[agentIdx] ? 14 : 8;
     },
-    [latestFrame],
+    [frame],
   );
 
   const cosmographRef = useRef<CosmographRef>(undefined);
@@ -175,9 +220,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
       setClusterMode(null);
       setCanvasOverride({});
       setSelectedAgentIndex(null);
-      setViewMode("initial");
-      autoSelectedRef.current = false;
-      userTouchedRef.current = false;
+      setColorBy("pub");
       return;
     }
 
@@ -243,6 +286,23 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     [t],
   );
 
+  // Cluster key for "Agrupar · Creencia": quartile of the belief at the
+  // VIEWED round (falls back to the initial belief before any frame exists).
+  // Receives the `agentIndex` column value. The identity of this callback
+  // changes with every rendered frame — that is what makes Cosmograph
+  // re-evaluate cluster assignments during playback (see the nudge effect).
+  const liveBeliefLabel = useCallback(
+    (value: unknown): string => {
+      const agentIdx = Number(value);
+      const belief =
+        (Number.isFinite(agentIdx) ? frame?.publicBelief[agentIdx] : undefined) ??
+        initialBeliefByIndex.get(agentIdx) ??
+        0.5;
+      return beliefLabel(belief);
+    },
+    [frame, initialBeliefByIndex, beliefLabel],
+  );
+
   const silenceEffectLabel = useCallback(
     (value: unknown): string => {
       const map: Record<number, string> = {
@@ -258,10 +318,9 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
   // ─── Cluster mode handler ─────────────────────────────────────────────────
 
   const handleClusterMode = useCallback(
-    (mode: ClusterMode) => {
+    (next: ClusterMode | null) => {
       if (prepResult === null) return;
 
-      const next = clusterMode === mode ? null : mode;
       setClusterMode(next);
 
       if (clusterTimerRef.current !== null) {
@@ -279,7 +338,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
             ? "silenceStrategy"
             : next === "effect"
               ? "silenceEffect"
-              : "initialBelief";
+              : "agentIndex";
         setCanvasOverride({
           pointClusterBy,
           showClusterLabels: true,
@@ -296,14 +355,20 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
           clusterStartTimerRef.current = null;
         }, 100);
 
-        clusterTimerRef.current = setTimeout(() => {
-          setCanvasOverride({
-            ...FREEZE_FLAGS,
-            pointClusterBy,
-            showClusterLabels: true,
-          });
-          clusterTimerRef.current = null;
-        }, CLUSTER_REANIMATE_MS);
+        // "Creencia" follows the VIEWED round: the simulation is left enabled
+        // (never re-frozen) so nodes migrate between belief groups as the
+        // playback advances; it cools down on its own when rounds stop
+        // changing. Static groupings (strategy/effect) re-freeze as before.
+        if (next !== "belief") {
+          clusterTimerRef.current = setTimeout(() => {
+            setCanvasOverride({
+              ...FREEZE_FLAGS,
+              pointClusterBy,
+              showClusterLabels: true,
+            });
+            clusterTimerRef.current = null;
+          }, CLUSTER_REANIMATE_MS);
+        }
       } else {
         setCanvasOverride({
           ...FREEZE_FLAGS,
@@ -312,7 +377,7 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         });
       }
     },
-    [clusterMode, prepResult],
+    [prepResult],
   );
 
   // Cleanup cluster timers on unmount
@@ -327,6 +392,24 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     };
   }, []);
 
+  // Belief clustering follows the viewed round: each rendered round
+  // re-assigns clusters (liveBeliefLabel identity change) and this gentle
+  // reheat gives the simulation enough energy to pull migrating nodes to
+  // their new group. It cools down by itself once rounds stop changing.
+  useEffect(() => {
+    if (clusterMode !== "belief" || frame === null) return;
+    cosmographRef.current?.start(0.12);
+  }, [clusterMode, frame]);
+
+  // Playback suspends belief clustering (user decision): the per-frame
+  // reassignment + reheat is what lags at high speeds. Manual stepping keeps
+  // it — the migration animation runs at the user's own pace.
+  useEffect(() => {
+    if (playbackActive && clusterMode === "belief") {
+      handleClusterMode(null);
+    }
+  }, [playbackActive, clusterMode, handleClusterMode]);
+
   // ─── Node selection greyout ───────────────────────────────────────────────
   // Tell Cosmograph which point is selected so it dims everything else.
   // Works regardless of link visibility.
@@ -340,23 +423,12 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     cosmographRef.current?.selectPoint(cosmographIndex, false, false);
   }, [selectedAgentIndex]);
 
-  // ─── Auto-select Final view once it becomes available ──────────────────────
-  // Fires for both cold-loaded completed runs and a live run reaching
-  // convergence, but only if the researcher hasn't already chosen a view.
-  // Gated on `frozen` so the heavy first render (force-layout warmup) always
-  // happens in the cheap Initial view — never with the per-point Final closure
-  // running on an unstable, still-simulating graph.
-  useEffect(() => {
-    if (
-      phase === "frozen" &&
-      finalAvailable &&
-      !autoSelectedRef.current &&
-      !userTouchedRef.current
-    ) {
-      autoSelectedRef.current = true;
-      setViewMode("final");
-    }
-  }, [phase, finalAvailable]);
+  // ─── Zoom controls (mockup: − / ＋ / ajustar a pantalla) ───────────────────
+  const zoomBy = useCallback((factor: number) => {
+    const current = cosmographRef.current?.getZoomLevel();
+    if (current === undefined) return;
+    cosmographRef.current?.setZoomLevel(current * factor, 150);
+  }, []);
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
@@ -388,7 +460,10 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     );
   }
 
-  if (status === "cancelled") {
+  // A cancelled run keeps its received data on screen (mockup: "los datos
+  // recibidos se conservan") — only fall back to the message when the graph
+  // never initialized.
+  if (status === "cancelled" && prepResult === null) {
     return (
       <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
         <div className="flex flex-col items-center gap-3">
@@ -477,19 +552,23 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
               ? silenceStrategyLabel
               : clusterMode === "effect"
                 ? silenceEffectLabel
-                : beliefLabel,
+                : liveBeliefLabel,
         })}
-        // Final view (#99): swap the static initialBelief coloring for per-agent
-        // final publicBelief + speaking, read from the merged frame by index.
+        // "Colorear por" (#99 repaint mechanism): per-agent color from the
+        // VIEWED frame by index — the store's latestFrame changes on every
+        // seek/live round and this closure re-reads it. Without a frame the
+        // fns fall back to initial beliefs; strategy coloring needs no frame.
         // Setting the strategies to undefined activates the *ByFn overrides.
-        // One-shot config change (not per-tick) — orthogonal to cluster/freeze.
-        {...(viewMode === "final" && {
+        {...((frame !== null || colorBy === "estr") && {
           pointColorBy: "agentIndex",
           pointColorStrategy: undefined,
-          pointColorByFn: finalColorByFn,
+          pointColorByFn: colorByFn,
+        })}
+        // Speaking agents render larger — meaningful once a round is on screen
+        {...(frame !== null && {
           pointSizeBy: "agentIndex",
           pointSizeStrategy: undefined,
-          pointSizeByFn: finalSizeByFn,
+          pointSizeByFn: speakingSizeByFn,
         })}
         // Hide links by making them transparent — keeps renderLinks=true so
         // Cosmograph's node selection greyout still works normally.
@@ -515,33 +594,69 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         </div>
       )}
 
-      {/* Cluster toggle — top-left */}
+      {/* "Agrupar" segmented — top-left */}
       <ClusterToggle
         activeMode={clusterMode}
-        onToggle={handleClusterMode}
+        onChange={handleClusterMode}
         disabled={phase !== "frozen"}
+        beliefDisabled={playbackActive}
       />
 
-      {/* Initial / Final view toggle — top-right */}
-      <ViewToggle view={viewMode} onChange={handleViewChange} finalEnabled={finalAvailable} />
+      {/* "Colorear por" select — top-right */}
+      <ColorBySelect value={colorBy} onChange={setColorBy} />
 
-      {/* Belief / size legend — bottom-right */}
-      <CanvasLegend view={viewMode} />
+      {/* Legend — bottom-right */}
+      <CanvasLegend
+        colorBy={colorBy}
+        strategyLegend={strategyLegendEntries}
+        showSpeakingLegend={frame !== null && currentRound > 0}
+      />
 
-      {/* Hide-links toggle — bottom-left, same pill style as cluster buttons */}
-      <div className="absolute bottom-2 left-2 z-10">
+      {/* Links toggle + zoom group — bottom-left (mockup) */}
+      <div className="absolute bottom-2.5 left-2.5 z-10 flex gap-1.5">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => setLinksHidden((prev) => !prev)}
-          className={`
-            rounded-full px-3 py-1.5 text-xs font-medium transition-colors
-            ${linksHidden ? "bg-primary/10 border-primary/30 text-primary" : ""}
-          `}
+          className="h-7 rounded-lg bg-card px-3 text-xs font-medium shadow-sm"
         >
           {linksHidden ? t("simulation.canvas.showLinks") : t("simulation.canvas.hideLinks")}
         </Button>
+        <span className="flex gap-0.5 rounded-lg border border-border bg-card p-0.5 shadow-sm">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t("runView.zoomOutAria")}
+            onClick={() => zoomBy(1 / 1.25)}
+          >
+            <Minus />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t("runView.zoomInAria")}
+            onClick={() => zoomBy(1.25)}
+          >
+            <Plus />
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t("runView.zoomFitTip")}
+                onClick={() => cosmographRef.current?.fitView(250)}
+              >
+                <Maximize />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{t("runView.zoomFitTip")}</TooltipContent>
+          </Tooltip>
+        </span>
       </div>
     </div>
   );

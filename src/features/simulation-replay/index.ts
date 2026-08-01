@@ -1,9 +1,16 @@
+export { type SweepHandle, startAggregatesSweep } from "./lib/aggregates-sweep";
 export {
-  REPLAY_SPEEDS,
-  type ReplaySpeed,
-  type ReplayStatus,
-  type UseReplayEngineReturn,
-  useReplayEngine,
-} from "./model/use-replay-engine";
-export { ReplayControlBar } from "./ui/replay-control-bar";
-export { ReplayDock } from "./ui/replay-dock";
+  findAdjacentEvent,
+  findNearbyEvent,
+  type RoundEvent,
+  type RoundEventKind,
+} from "./lib/round-events";
+export {
+  PLAYBACK_SPEEDS,
+  type PlaybackSpeed,
+  type PlaybackStatus,
+  type UsePlaybackEngineReturn,
+  usePlaybackEngine,
+} from "./model/use-playback-engine";
+export { useRoundEvents } from "./model/use-round-events";
+export { TimelinePanel } from "./ui/timeline-panel";

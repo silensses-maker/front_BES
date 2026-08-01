@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { ReplayDock } from "@/features/simulation-replay";
-import { RunStatusPanel, SimulationRunView } from "@/features/simulation-stream";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
 import type { DashboardOutletContext } from "@/shared/types/dashboard";
 import { NetworkListPanel } from "./network-list-panel";
 import { NetworkSelectorWaiting } from "./network-selector";
+import { RunView } from "./run-view";
 
 type LoadingState = "loading" | "waiting" | "selector" | "run-view";
 
@@ -34,22 +33,16 @@ export function LiveRunPage() {
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
   const [networkIds, setNetworkIds] = useState<string[]>([]);
 
-  // Inject the right sidebar panel whenever state or network list changes.
-  // "selector" shows the network list to pick from; all other states show
-  // the simulation status panel.
+  // Inject the sidebar panel for the pre-run states ("selector"/"waiting").
+  // The run-view state owns its own sidebar injection (RunView → RunStatusPanel
+  // with run metadata props).
   useEffect(() => {
     if (!runId) return;
+    if (loadingState !== "selector" && loadingState !== "waiting") return;
 
-    const content =
-      loadingState === "selector" ? (
-        <NetworkListPanel runId={runId} networkIds={networkIds} />
-      ) : loadingState === "waiting" ? (
-        <NetworkListPanel runId={runId} networkIds={[]} />
-      ) : (
-        <RunStatusPanel runId={runId} />
-      );
-
-    setSidebarContent(content);
+    setSidebarContent(
+      <NetworkListPanel runId={runId} networkIds={loadingState === "selector" ? networkIds : []} />,
+    );
     return () => setSidebarContent(null);
   }, [runId, loadingState, networkIds, setSidebarContent]);
 
@@ -121,11 +114,5 @@ export function LiveRunPage() {
   }
 
   // loadingState === "run-view" — networkId is guaranteed present here
-  return (
-    <SimulationRunView
-      runId={runId}
-      networkId={networkId!}
-      replaySlot={<ReplayDock runId={runId} networkId={networkId!} />}
-    />
-  );
+  return <RunView runId={runId} networkId={networkId!} />;
 }

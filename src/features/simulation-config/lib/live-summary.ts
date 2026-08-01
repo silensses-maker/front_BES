@@ -136,8 +136,6 @@ export function listValidationMessages(
   return messages;
 }
 
-/** Locale-aware number formatting (mockup's fmt: es-CO grouping "1.068"). */
-export function formatNumber(n: number, lang: string): string {
-  if (!Number.isFinite(n)) return "∞";
-  return n.toLocaleString(lang);
-}
+// Locale-aware number formatting (mockup's fmt: es-CO grouping "1.068").
+// Implementation lives in shared/lib; re-exported here for this slice's consumers.
+export { formatNumber } from "@/shared/lib/format-number";
