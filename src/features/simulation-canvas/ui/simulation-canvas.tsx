@@ -243,6 +243,18 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
     [t],
   );
 
+  const silenceEffectLabel = useCallback(
+    (value: unknown): string => {
+      const map: Record<number, string> = {
+        0: t("enums.silenceEffect.degroot"),
+        1: t("enums.silenceEffect.memory"),
+        2: t("enums.silenceEffect.memoryless"),
+      };
+      return map[value as number] ?? String(value);
+    },
+    [t],
+  );
+
   // ─── Cluster mode handler ─────────────────────────────────────────────────
 
   const handleClusterMode = useCallback(
@@ -262,7 +274,12 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
       }
 
       if (next !== null) {
-        const pointClusterBy = next === "strategy" ? "silenceStrategy" : "initialBelief";
+        const pointClusterBy =
+          next === "strategy"
+            ? "silenceStrategy"
+            : next === "effect"
+              ? "silenceEffect"
+              : "initialBelief";
         setCanvasOverride({
           pointClusterBy,
           showClusterLabels: true,
@@ -455,7 +472,12 @@ export function SimulationCanvas({ status, topology }: SimulationCanvasProps) {
         {...BASE_CONFIG}
         {...canvasOverride}
         {...(clusterMode !== null && {
-          pointClusterByFn: clusterMode === "strategy" ? silenceStrategyLabel : beliefLabel,
+          pointClusterByFn:
+            clusterMode === "strategy"
+              ? silenceStrategyLabel
+              : clusterMode === "effect"
+                ? silenceEffectLabel
+                : beliefLabel,
         })}
         // Final view (#99): swap the static initialBelief coloring for per-agent
         // final publicBelief + speaking, read from the merged frame by index.

@@ -3,7 +3,7 @@ import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
-export type ClusterMode = "strategy" | "belief";
+export type ClusterMode = "strategy" | "belief" | "effect";
 
 interface ClusterToggleProps {
   activeMode: ClusterMode | null;
@@ -20,10 +20,11 @@ export function ClusterToggle({ activeMode, onToggle, disabled = false }: Cluste
   const { t } = useTranslation();
   const onWindows = isWindows();
 
-  const modes: ClusterMode[] = ["strategy", "belief"];
+  const modes: ClusterMode[] = ["strategy", "belief", "effect"];
   const labels: Record<ClusterMode, string> = {
     strategy: t("simulation.canvas.clusterByStrategy"),
     belief: t("simulation.canvas.clusterByBelief"),
+    effect: t("simulation.canvas.clusterByEffect"),
   };
 
   return (

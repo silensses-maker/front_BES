@@ -313,6 +313,7 @@ const en = {
       computingLayout: "Computing layout…",
       clusterByStrategy: "By strategy",
       clusterByBelief: "By belief",
+      clusterByEffect: "By effect",
       windowsClusterWarning: "Clustering may be unstable on Windows",
       dataPrepError: "Failed to prepare data — try refreshing",
       hideLinks: "Hide links",
