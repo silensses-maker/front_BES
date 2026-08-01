@@ -173,7 +173,7 @@ mjx-container svg {
 
   /* Layout — dashboard sidebar expanded width (mockup: 416px = 26rem).
      --container-* is the Tailwind v4 namespace that feeds w-* named sizes. */
-  --container-sidebar: 26rem;
+  --container-sidebar: 36rem;
 
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);

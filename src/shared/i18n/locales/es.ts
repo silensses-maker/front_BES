@@ -743,8 +743,7 @@ const es = {
     groupStrategy: "Estrategia",
     groupBelief: "Creencia",
     groupEffect: "Efecto",
-    groupBeliefPlaybackTip:
-      "No disponible mientras las rondas avanzan solas — pausa para agrupar por creencia.",
+    groupPlaybackTip: "No disponible mientras las rondas avanzan solas — pausa para agrupar.",
     colorByLabel: "Colorear por",
     colorPublic: "Creencia pública",
     colorPrivate: "Creencia privada",

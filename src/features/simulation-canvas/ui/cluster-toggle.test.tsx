@@ -92,20 +92,21 @@ describe("ClusterToggle", () => {
     });
   });
 
-  describe("belief suspended during playback", () => {
-    it("disables ONLY the belief button when beliefDisabled=true", () => {
+  describe("suspended during auto-advance", () => {
+    it("disables every grouping mode but keeps Ninguno enabled", () => {
       const onChange = vi.fn();
-      render(<ClusterToggle activeMode={null} onChange={onChange} beliefDisabled />);
+      render(<ClusterToggle activeMode={null} onChange={onChange} suspended />);
 
       expect(getOptionButton("belief")).toBeDisabled();
+      expect(getOptionButton("strategy")).toBeDisabled();
+      expect(getOptionButton("effect")).toBeDisabled();
       expect(getOptionButton("none")).not.toBeDisabled();
-      expect(getOptionButton("strategy")).not.toBeDisabled();
-      expect(getOptionButton("effect")).not.toBeDisabled();
 
       fireEvent.click(getOptionButton("belief"));
-      expect(onChange).not.toHaveBeenCalled();
       fireEvent.click(getOptionButton("strategy"));
-      expect(onChange).toHaveBeenCalledWith("strategy");
+      expect(onChange).not.toHaveBeenCalled();
+      fireEvent.click(getOptionButton("none"));
+      expect(onChange).toHaveBeenCalledWith(null);
     });
   });
 

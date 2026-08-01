@@ -732,7 +732,7 @@ const en = {
     groupStrategy: "Strategy",
     groupBelief: "Belief",
     groupEffect: "Effect",
-    groupBeliefPlaybackTip: "Unavailable while rounds auto-advance — pause to group by belief.",
+    groupPlaybackTip: "Unavailable while rounds auto-advance — pause to group.",
     colorByLabel: "Color by",
     colorPublic: "Public belief",
     colorPrivate: "Private belief",

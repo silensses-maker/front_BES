@@ -39,6 +39,16 @@ const LAYOUT_DURATION_MS = 5_000;
 /** Duration (ms) the clustering re-run executes before re-freezing. */
 const CLUSTER_REANIMATE_MS = 4_000;
 
+/** Duration (ms) of the animated return to the organic layout on de-cluster. */
+const DECLUSTER_ANIMATE_MS = 2_000;
+
+/**
+ * Wait before playback actually starts when play is pressed with clustering
+ * active (user decision): the de-cluster animation runs ~80% before rounds
+ * begin to advance, so the two motions never overlap.
+ */
+export const DECLUSTER_PLAY_DELAY_MS = Math.round(DECLUSTER_ANIMATE_MS * 0.8);
+
 /** Categorical palette for "Colorear por estrategia" (mockup PAL). */
 const STRATEGY_COLORS = ["#4f6bd8", "#7cb342", "#f59e0b", "#ec4899", "#8b5cf6"] as const;
 
@@ -80,11 +90,15 @@ export interface SimulationCanvasProps {
   status: SimulationStatus;
   topology: TopologyResponse | null;
   /**
-   * True while the playback auto-advances rounds. Belief clustering is
-   * suspended during playback (per-frame cluster reassignment is what lags);
-   * manual round stepping keeps it available and animates at the user's pace.
+   * True while rounds auto-advance (replay playback or the live tail).
+   * Clustering is suspended entirely during auto-advance (per-frame belief
+   * reassignment is what lags; static modes follow the same rule for a
+   * uniform UX); manual round stepping keeps it available and animates at
+   * the user's pace.
    */
   playbackActive?: boolean;
+  /** Reports whether any grouping is active — the page delays play with it. */
+  onClusterActiveChange?: (active: boolean) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -93,6 +107,7 @@ export function SimulationCanvas({
   status,
   topology,
   playbackActive = false,
+  onClusterActiveChange,
 }: SimulationCanvasProps) {
   const { t } = useTranslation();
 
@@ -370,11 +385,29 @@ export function SimulationCanvas({
           }, CLUSTER_REANIMATE_MS);
         }
       } else {
+        // De-cluster ANIMATED: re-enable the simulation without cluster force
+        // so repulsion/links pull the layout back to its organic arrangement,
+        // then freeze. (Play-with-clustering waits DECLUSTER_PLAY_DELAY_MS so
+        // this animation runs mostly alone before rounds start advancing.)
         setCanvasOverride({
-          ...FREEZE_FLAGS,
+          preservePointPositionsOnDataUpdate: false,
           simulationCluster: 0.1,
           simulationGravity: BASE_CONFIG.simulationGravity,
         });
+
+        clusterStartTimerRef.current = setTimeout(() => {
+          cosmographRef.current?.start(1);
+          clusterStartTimerRef.current = null;
+        }, 100);
+
+        clusterTimerRef.current = setTimeout(() => {
+          setCanvasOverride({
+            ...FREEZE_FLAGS,
+            simulationCluster: 0.1,
+            simulationGravity: BASE_CONFIG.simulationGravity,
+          });
+          clusterTimerRef.current = null;
+        }, DECLUSTER_ANIMATE_MS);
       }
     },
     [prepResult],
@@ -401,14 +434,21 @@ export function SimulationCanvas({
     cosmographRef.current?.start(0.12);
   }, [clusterMode, frame]);
 
-  // Playback suspends belief clustering (user decision): the per-frame
-  // reassignment + reheat is what lags at high speeds. Manual stepping keeps
-  // it — the migration animation runs at the user's own pace.
+  // Auto-advancing rounds suspend clustering entirely (user decision): belief
+  // reassignment per frame is what lags, and the static modes are suspended
+  // too for a uniform rule. Manual stepping keeps them — the migration
+  // animation runs at the user's own pace.
   useEffect(() => {
-    if (playbackActive && clusterMode === "belief") {
+    if (playbackActive && clusterMode !== null) {
       handleClusterMode(null);
     }
   }, [playbackActive, clusterMode, handleClusterMode]);
+
+  // Let the page know whether grouping is active (it delays play so the
+  // de-cluster animation runs before rounds start advancing).
+  useEffect(() => {
+    onClusterActiveChange?.(clusterMode !== null);
+  }, [clusterMode, onClusterActiveChange]);
 
   // ─── Node selection greyout ───────────────────────────────────────────────
   // Tell Cosmograph which point is selected so it dims everything else.
@@ -599,7 +639,7 @@ export function SimulationCanvas({
         activeMode={clusterMode}
         onChange={handleClusterMode}
         disabled={phase !== "frozen"}
-        beliefDisabled={playbackActive}
+        suspended={playbackActive}
       />
 
       {/* "Colorear por" select — top-right */}

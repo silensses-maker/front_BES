@@ -9,8 +9,8 @@ interface ClusterToggleProps {
   activeMode: ClusterMode | null;
   onChange: (mode: ClusterMode | null) => void;
   disabled?: boolean;
-  /** Belief grouping is suspended while the playback auto-advances rounds. */
-  beliefDisabled?: boolean;
+  /** Grouping is suspended while rounds auto-advance (playback / live tail). */
+  suspended?: boolean;
 }
 
 /** Returns true when running on a Windows host (detects via userAgent). */
@@ -26,7 +26,7 @@ export function ClusterToggle({
   activeMode,
   onChange,
   disabled = false,
-  beliefDisabled = false,
+  suspended = false,
 }: ClusterToggleProps) {
   const { t } = useTranslation();
   const onWindows = isWindows();
@@ -45,8 +45,8 @@ export function ClusterToggle({
       </span>
       {options.map(({ mode, label }) => {
         const isActive = activeMode === mode;
-        const isBeliefSuspended = mode === "belief" && beliefDisabled;
-        const isDisabled = disabled || isBeliefSuspended;
+        const isSuspended = mode !== null && suspended;
+        const isDisabled = disabled || isSuspended;
         const showWarning = isActive && mode !== null && onWindows;
 
         const button = (
@@ -66,7 +66,7 @@ export function ClusterToggle({
           </button>
         );
 
-        if (isBeliefSuspended) {
+        if (isSuspended) {
           // Radix tooltips don't fire on disabled elements — wrap in a span
           return (
             <Tooltip key={mode}>
@@ -74,7 +74,7 @@ export function ClusterToggle({
                 <span className="inline-flex">{button}</span>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p className="text-xs">{t("runView.groupBeliefPlaybackTip")}</p>
+                <p className="text-xs">{t("runView.groupPlaybackTip")}</p>
               </TooltipContent>
             </Tooltip>
           );

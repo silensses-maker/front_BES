@@ -1,8 +1,8 @@
 import { Maximize2, Minimize2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useRoundAggregatesStore, useSimulationStore } from "@/entities/simulation";
-import { SimulationCanvas } from "@/features/simulation-canvas";
+import { DECLUSTER_PLAY_DELAY_MS, SimulationCanvas } from "@/features/simulation-canvas";
 import {
   buildAgentRows,
   buildAgentRowsFromResults,
@@ -269,10 +269,54 @@ export function RunView({ runId, networkId }: RunViewProps) {
     ? Math.max(runMeta?.iterationLimit ?? 0, engine.receivedRound, 1)
     : Math.max(engine.finalRound ?? 0, 1);
 
+  // ── Play diferido con clustering activo ────────────────────────────────────
+  // Pressing play while grouped first runs the de-cluster animation and only
+  // starts advancing rounds at ~80% of it, so the two motions never overlap.
+  // Pressing play again during the wait cancels it (toggle semantics).
+  const clusterActiveRef = useRef(false);
+  const pendingPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingPlay, setPendingPlay] = useState(false);
+
+  const handleClusterActiveChange = useCallback((active: boolean) => {
+    clusterActiveRef.current = active;
+  }, []);
+
+  const cancelPendingPlay = useCallback(() => {
+    if (pendingPlayRef.current !== null) {
+      clearTimeout(pendingPlayRef.current);
+      pendingPlayRef.current = null;
+    }
+    setPendingPlay(false);
+  }, []);
+
+  useEffect(() => cancelPendingPlay, [cancelPendingPlay]);
+
+  // The engine's callbacks are useCallback-stable; destructuring keeps the
+  // wrapped toggle and the hotkeys effect from churning on state changes.
+  const { seek, stepBy, goToEnd, isPlaying } = engine;
+  const enginePlay = engine.play;
+  const engineTogglePlay = engine.togglePlay;
+
+  const togglePlayDeclustered = useCallback(() => {
+    if (pendingPlayRef.current !== null) {
+      cancelPendingPlay();
+      return;
+    }
+    if (!isPlaying && clusterActiveRef.current) {
+      // pendingPlay feeds playbackActive → the canvas de-clusters animated
+      setPendingPlay(true);
+      pendingPlayRef.current = setTimeout(() => {
+        pendingPlayRef.current = null;
+        setPendingPlay(false);
+        enginePlay();
+      }, DECLUSTER_PLAY_DELAY_MS);
+      return;
+    }
+    engineTogglePlay();
+  }, [isPlaying, enginePlay, engineTogglePlay, cancelPendingPlay]);
+
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
-  // The engine's callbacks are useCallback-stable; destructuring keeps this
-  // effect from re-subscribing on every engine state change.
-  const { seek, stepBy, goToEnd, togglePlay } = engine;
+  const togglePlay = togglePlayDeclustered;
   const jumpEvent = useCallback(
     (dir: 1 | -1) => {
       const candidate = findAdjacentEvent(events, useSimulationStore.getState().currentRound, dir);
@@ -407,12 +451,13 @@ export function RunView({ runId, networkId }: RunViewProps) {
           {/* ── Graph / Table panel ────────────────────────────── */}
           {mainTab === "grafo" ? (
             <div className="relative mx-4 mt-2.5 min-h-65 flex-1 overflow-hidden rounded-xl border border-border">
-              {/* Belief clustering suspends whenever rounds auto-advance:
-                  replay playback AND the live tail (same per-frame churn) */}
+              {/* Clustering suspends whenever rounds auto-advance: replay
+                  playback, the live tail, and the pre-play de-cluster wait */}
               <SimulationCanvas
                 status={status}
                 topology={topology}
-                playbackActive={engine.isPlaying || (engine.isLive && engine.follow)}
+                playbackActive={engine.isPlaying || pendingPlay || (engine.isLive && engine.follow)}
+                onClusterActiveChange={handleClusterActiveChange}
               />
             </div>
           ) : (
@@ -438,7 +483,11 @@ export function RunView({ runId, networkId }: RunViewProps) {
       {/* ── Timeline ─────────────────────────────────────────── */}
       {!limited && (
         <div className="mx-4 my-2.5 flex-none">
-          <TimelinePanel engine={engine} events={events} domainEnd={domainEnd} />
+          <TimelinePanel
+            engine={{ ...engine, togglePlay: togglePlayDeclustered }}
+            events={events}
+            domainEnd={domainEnd}
+          />
         </div>
       )}
 
