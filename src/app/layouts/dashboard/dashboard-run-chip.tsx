@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { type LastRunStatus, useLastRunStore, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
@@ -24,8 +24,9 @@ const DOT_CLASS: Record<LastRunStatus, string> = {
  * WS-driven state.
  */
 export function DashboardRunChip() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const runId = useLastRunStore((s) => s.runId);
   const status = useLastRunStore((s) => s.status);
@@ -57,11 +58,12 @@ export function DashboardRunChip() {
     };
   }, [runId, status]);
 
-  if (runId === null) return null;
+  // Per mockup, the chip is hidden while already inside the run view
+  if (runId === null || pathname.startsWith("/board/simulation/")) return null;
 
   const label =
     status === "running"
-      ? t("dashboard.runChipRunning", { round: String(round) })
+      ? t("dashboard.runChipRunning", { round: round.toLocaleString(i18n.language) })
       : t("dashboard.runChipLast");
 
   return (
@@ -70,14 +72,11 @@ export function DashboardRunChip() {
       onClick={() => navigate(`/board/simulation/${runId}`)}
       className={cn(
         "hidden items-center gap-1.5 rounded-full border border-border px-3 py-1 font-sans text-xs md:flex",
-        "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        "text-foreground transition-colors hover:border-primary",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
     >
-      <span
-        className={cn("size-1.5 shrink-0 rounded-full", DOT_CLASS[status])}
-        aria-hidden="true"
-      />
+      <span className={cn("size-2 shrink-0 rounded-full", DOT_CLASS[status])} aria-hidden="true" />
       {label}
     </button>
   );

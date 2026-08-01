@@ -66,7 +66,12 @@ export function SettingsDropdown() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium leading-none">{displayName}</span>
-            <span className="text-xs leading-none text-muted-foreground">{email}</span>
+            <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
+            {user && user.roles.length > 0 && (
+              <span className="mt-1.5 w-fit rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-medium text-primary">
+                {user.roles[0]}
+              </span>
+            )}
           </div>
         </DropdownMenuLabel>
 

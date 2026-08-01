@@ -257,7 +257,7 @@ const es = {
     userMenuTrigger: "Menú de usuario",
     guestName: "Invitado",
     guestEmail: "Sin sesión iniciada",
-    profile: "Perfil",
+    profile: "Perfil y límites de uso",
     theme: "Tema",
     themeLight: "Claro",
     themeDark: "Oscuro",
@@ -286,8 +286,11 @@ const es = {
     // Run chip + connection status
     runChipRunning: "En ejecución · Ronda {{round}}",
     runChipLast: "Ver última ejecución",
+    railRunTip: "Ejecución: {{status}}",
     wsReconnecting: "Reconectando…",
-    themeToggle: "Cambiar tema",
+    themeToggle: "Cambiar tema claro / oscuro",
+    sidebarToggleHint: "Expandir o contraer el panel lateral",
+    breadcrumbFullRunId: "ID completo de la ejecución",
   },
   footer: {
     description:

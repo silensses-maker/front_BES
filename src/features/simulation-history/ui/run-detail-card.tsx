@@ -36,7 +36,7 @@ function formatDate(iso: string): string {
 }
 
 export function RunDetailCard({ run }: RunDetailCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   const displayName = run.name ?? t("simulationHistory.runNameFallback");
@@ -50,7 +50,10 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
           : t("simulationHistory.runTypeCustom"),
     },
     { label: t("simulationHistory.runNetworks"), value: run.networkCount },
-    { label: t("simulationHistory.runIterations"), value: run.iterationLimit },
+    {
+      label: t("simulationHistory.runIterations"),
+      value: run.iterationLimit.toLocaleString(i18n.language),
+    },
     { label: t("simulationHistory.runCreated"), value: formatDate(run.createdAt) },
   ];
 
@@ -64,9 +67,8 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
               {t("simulationHistory.runDetailTitle")}
             </p>
             <div className="mt-0.5 flex items-center gap-2">
-              <h2 className="truncate font-sans text-base font-semibold text-foreground">
-                {displayName}
-              </h2>
+              {/* Mockup uses the display serif for the experiment name */}
+              <h2 className="truncate font-display text-xl text-foreground">{displayName}</h2>
               <Badge variant={STATUS_BADGE_VARIANT[run.status]} className="shrink-0">
                 {t(STATUS_LABEL_KEY[run.status])}
               </Badge>
@@ -98,13 +100,7 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
           ))}
         </dl>
 
-        <p className="font-sans text-xs text-muted-foreground">
-          {t("simulationHistory.retentionNote")}
-        </p>
-
-        <Separator />
-
-        {/* ── Action ─────────────────────────────────────── */}
+        {/* ── Action (footnote goes BELOW it, per mockup) ── */}
         <Button
           type="button"
           className="w-full"
@@ -112,6 +108,10 @@ export function RunDetailCard({ run }: RunDetailCardProps) {
         >
           {t("simulationHistory.openLiveRun")}
         </Button>
+
+        <p className="text-center font-sans text-xs text-muted-foreground">
+          {t("simulationHistory.retentionNote")}
+        </p>
       </CardContent>
     </Card>
   );

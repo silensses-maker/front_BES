@@ -125,7 +125,14 @@ export function BoardPage() {
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 text-center">
-      <p className="font-sans text-base font-medium text-foreground">
+      {/* Mockup empty-state glyph: dashed circle with ◌ */}
+      <div
+        aria-hidden="true"
+        className="mb-2 flex size-12 items-center justify-center rounded-full border border-dashed border-muted-foreground text-lg text-muted-foreground"
+      >
+        ◌
+      </div>
+      <p className="font-sans text-base font-semibold text-foreground">
         {t("board.emptyMyExperiments")}
       </p>
       <p className="font-sans text-sm text-muted-foreground">{t("board.emptyMyExperimentsHint")}</p>

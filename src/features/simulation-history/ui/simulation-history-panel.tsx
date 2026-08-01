@@ -150,18 +150,29 @@ export function SimulationHistoryPanel({
 
           return (
             <div key={run.id}>
-              <button
-                type="button"
+              {/* Row is a div (not <button>) because it nests the cancel action;
+                  role+tabIndex+keyboard handler keep selection accessible. */}
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelectRun(run.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectRun(run.id);
+                  }
+                }}
                 className={cn(
-                  "w-full px-3 pb-1 pt-2.5 text-left transition-colors",
+                  "w-full cursor-pointer px-3 pb-2 pt-2.5 text-left transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                  selectedRunId === run.id ? "bg-primary/10" : "hover:bg-accent",
+                  selectedRunId === run.id &&
+                    "bg-accent shadow-[inset_3px_0_0_var(--color-primary)]",
                 )}
               >
+                {/* Line 1 — name + status badge */}
                 <div className="flex items-start justify-between gap-2">
                   <span
-                    className="flex-1 truncate font-sans text-sm font-medium text-foreground"
+                    className="flex-1 truncate font-sans text-sm font-semibold text-foreground"
                     title={displayName}
                   >
                     {displayName}
@@ -170,30 +181,31 @@ export function SimulationHistoryPanel({
                     {t(STATUS_LABEL_KEY[run.status])}
                   </Badge>
                 </div>
-                <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                  {run.id.slice(0, 8)} · {typeLabel} ·{" "}
-                  {t("simulationHistory.runMetaNetworks", { count: run.networkCount })} ·{" "}
-                  {formatDate(run.createdAt)}
+                {/* Line 2 — id · type · networks */}
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  <span className="font-mono">{run.id.slice(0, 8)}</span> · {typeLabel} ·{" "}
+                  {t("simulationHistory.runMetaNetworks", { count: run.networkCount })}
                 </p>
-              </button>
-
-              {run.status === "running" && (
-                <div className="flex items-center px-3 pb-2">
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    aria-label={t("simulationHistory.cancelRun")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRequestCancel(run.id);
-                    }}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    {t("simulationHistory.cancelRun")}
-                  </Button>
+                {/* Line 3 — date left, cancel action right (running runs only) */}
+                <div className="mt-1 flex min-h-5 items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">{formatDate(run.createdAt)}</span>
+                  {run.status === "running" && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      aria-label={t("simulationHistory.cancelRun")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRequestCancel(run.id);
+                      }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      {t("simulationHistory.cancelRun")}
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
 
               <Separator />
             </div>
@@ -221,7 +233,7 @@ export function SimulationHistoryPanel({
 
       {/* Cancel confirmation — the single shell dialog pattern */}
       <Dialog open={pendingCancelRun !== null} onOpenChange={(open) => !open && onDismissCancel()}>
-        <DialogContent>
+        <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>{t("simulationHistory.cancelDialogTitle")}</DialogTitle>
             <DialogDescription>{t("simulationHistory.cancelDialogBody")}</DialogDescription>

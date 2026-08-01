@@ -253,7 +253,7 @@ const en = {
     userMenuTrigger: "User menu",
     guestName: "Guest",
     guestEmail: "Not signed in",
-    profile: "Profile",
+    profile: "Profile & usage limits",
     theme: "Theme",
     themeLight: "Light",
     themeDark: "Dark",
@@ -282,8 +282,11 @@ const en = {
     // Run chip + connection status
     runChipRunning: "Running · Round {{round}}",
     runChipLast: "View last run",
+    railRunTip: "Run: {{status}}",
     wsReconnecting: "Reconnecting…",
-    themeToggle: "Toggle theme",
+    themeToggle: "Switch light / dark theme",
+    sidebarToggleHint: "Expand or collapse the side panel",
+    breadcrumbFullRunId: "Full run ID",
   },
   footer: {
     description:
