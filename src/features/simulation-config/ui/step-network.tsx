@@ -1,9 +1,13 @@
 import { useTranslation } from "@/shared/i18n";
+import { cn } from "@/shared/lib/utils";
+import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { formatNumber } from "../lib/live-summary";
+import { computeMaxEdges } from "../lib/validation";
 import type {
   GeneratedSimFormValues,
   SimConfigValidationErrors,
@@ -18,6 +22,48 @@ interface StepNetworkProps {
   onUpdate: (patch: Partial<SimFormValues>) => void;
 }
 
+const SAVE_MODE_DESC_KEYS: Record<number, string> = {
+  0: "simulationConfig.saveModeFullDesc",
+  1: "simulationConfig.saveModeStandardDesc",
+  2: "simulationConfig.saveModeLightDesc",
+};
+
+/**
+ * Inline over-quota affordance (mockup): danger error + "Ajustar al máximo"
+ * quick-fix while exceeding the plan, or a muted plan hint when within a
+ * finite limit. Mutually exclusive.
+ */
+function QuotaFieldHint({
+  over,
+  limit,
+  hintKey,
+  onAdjust,
+}: {
+  over: boolean;
+  limit: number | null;
+  hintKey: string;
+  onAdjust: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  if (limit === null) return null;
+  const limitLabel = formatNumber(limit, i18n.language);
+  if (over) {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-destructive">
+        {t("simulationConfig.errorAgentLimitInline", { limit: limitLabel })}
+        <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={onAdjust}>
+          {t("simulationConfig.adjustToMax")}
+        </Button>
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs text-muted-foreground">
+      {t(hintKey as Parameters<typeof t>[0], { limit: limitLabel })}
+    </p>
+  );
+}
+
 export function StepNetwork({
   values,
   maxAgents,
@@ -25,7 +71,7 @@ export function StepNetwork({
   errors,
   onUpdate,
 }: StepNetworkProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const gen = values.networkType === "generated" ? (values as GeneratedSimFormValues) : null;
 
   if (gen === null) {
@@ -35,6 +81,10 @@ export function StepNetwork({
       </p>
     );
   }
+
+  const agentsOver = maxAgents !== null && gen.numberOfAgents > maxAgents;
+  const iterOver = maxIterations !== null && gen.iterationLimit > maxIterations;
+  const maxEdges = computeMaxEdges(gen.density, gen.numberOfAgents);
 
   return (
     <div className="space-y-6">
@@ -55,9 +105,13 @@ export function StepNetwork({
           <SelectContent>
             <SelectItem value="0">{t("simulationConfig.saveModeFull")}</SelectItem>
             <SelectItem value="1">{t("simulationConfig.saveModeStandard")}</SelectItem>
-            <SelectItem value="2">{t("simulationConfig.saveModeDebug")}</SelectItem>
+            <SelectItem value="2">{t("simulationConfig.saveModeLight")}</SelectItem>
           </SelectContent>
         </Select>
+        {/* Mockup: description of the selected save mode under the select */}
+        <p className="text-xs text-muted-foreground">
+          {t(SAVE_MODE_DESC_KEYS[gen.saveMode] as Parameters<typeof t>[0])}
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -85,10 +139,19 @@ export function StepNetwork({
           id="numberOfAgents"
           type="number"
           min={1}
-          max={maxAgents ?? undefined}
+          aria-invalid={agentsOver || undefined}
+          className={cn(agentsOver && "border-destructive")}
           value={gen.numberOfAgents}
           onChange={(e) =>
             onUpdate({ numberOfAgents: Number(e.target.value) } as Partial<SimFormValues>)
+          }
+        />
+        <QuotaFieldHint
+          over={agentsOver}
+          limit={maxAgents}
+          hintKey="simulationConfig.agentsPlanHint"
+          onAdjust={() =>
+            maxAgents !== null && onUpdate({ numberOfAgents: maxAgents } as Partial<SimFormValues>)
           }
         />
       </div>
@@ -106,6 +169,12 @@ export function StepNetwork({
           value={gen.density}
           onChange={(e) => onUpdate({ density: Number(e.target.value) } as Partial<SimFormValues>)}
         />
+        {/* Mockup: derived Barabási–Albert edge count */}
+        <p className="text-xs text-muted-foreground">
+          {t("simulationConfig.densityEdgesHint", {
+            edges: formatNumber(maxEdges, i18n.language),
+          })}
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -117,16 +186,22 @@ export function StepNetwork({
           id="iterationLimit"
           type="number"
           min={1}
-          max={maxIterations ?? undefined}
+          aria-invalid={iterOver || undefined}
+          className={cn(iterOver && "border-destructive")}
           value={gen.iterationLimit}
-          disabled={maxIterations !== null && gen.iterationLimit > maxIterations}
           onChange={(e) =>
             onUpdate({ iterationLimit: Number(e.target.value) } as Partial<SimFormValues>)
           }
         />
-        {errors?.iterationLimitExceeded && (
-          <p className="text-xs text-destructive">{t("simulationConfig.errorIterationLimit")}</p>
-        )}
+        <QuotaFieldHint
+          over={iterOver}
+          limit={maxIterations}
+          hintKey="simulationConfig.iterationsPlanHint"
+          onAdjust={() =>
+            maxIterations !== null &&
+            onUpdate({ iterationLimit: maxIterations } as Partial<SimFormValues>)
+          }
+        />
       </div>
 
       <div className="space-y-2">
@@ -180,10 +255,7 @@ export function StepNetwork({
       </div>
 
       {/* Cross-step validation errors that would otherwise silently disable Next */}
-      {(errors?.agentCountMismatch ||
-        errors?.biasCountMismatch ||
-        errors?.countsInvalid ||
-        errors?.agentLimitExceeded) && (
+      {(errors?.agentCountMismatch || errors?.biasCountMismatch || errors?.countsInvalid) && (
         <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
           {errors.agentCountMismatch && (
             <p className="text-xs text-destructive">
@@ -197,9 +269,6 @@ export function StepNetwork({
           )}
           {errors.countsInvalid && (
             <p className="text-xs text-destructive">{t("simulationConfig.errorCountsInvalid")}</p>
-          )}
-          {errors.agentLimitExceeded && (
-            <p className="text-xs text-destructive">{t("simulationConfig.errorAgentLimit")}</p>
           )}
         </div>
       )}

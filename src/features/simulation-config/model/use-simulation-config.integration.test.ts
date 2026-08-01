@@ -14,7 +14,7 @@ import { useSimulationConfig } from "./use-simulation-config";
 // ─── Module mocks — encoder intentionally NOT mocked ─────────────────────────
 
 vi.mock("react-router-dom", () => ({ useNavigate: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/shared/lib/ws-manager", () => ({
   useSimulationWsManager: vi.fn(() => ({ prepareRun: vi.fn() })),
 }));

@@ -184,4 +184,27 @@ describe("useSimulationConfigStore", () => {
       expect(state.activeTemplate).toBeNull();
     });
   });
+
+  describe("loadedFromFile (#110)", () => {
+    it("defaults to false", () => {
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
+    });
+
+    it("setLoadedFromFile toggles the flag", () => {
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(true);
+    });
+
+    it("setNetworkType clears the flag", () => {
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+      useSimulationConfigStore.getState().setNetworkType("custom");
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
+    });
+
+    it("reset clears the flag", () => {
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+      useSimulationConfigStore.getState().reset();
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
+    });
+  });
 });

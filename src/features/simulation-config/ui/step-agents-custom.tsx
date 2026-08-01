@@ -1,5 +1,6 @@
 import { Info, X } from "lucide-react";
 import { useRef } from "react";
+import { toast } from "sonner";
 import type {
   AgentSpec,
   CognitiveBias,
@@ -148,6 +149,11 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
   };
 
   const addEdge = () => {
+    // Mockup guard: edges need at least two agents to connect
+    if (agents.filter((a) => a.name.trim() !== "").length < 2) {
+      toast.warning(t("simulationConfig.addEdgeNeedsAgentsToast"));
+      return;
+    }
     edgeKeys.current.push(crypto.randomUUID());
     const newEdge: EdgeSpec = {
       source: "",
@@ -168,7 +174,14 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
       <div className="space-y-8">
         {/* ── Agents section ──────────────────────────────────────────────────── */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold">{t("simulationConfig.customAgentsTableTitle")}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">
+              {t("simulationConfig.customAgentsTableTitle")}
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {t("simulationConfig.customAgentsCount", { count: agents.length })}
+            </span>
+          </div>
 
           {agents.length === 0 && (
             <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
@@ -190,7 +203,7 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
                   <X className="h-4 w-4" />
                 </Button>
 
-                <CardContent className="space-y-3 pr-10">
+                <CardContent className="space-y-3 px-4 pr-10">
                   {/* Name */}
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">
@@ -308,8 +321,14 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
             ))}
           </div>
 
-          <Button type="button" variant="link" size="sm" className="px-0" onClick={addAgent}>
-            + {t("simulationConfig.customAddAgent")}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full border-dashed text-primary"
+            onClick={addAgent}
+          >
+            ＋ {t("simulationConfig.customAddAgent")}
           </Button>
           {errors.customNoAgents && (
             <p className="text-sm text-destructive">{t("simulationConfig.errorCustomNoAgents")}</p>
@@ -320,7 +339,12 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
 
         {/* ── Edges section ───────────────────────────────────────────────────── */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold">{t("simulationConfig.customEdgesTableTitle")}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">{t("simulationConfig.customEdgesTableTitle")}</h3>
+            <span className="text-xs text-muted-foreground">
+              {t("simulationConfig.customEdgesCount", { count: edges.length })}
+            </span>
+          </div>
 
           {edges.length === 0 && (
             <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
@@ -361,7 +385,7 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
                     <X className="h-4 w-4" />
                   </Button>
 
-                  <CardContent className="space-y-3 pr-10">
+                  <CardContent className="space-y-3 px-4 pr-10">
                     {/* Source / Target */}
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
@@ -455,13 +479,16 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
 
           <Button
             type="button"
-            variant="link"
+            variant="outline"
             size="sm"
-            className="px-0"
+            className="w-full border-dashed text-primary"
             onClick={addEdge}
-            disabled={edges.length >= agents.filter((a) => a.name.trim() !== "").length ** 2}
+            disabled={
+              agents.filter((a) => a.name.trim() !== "").length >= 2 &&
+              edges.length >= agents.filter((a) => a.name.trim() !== "").length ** 2
+            }
           >
-            + {t("simulationConfig.customAddEdge")}
+            ＋ {t("simulationConfig.customAddEdge")}
           </Button>
           {errors.customNoEdges && (
             <p className="text-sm text-destructive">{t("simulationConfig.errorCustomNoEdges")}</p>

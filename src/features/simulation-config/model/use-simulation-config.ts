@@ -20,7 +20,14 @@ import {
 } from "@/shared/lib/simulation-export";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import { rebalanceCounts } from "../lib/rebalance";
-import { computeMaxEdges, customSimSchema, generatedSimSchema } from "../lib/validation";
+import {
+  computeMaxEdges,
+  customSimSchema,
+  generatedSimSchema,
+  hasValidationErrors,
+  validateCustomForm,
+  validateGeneratedForm,
+} from "../lib/validation";
 import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
@@ -29,92 +36,6 @@ import type {
   WizardStep,
 } from "../types/simulation-config.types";
 import { useSimulationConfigStore } from "./simulation-config.store";
-
-function validateCustomForm(values: CustomSimFormValues): SimConfigValidationErrors {
-  const errors: SimConfigValidationErrors = {};
-  const result = customSimSchema.safeParse(values);
-
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      const msg = issue.message;
-      const path = issue.path[0];
-
-      if (msg === "duplicateEdge") {
-        errors.customEdgeDuplicate = true;
-      } else if (msg === "edgeUnknownAgent") {
-        errors.customEdgeUnknownAgent = true;
-      } else if (path === "networkName") {
-        errors.customNetworkNameEmpty = true;
-      } else if (path === "stopThreshold") {
-        errors.stopThresholdOutOfRange = true;
-      } else if (path === "agents") {
-        // min(1) fires at the "agents" root path
-        errors.customNoAgents = true;
-      } else if (path === "edges") {
-        // min(1) fires at the "edges" root path
-        errors.customNoEdges = true;
-      } else if (typeof path === "string") {
-        errors.countsInvalid = true;
-      } else {
-        // Nested path: agents[i].* or edges[i].*
-        const parentKey = issue.path[0];
-        if (parentKey === "agents") {
-          errors.customAgentInvalid = true;
-        } else {
-          errors.customEdgeInvalid = true;
-        }
-      }
-    }
-  }
-
-  return errors;
-}
-
-function validateGeneratedForm(
-  values: GeneratedSimFormValues,
-  maxAgents: number | undefined,
-  maxIterations: number | undefined,
-): SimConfigValidationErrors {
-  const errors: SimConfigValidationErrors = {};
-  const result = generatedSimSchema.safeParse(values);
-
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      const msg = issue.message;
-      const path = issue.path[0];
-
-      if (msg === "agentCountMismatch") {
-        errors.agentCountMismatch = true;
-      } else if (msg === "biasCountMismatch") {
-        errors.biasCountMismatch = true;
-      } else if (path === "stopThreshold") {
-        errors.stopThresholdOutOfRange = true;
-      } else {
-        errors.countsInvalid = true;
-      }
-    }
-  }
-
-  const totalAgents = values.agentTypes.reduce((sum, r) => sum + r.count, 0);
-
-  if (
-    maxIterations !== undefined &&
-    maxIterations !== null &&
-    values.iterationLimit > maxIterations
-  ) {
-    errors.iterationLimitExceeded = true;
-  }
-
-  if (maxAgents !== undefined && maxAgents !== null && totalAgents > maxAgents) {
-    errors.agentLimitExceeded = true;
-  }
-
-  return errors;
-}
-
-function hasErrors(errors: SimConfigValidationErrors): boolean {
-  return Object.values(errors).some(Boolean);
-}
 
 /**
  * When network-level params change (`numberOfAgents`, `density`), rebalance
@@ -174,6 +95,7 @@ export function useSimulationConfig() {
   const storeUpdateCustomValues = useSimulationConfigStore((s) => s.updateCustomValues);
   const storeSetActiveTemplate = useSimulationConfigStore((s) => s.setActiveTemplate);
   const storeReset = useSimulationConfigStore((s) => s.reset);
+  const loadedFromFile = useSimulationConfigStore((s) => s.loadedFromFile);
 
   // Non-persistent local state
   const [errors, setErrors] = useState<SimConfigValidationErrors>({});
@@ -217,30 +139,31 @@ export function useSimulationConfig() {
     // customValues by loadFileAndAdvance. Nothing left to validate here.
     if (networkType === "load") return true;
 
+    let errs: SimConfigValidationErrors;
     if (networkType === "generated") {
-      const errs = validateGeneratedForm(
+      errs = validateGeneratedForm(
         generatedValues,
         maxAgents ?? undefined,
         maxIterations ?? undefined,
       );
-      setErrors(errs);
-      return !hasErrors(errs);
-    }
-    // custom: step "network" only checks the 4 header fields
-    if (step === "network") {
-      const errs: SimConfigValidationErrors = {};
+    } else if (step === "network") {
+      // custom: step "network" only checks the header fields
+      errs = {};
       if (!customValues.networkName.trim()) errs.customNetworkNameEmpty = true;
       if (customValues.stopThreshold <= 0 || customValues.stopThreshold >= 1)
         errs.stopThresholdOutOfRange = true;
       if (maxIterations != null && customValues.iterationLimit > maxIterations)
         errs.iterationLimitExceeded = true;
-      setErrors(errs);
-      return !hasErrors(errs);
+    } else {
+      // custom: step "agents" — full validation
+      errs = validateCustomForm(customValues);
     }
-    // custom: step "agents" — full validation
-    const errs = validateCustomForm(customValues);
     setErrors(errs);
-    return !hasErrors(errs);
+    if (hasValidationErrors(errs)) {
+      toast.error(t("simulationConfig.nextInvalidToast"));
+      return false;
+    }
+    return true;
   };
 
   const submit = async () => {
@@ -251,18 +174,14 @@ export function useSimulationConfig() {
       return;
     }
 
-    if (networkType === "generated") {
-      const errs = validateGeneratedForm(
-        generatedValues,
-        maxAgents ?? undefined,
-        maxIterations ?? undefined,
-      );
-      setErrors(errs);
-      if (hasErrors(errs)) return;
-    } else {
-      const errs = validateCustomForm(customValues);
-      setErrors(errs);
-      if (hasErrors(errs)) return;
+    const launchErrs =
+      networkType === "generated"
+        ? validateGeneratedForm(generatedValues, maxAgents ?? undefined, maxIterations ?? undefined)
+        : validateCustomForm(customValues);
+    setErrors(launchErrs);
+    if (hasValidationErrors(launchErrs)) {
+      toast.error(t("simulationConfig.launchInvalidToast"));
+      return;
     }
 
     setUsageLimitError(null);
@@ -346,6 +265,7 @@ export function useSimulationConfig() {
       setStatus("running");
       navigate(`/board/simulation/${result.runId}`);
       storeReset();
+      toast.success(t("simulationConfig.launchSuccessToast"));
     } catch (error) {
       logger.error("useSimulationConfig", error);
       if (isErrorCode(error, "usage_limit_exceeded")) {
@@ -369,6 +289,19 @@ export function useSimulationConfig() {
     storeSetActiveTemplate(key);
     setErrors({});
     setUsageLimitError(null);
+    const name =
+      key === "consensus-pursuit"
+        ? t("simulationConfig.templateConsensusPursuit")
+        : t("simulationConfig.templatePolarization");
+    toast.success(t("simulationConfig.templateAppliedToast", { name }));
+  };
+
+  /** Discards the persisted draft and restores wizard defaults (mockup quota strip). */
+  const resetDraft = () => {
+    storeReset();
+    setErrors({});
+    setUsageLimitError(null);
+    toast.success(t("simulationConfig.discardSuccessToast"));
   };
 
   // ─── Import / Export JSON ─────────────────────────────────────────────────
@@ -376,6 +309,7 @@ export function useSimulationConfig() {
   const exportConfig = () => {
     const envelope = buildEnvelope(values as unknown as Record<string, unknown>);
     downloadEnvelopeJson(envelope, values.networkType);
+    toast.success(t("simulationConfig.exportSuccessToast"));
   };
 
   const handleImportFile = async (file: File) => {
@@ -456,6 +390,9 @@ export function useSimulationConfig() {
     // (handleImportFile switches networkType to "generated" or "custom" on
     // success). Only advance when the type changed.
     if (freshErrors.networkType !== "load") {
+      // Mark the draft as file-originated AFTER the type switch (setNetworkType
+      // clears the flag) so Review can show "Cargada desde archivo".
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
       setStep("agents");
     }
   };
@@ -468,6 +405,7 @@ export function useSimulationConfig() {
     loading,
     usageLimitError,
     activeTemplate,
+    loadedFromFile,
     maxAgents: maxAgents ?? null,
     maxIterations: maxIterations ?? null,
     userRole: user?.roles?.[0] ?? null,
@@ -477,6 +415,7 @@ export function useSimulationConfig() {
     validateAndAdvance,
     submit,
     applyTemplate,
+    resetDraft,
     exportConfig,
     handleImportFile,
     loadFileAndAdvance,

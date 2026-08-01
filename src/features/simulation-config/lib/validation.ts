@@ -1,4 +1,9 @@
 import { z } from "zod";
+import type {
+  CustomSimFormValues,
+  GeneratedSimFormValues,
+  SimConfigValidationErrors,
+} from "../types/simulation-config.types";
 
 export function computeMaxEdges(density: number, numberOfAgents: number): number {
   if (numberOfAgents < density) return 0;
@@ -121,3 +126,91 @@ export const customSimSchema = z
   });
 
 export type CustomSimSchemaInput = z.input<typeof customSimSchema>;
+
+// ─── Form validators (shared by the wizard hook and the live summary) ─────────
+
+export function validateCustomForm(values: CustomSimFormValues): SimConfigValidationErrors {
+  const errors: SimConfigValidationErrors = {};
+  const result = customSimSchema.safeParse(values);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const msg = issue.message;
+      const path = issue.path[0];
+
+      if (msg === "duplicateEdge") {
+        errors.customEdgeDuplicate = true;
+      } else if (msg === "edgeUnknownAgent") {
+        errors.customEdgeUnknownAgent = true;
+      } else if (path === "networkName") {
+        errors.customNetworkNameEmpty = true;
+      } else if (path === "stopThreshold") {
+        errors.stopThresholdOutOfRange = true;
+      } else if (path === "agents") {
+        // min(1) fires at the "agents" root path
+        errors.customNoAgents = true;
+      } else if (path === "edges") {
+        // min(1) fires at the "edges" root path
+        errors.customNoEdges = true;
+      } else if (typeof path === "string") {
+        errors.countsInvalid = true;
+      } else {
+        // Nested path: agents[i].* or edges[i].*
+        const parentKey = issue.path[0];
+        if (parentKey === "agents") {
+          errors.customAgentInvalid = true;
+        } else {
+          errors.customEdgeInvalid = true;
+        }
+      }
+    }
+  }
+
+  return errors;
+}
+
+export function validateGeneratedForm(
+  values: GeneratedSimFormValues,
+  maxAgents: number | undefined,
+  maxIterations: number | undefined,
+): SimConfigValidationErrors {
+  const errors: SimConfigValidationErrors = {};
+  const result = generatedSimSchema.safeParse(values);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const msg = issue.message;
+      const path = issue.path[0];
+
+      if (msg === "agentCountMismatch") {
+        errors.agentCountMismatch = true;
+      } else if (msg === "biasCountMismatch") {
+        errors.biasCountMismatch = true;
+      } else if (path === "stopThreshold") {
+        errors.stopThresholdOutOfRange = true;
+      } else {
+        errors.countsInvalid = true;
+      }
+    }
+  }
+
+  const totalAgents = values.agentTypes.reduce((sum, r) => sum + r.count, 0);
+
+  if (
+    maxIterations !== undefined &&
+    maxIterations !== null &&
+    values.iterationLimit > maxIterations
+  ) {
+    errors.iterationLimitExceeded = true;
+  }
+
+  if (maxAgents !== undefined && maxAgents !== null && totalAgents > maxAgents) {
+    errors.agentLimitExceeded = true;
+  }
+
+  return errors;
+}
+
+export function hasValidationErrors(errors: SimConfigValidationErrors): boolean {
+  return Object.values(errors).some(Boolean);
+}

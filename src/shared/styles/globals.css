@@ -58,6 +58,7 @@ mjx-container svg {
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --warn: oklch(0.66 0.13 75);
+  --ok: oklch(0.55 0.14 150);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.43 0.168 264);
@@ -97,6 +98,7 @@ mjx-container svg {
   --accent-foreground: oklch(0.96 0.008 264);
   --destructive: oklch(0.40 0.150 25.723);
   --warn: oklch(0.75 0.14 80);
+  --ok: oklch(0.72 0.15 150);
   --destructive-foreground: oklch(0.65 0.240 25.331);
   --border: oklch(0.22 0.012 265);
   --input: oklch(0.20 0.015 265);
@@ -137,6 +139,7 @@ mjx-container svg {
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-warn: var(--warn);
+  --color-ok: var(--ok);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -168,12 +171,9 @@ mjx-container svg {
   --color-brand-900: var(--brand-900);
   --color-brand-950: var(--brand-950);
 
-  /* Layout — dashboard sidebar expanded width.
-     --container-* is the Tailwind v4 namespace that feeds w-* named sizes.
-     The mockup specifies 416px (26rem), but the CURRENT wizard was built for
-     the previous 36rem width and overflows below it. Keep 36rem until the
-     #110 wizard restyle compacts the forms, then drop this to 26rem. */
-  --container-sidebar: 36rem;
+  /* Layout — dashboard sidebar expanded width (mockup: 416px = 26rem).
+     --container-* is the Tailwind v4 namespace that feeds w-* named sizes. */
+  --container-sidebar: 26rem;
 
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);

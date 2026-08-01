@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { formatNumber, listValidationMessages } from "../lib/live-summary";
 import { computeMaxEdges } from "../lib/validation";
 import type {
   CustomSimFormValues,
@@ -35,6 +36,10 @@ interface StepReviewProps {
   values: SimFormValues;
   errors: SimConfigValidationErrors;
   usageLimitError: { limit: number; requested: number } | null;
+  maxAgents?: number | null;
+  maxIterations?: number | null;
+  /** True when the draft was imported from a file — Review shows "Cargada desde archivo". */
+  loadedFromFile?: boolean;
   onExport: () => void;
   onImport: (file: File) => void;
 }
@@ -43,16 +48,30 @@ export function StepReview({
   values,
   errors,
   usageLimitError,
+  maxAgents = null,
+  maxIterations = null,
+  loadedFromFile = false,
   onExport,
   onImport,
 }: StepReviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasErrors = Object.values(errors).some(Boolean);
   const isGenerated = values.networkType === "generated";
   const gen = isGenerated ? (values as GeneratedSimFormValues) : null;
   const custom = isGenerated ? null : (values as CustomSimFormValues);
   const maxEdges = gen ? computeMaxEdges(gen.density, gen.numberOfAgents) : 0;
+  const fmt = (n: number) => formatNumber(n, i18n.language);
+
+  const validationMessages = listValidationMessages(errors, {
+    requested: gen ? fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)) : "",
+    limit: maxAgents !== null ? fmt(maxAgents) : "∞",
+    iterationLimit: maxIterations !== null ? fmt(maxIterations) : "∞",
+    actual: gen ? fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)) : "",
+    expected: gen ? fmt(gen.numberOfAgents) : "",
+    bias: gen ? fmt(gen.biasTypes.reduce((sum, r) => sum + r.count, 0)) : "",
+    maxEdges: fmt(maxEdges),
+  });
 
   return (
     <div className="space-y-4">
@@ -64,9 +83,11 @@ export function StepReview({
           <div className="flex justify-between px-4 py-2">
             <span className="text-muted-foreground">{t("simulationConfig.networkType")}</span>
             <span className="font-medium">
-              {values.networkType === "generated"
-                ? t("simulationConfig.networkTypeGenerated")
-                : t("simulationConfig.networkTypeCustom")}
+              {loadedFromFile
+                ? t("simulationConfig.networkTypeLoaded")
+                : values.networkType === "generated"
+                  ? t("simulationConfig.networkTypeGenerated")
+                  : t("simulationConfig.networkTypeCustom")}
             </span>
           </div>
 
@@ -82,7 +103,7 @@ export function StepReview({
                 <span className="text-muted-foreground">
                   {t("simulationConfig.iterationLimit")}
                 </span>
-                <span>{custom.iterationLimit}</span>
+                <span>{fmt(custom.iterationLimit)}</span>
               </div>
               <div className="flex justify-between px-4 py-2">
                 <span className="text-muted-foreground">{t("simulationConfig.stopThreshold")}</span>
@@ -95,7 +116,7 @@ export function StepReview({
                     ? t("simulationConfig.saveModeFull")
                     : custom.saveMode === 1
                       ? t("simulationConfig.saveModeStandard")
-                      : t("simulationConfig.saveModeDebug")}
+                      : t("simulationConfig.saveModeLight")}
                 </span>
               </div>
             </>
@@ -107,7 +128,7 @@ export function StepReview({
                 <span className="text-muted-foreground">
                   {t("simulationConfig.numberOfAgents")}
                 </span>
-                <span>{gen.numberOfAgents}</span>
+                <span>{fmt(gen.numberOfAgents)}</span>
               </div>
               <div className="flex justify-between px-4 py-2">
                 <span className="text-muted-foreground">
@@ -123,7 +144,7 @@ export function StepReview({
                 <span className="text-muted-foreground">
                   {t("simulationConfig.iterationLimit")}
                 </span>
-                <span>{gen.iterationLimit}</span>
+                <span>{fmt(gen.iterationLimit)}</span>
               </div>
               <div className="flex justify-between px-4 py-2">
                 <span className="text-muted-foreground">{t("simulationConfig.stopThreshold")}</span>
@@ -140,7 +161,7 @@ export function StepReview({
                     ? t("simulationConfig.saveModeFull")
                     : gen.saveMode === 1
                       ? t("simulationConfig.saveModeStandard")
-                      : t("simulationConfig.saveModeDebug")}
+                      : t("simulationConfig.saveModeLight")}
                 </span>
               </div>
             </>
@@ -193,7 +214,9 @@ export function StepReview({
                           {extra && <span className="text-xs text-muted-foreground">{extra}</span>}
                         </td>
                         <td className="px-2 py-1.5 text-muted-foreground">{effectLabel}</td>
-                        <td className="px-4 py-1.5 text-right tabular-nums">{row.count}</td>
+                        <td className="px-4 py-1.5 text-right font-mono tabular-nums">
+                          {fmt(row.count)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -208,8 +231,7 @@ export function StepReview({
       {gen !== null && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">
-            {t("simulationConfig.reviewBiasDistribution")}
-            <span className="ml-1 text-muted-foreground/60">({maxEdges} edges)</span>
+            {t("simulationConfig.reviewBiasDistributionWithEdges", { edges: fmt(maxEdges) })}
           </p>
           <Card className="gap-0 py-0">
             <CardContent className="px-0 py-0">
@@ -230,7 +252,9 @@ export function StepReview({
                       <td className="px-4 py-1.5">
                         {t(BIAS_KEYS[row.cognitiveBias] as Parameters<typeof t>[0])}
                       </td>
-                      <td className="px-4 py-1.5 text-right tabular-nums">{row.count}</td>
+                      <td className="px-4 py-1.5 text-right font-mono tabular-nums">
+                        {fmt(row.count)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,64 +377,21 @@ export function StepReview({
         />
       </div>
 
-      {/* Validation errors */}
-      {hasErrors && (
+      {/* Validation errors (single source: listValidationMessages) */}
+      {hasErrors ? (
         <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
-          {errors.stopThresholdOutOfRange && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorStopThreshold")}</p>
-          )}
-          {errors.iterationLimitExceeded && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorIterationLimit")}</p>
-          )}
-          {errors.agentLimitExceeded && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorAgentLimit")}</p>
-          )}
-          {errors.agentCountMismatch && (
-            <p className="text-sm text-destructive">
-              {t("simulationConfig.errorAgentCountMismatch", {
-                expected: String((values as GeneratedSimFormValues).numberOfAgents),
-                actual: String(
-                  (values as GeneratedSimFormValues).agentTypes?.reduce((s, r) => s + r.count, 0) ??
-                    0,
-                ),
-              })}
+          <p className="text-sm font-semibold text-destructive">
+            {t("simulationConfig.reviewErrorsTitle")}
+          </p>
+          {validationMessages.map(({ key, params }) => (
+            <p key={key} className="text-xs text-destructive">
+              • {t(key as Parameters<typeof t>[0], params)}
             </p>
-          )}
-          {errors.biasCountMismatch && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorBiasMismatch")}</p>
-          )}
-          {errors.countsInvalid && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorCountsInvalid")}</p>
-          )}
-          {errors.customNetworkNameEmpty && (
-            <p className="text-sm text-destructive">
-              {t("simulationConfig.errorCustomNetworkNameEmpty")}
-            </p>
-          )}
-          {errors.customNoAgents && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorCustomNoAgents")}</p>
-          )}
-          {errors.customNoEdges && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorCustomNoEdges")}</p>
-          )}
-          {errors.customAgentInvalid && (
-            <p className="text-sm text-destructive">
-              {t("simulationConfig.errorCustomAgentInvalid")}
-            </p>
-          )}
-          {errors.customEdgeInvalid && (
-            <p className="text-sm text-destructive">
-              {t("simulationConfig.errorCustomEdgeInvalid")}
-            </p>
-          )}
-          {errors.customEdgeUnknownAgent && (
-            <p className="text-sm text-destructive">
-              {t("simulationConfig.errorCustomEdgeUnknownAgent")}
-            </p>
-          )}
-          {errors.importInvalid && (
-            <p className="text-sm text-destructive">{t("simulationConfig.errorImportInvalid")}</p>
-          )}
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-ok/30 bg-ok/10 px-4 py-2.5">
+          <p className="text-sm font-medium text-ok">{t("simulationConfig.reviewValid")}</p>
         </div>
       )}
 

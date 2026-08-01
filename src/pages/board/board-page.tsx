@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
-import { SimulationConfigWizard } from "@/features/simulation-config";
+import { SimulationConfigWizard, SimulationLiveSummary } from "@/features/simulation-config";
 import {
   RunDetailCard,
   SimulationHistoryPanel,
@@ -104,13 +104,8 @@ export function BoardPage() {
   // ── Board panels ──────────────────────────────────────────────────────────
   if (activePanel === "new-simulation") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 text-center">
-        <p className="font-sans text-base font-medium text-foreground">
-          {t("board.emptyNewSimulation")}
-        </p>
-        <p className="font-sans text-sm text-muted-foreground">
-          {t("board.emptyNewSimulationHint")}
-        </p>
+      <div className="py-6">
+        <SimulationLiveSummary />
       </div>
     );
   }

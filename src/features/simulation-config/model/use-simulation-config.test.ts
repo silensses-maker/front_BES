@@ -37,7 +37,7 @@ vi.mock("@/shared/lib/ws-manager", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
 // Real last-run store (imported by file path to avoid the entity index pulling
@@ -1571,6 +1571,112 @@ describe("useSimulationConfig", () => {
 
       expect(result.current.networkType).toBe("load");
       expect(result.current.step).toBe("load");
+    });
+  });
+
+  // ── #110 additions: resetDraft, toasts, loadedFromFile ────────────────────
+
+  describe("resetDraft", () => {
+    it("resets the store to defaults and fires the discard toast", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ numberOfAgents: 500 });
+      });
+      act(() => {
+        result.current.resetDraft();
+      });
+
+      expect(useSimulationConfigStore.getState().generatedValues.numberOfAgents).toBe(10);
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.discardSuccessToast");
+      expect(result.current.errors).toEqual({});
+      expect(result.current.usageLimitError).toBeNull();
+    });
+  });
+
+  describe("wizard toasts (#110)", () => {
+    it("validateAndAdvance fires nextInvalidToast on failure", () => {
+      setupMocks({ maxAgents: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(overAgentLimitValues);
+      });
+      let advanced = true;
+      act(() => {
+        advanced = result.current.validateAndAdvance();
+      });
+
+      expect(advanced).toBe(false);
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.nextInvalidToast");
+    });
+
+    it("submit with invalid values fires launchInvalidToast", async () => {
+      setupMocks({ maxAgents: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(overAgentLimitValues);
+      });
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.launchInvalidToast");
+      expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
+    });
+
+    it("successful submit fires launchSuccessToast", async () => {
+      vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(validGeneratedValues);
+      });
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.launchSuccessToast");
+    });
+
+    it("applyTemplate fires templateAppliedToast with the resolved name", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.templateAppliedToast");
+    });
+
+    it("exportConfig fires exportSuccessToast", () => {
+      vi.mocked(buildEnvelope).mockReturnValue({} as SimConfigEnvelope);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.exportConfig();
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.exportSuccessToast");
+    });
+  });
+
+  describe("loadedFromFile (#110)", () => {
+    it("is false by default and exposed by the hook", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+      expect(result.current.loadedFromFile).toBe(false);
+    });
+
+    it("is cleared by setNetworkType", () => {
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+      });
+
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
     });
   });
 });
