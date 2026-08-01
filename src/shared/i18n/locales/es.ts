@@ -563,6 +563,15 @@ const es = {
     runNameFallback: "Ejecución sin nombre",
     runDetailTitle: "Detalles del experimento",
   },
+  replay: {
+    play: "Reproducir",
+    pause: "Pausar",
+    scrubberLabel: "Control de ronda de la repetición",
+    speedLabel: "Velocidad de reproducción",
+    roundLabel: "Ronda {{current}} / {{total}}",
+    seeking: "Obteniendo rondas…",
+    errorLoad: "No se pudieron cargar los datos de la repetición",
+  },
   user: {
     errorGet: "Error al cargar los datos del usuario.",
     errorGetByEmail: "Error al cargar el usuario por correo.",

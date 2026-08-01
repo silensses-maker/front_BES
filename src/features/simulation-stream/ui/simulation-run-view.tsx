@@ -23,6 +23,11 @@ type MaximizedPanel = "a" | "b" | "c" | null;
 interface SimulationRunViewProps {
   runId: string;
   networkId: string;
+  /**
+   * Optional content anchored below the canvas (Panel B) — used by the page
+   * layer to inject the replay transport bar without a feature→feature import.
+   */
+  replaySlot?: React.ReactNode;
 }
 
 /**
@@ -33,7 +38,7 @@ interface SimulationRunViewProps {
  * sidebar slot. This component's sole responsibility is the canvas layout
  * and the maximize/restore mechanics.
  */
-export function SimulationRunView({ runId, networkId }: SimulationRunViewProps) {
+export function SimulationRunView({ runId, networkId, replaySlot }: SimulationRunViewProps) {
   const { t } = useTranslation();
   const { status, topology } = useSimulationStream(runId, networkId);
 
@@ -144,14 +149,17 @@ export function SimulationRunView({ runId, networkId }: SimulationRunViewProps) 
                 collapsible
                 collapsedSize={0}
               >
-                <div className="relative h-full w-full">
-                  <SimulationCanvas status={status} topology={topology} />
-                  <MaximizeButton
-                    maximized={maximized === "b"}
-                    onClick={() => handleMaximize("b")}
-                    maximizeLabel={t("simulation.maximizePanel")}
-                    restoreLabel={t("simulation.restorePanel")}
-                  />
+                <div className="flex h-full w-full flex-col">
+                  <div className="relative min-h-0 flex-1">
+                    <SimulationCanvas status={status} topology={topology} />
+                    <MaximizeButton
+                      maximized={maximized === "b"}
+                      onClick={() => handleMaximize("b")}
+                      maximizeLabel={t("simulation.maximizePanel")}
+                      restoreLabel={t("simulation.restorePanel")}
+                    />
+                  </div>
+                  {replaySlot}
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>

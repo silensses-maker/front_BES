@@ -33,6 +33,9 @@ export function useChartData(
   // Tracks the last frame processed to skip duplicates (initial-frame check +
   // subscribe callback can both see the same reference on first mount).
   const lastFrameRef = useRef<MergedFrame | null>(null);
+  // Timelines are append-only: frames from a backward replay seek (round lower
+  // than what was already accumulated) must be ignored, not appended.
+  const lastRoundRef = useRef(-1);
 
   const [chartData, setChartData] = useState<ChartData>(emptyChartData);
 
@@ -68,6 +71,7 @@ export function useChartData(
     speakingTimelineRef.current = [];
     histogramRef.current = [];
     lastFrameRef.current = null;
+    lastRoundRef.current = -1;
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -82,6 +86,8 @@ export function useChartData(
     function processFrame(frame: MergedFrame): void {
       if (frame === lastFrameRef.current) return;
       lastFrameRef.current = frame;
+      if (frame.round <= lastRoundRef.current) return;
+      lastRoundRef.current = frame.round;
 
       const len = frame.publicBelief.length;
       let sumPublic = 0;

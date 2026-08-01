@@ -394,4 +394,62 @@ describe("simulationsApi", () => {
       );
     });
   });
+
+  describe("getFrames", () => {
+    const mockBuffer = new ArrayBuffer(36);
+
+    it("requests an exact round as arraybuffer", async () => {
+      vi.mocked(backendClient.get).mockResolvedValue({ status: 200, data: mockBuffer });
+
+      const result = await simulationsApi.getFrames("run-001", "net-001", { round: 50 });
+
+      expect(result).toBe(mockBuffer);
+      expect(backendClient.get).toHaveBeenCalledWith(
+        "/simulations/run-001/networks/net-001/frames",
+        expect.objectContaining({
+          params: { round: 50 },
+          responseType: "arraybuffer",
+        }),
+      );
+    });
+
+    it("requests the last persisted round", async () => {
+      vi.mocked(backendClient.get).mockResolvedValue({ status: 200, data: mockBuffer });
+
+      await simulationsApi.getFrames("run-001", "net-001", { round: "last" });
+
+      expect(backendClient.get).toHaveBeenCalledWith(
+        "/simulations/run-001/networks/net-001/frames",
+        expect.objectContaining({ params: { round: "last" } }),
+      );
+    });
+
+    it("requests an inclusive range", async () => {
+      vi.mocked(backendClient.get).mockResolvedValue({ status: 200, data: mockBuffer });
+
+      await simulationsApi.getFrames("run-001", "net-001", { from: 0, to: 99 });
+
+      expect(backendClient.get).toHaveBeenCalledWith(
+        "/simulations/run-001/networks/net-001/frames",
+        expect.objectContaining({ params: { from: 0, to: 99 } }),
+      );
+    });
+
+    it("returns null when status 404 (frames not persisted or expired)", async () => {
+      vi.mocked(backendClient.get).mockResolvedValue({ status: 404, data: null });
+
+      const result = await simulationsApi.getFrames("run-001", "net-001", { round: "last" });
+
+      expect(result).toBeNull();
+    });
+
+    it("propagates error on unexpected status", async () => {
+      const error = new Error("forbidden");
+      vi.mocked(backendClient.get).mockRejectedValue(error);
+
+      await expect(simulationsApi.getFrames("run-001", "net-001", { round: 1 })).rejects.toThrow(
+        "forbidden",
+      );
+    });
+  });
 });

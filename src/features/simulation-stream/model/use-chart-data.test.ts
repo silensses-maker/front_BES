@@ -166,6 +166,34 @@ describe("useChartData", () => {
     expect(result.current.beliefTimeline).toHaveLength(1);
   });
 
+  it("ignores frames from a backward replay seek (round not greater than last)", () => {
+    // Capture rAF (same rationale as the 500-cap test below): flush once after
+    // all pushes so the assertion sees the fully-accumulated ref state.
+    let pendingCb: FrameRequestCallback | null = null;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      pendingCb = cb;
+      return 1;
+    });
+
+    setTopology(makeTopology([{ silenceStrategy: 0, silenceEffect: 0 }]));
+    const { result } = renderHook(() => useChartData(strategyLabel, effectLabel));
+
+    act(() => {
+      storeListener?.({ latestFrame: makeFrame(10) });
+      // Backward seek to round 3, then a re-render of round 10
+      storeListener?.({ latestFrame: makeFrame(3) });
+      storeListener?.({ latestFrame: makeFrame(10) });
+      // Forward progress still accumulates
+      storeListener?.({ latestFrame: makeFrame(11) });
+    });
+    act(() => {
+      pendingCb?.(0);
+    });
+
+    expect(result.current.beliefTimeline.map((p) => p.round)).toEqual([10, 11]);
+    expect(result.current.speakingTimeline.map((p) => p.round)).toEqual([10, 11]);
+  });
+
   it("ignores null latestFrame pushes", () => {
     setTopology(makeTopology([{ silenceStrategy: 0, silenceEffect: 0 }]));
     const { result } = renderHook(() => useChartData(strategyLabel, effectLabel));
