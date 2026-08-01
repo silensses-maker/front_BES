@@ -317,6 +317,7 @@ const es = {
       computingLayout: "Calculando layout…",
       clusterByStrategy: "Por estrategia",
       clusterByBelief: "Por creencia",
+      clusterByEffect: "Por efecto",
       windowsClusterWarning: "El agrupamiento puede ser inestable en Windows",
       dataPrepError: "Error al preparar datos — intenta refrescar",
       hideLinks: "Ocultar aristas",
