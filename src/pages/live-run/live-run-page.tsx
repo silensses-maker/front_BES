@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import type { DashboardOutletContext } from "@/app/layouts/dashboard/dashboard-layout";
+import { ReplayDock } from "@/features/simulation-replay";
 import { RunStatusPanel, SimulationRunView } from "@/features/simulation-stream";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
@@ -120,5 +121,11 @@ export function LiveRunPage() {
   }
 
   // loadingState === "run-view" — networkId is guaranteed present here
-  return <SimulationRunView runId={runId} networkId={networkId!} />;
+  return (
+    <SimulationRunView
+      runId={runId}
+      networkId={networkId!}
+      replaySlot={<ReplayDock runId={runId} networkId={networkId!} />}
+    />
+  );
 }

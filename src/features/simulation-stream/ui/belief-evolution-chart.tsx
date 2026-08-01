@@ -51,6 +51,8 @@ export function BeliefEvolutionChart({
   const lastFrameRef = useRef<
     import("@/shared/workers/simulation-frame-merger").MergedFrame | null
   >(null);
+  // Histories are append-only: ignore frames from a backward replay seek.
+  const lastRoundRef = useRef(-1);
 
   const [series, setSeries] = useState<AgentSeries[]>([]);
 
@@ -62,6 +64,7 @@ export function BeliefEvolutionChart({
   useEffect(() => {
     agentHistoryRef.current = new Map();
     lastFrameRef.current = null;
+    lastRoundRef.current = -1;
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -73,6 +76,8 @@ export function BeliefEvolutionChart({
     ): void {
       if (frame === lastFrameRef.current) return;
       lastFrameRef.current = frame;
+      if (frame.round <= lastRoundRef.current) return;
+      lastRoundRef.current = frame.round;
 
       const totalAgents = frame.publicBelief.length;
       if (totalAgents === 0) return;

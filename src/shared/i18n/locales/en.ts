@@ -552,6 +552,15 @@ const en = {
     runNameFallback: "Unnamed run",
     runDetailTitle: "Experiment details",
   },
+  replay: {
+    play: "Play",
+    pause: "Pause",
+    scrubberLabel: "Replay round scrubber",
+    speedLabel: "Playback speed",
+    roundLabel: "Round {{current}} / {{total}}",
+    seeking: "Fetching rounds…",
+    errorLoad: "Could not load replay data",
+  },
   user: {
     errorGet: "Error loading user data.",
     errorGetByEmail: "Error loading user by email.",
