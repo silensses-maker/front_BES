@@ -14,6 +14,7 @@ import {
   filterNetworkRows,
   networkSortKey,
   paginate,
+  roundSortKey,
   sortRows,
 } from "./table-datasets";
 
@@ -218,5 +219,60 @@ describe("filters + sort + pagination", () => {
     expect(paginate(120, 2, 50)).toEqual({ page: 2, pages: 3, from: 100, to: 120 });
     expect(paginate(120, 99, 50).page).toBe(2);
     expect(paginate(0, 0, 25)).toEqual({ page: 0, pages: 1, from: 0, to: 0 });
+  });
+
+  it("agentSortKey covers every column, with unknown speaking sorted first", () => {
+    const row = rows[1];
+    if (!row) throw new Error("fixture row missing");
+    expect(agentSortKey(row, 0)).toBe(1);
+    expect(agentSortKey(row, 1)).toBe(""); // null name → empty string
+    expect(agentSortKey(row, 2)).toBe(2);
+    expect(agentSortKey(row, 3)).toBe(1);
+    expect(agentSortKey(row, 4)).toBeCloseTo(0.6, 4);
+    expect(agentSortKey(row, 5)).toBeCloseTo(0.3, 4);
+    expect(agentSortKey(row, 6)).toBeCloseTo(0.3, 4);
+    expect(agentSortKey(row, 7)).toBe(0); // silent
+    expect(agentSortKey({ ...row, speaking: true }, 7)).toBe(1);
+    expect(agentSortKey({ ...row, speaking: null }, 7)).toBe(-1);
+    expect(agentSortKey(row, 8)).toBe(2);
+    expect(agentSortKey(row, 9)).toBe(1);
+  });
+
+  it("roundSortKey covers every column", () => {
+    const row = {
+      round: 7,
+      meanPublic: 0.1,
+      meanPrivate: 0.2,
+      spread: 0.3,
+      participation: 0.4,
+    };
+    expect([0, 1, 2, 3, 4].map((col) => roundSortKey(row, col))).toEqual([7, 0.1, 0.2, 0.3, 0.4]);
+  });
+
+  it("networkSortKey covers every column, with pending values sorted first", () => {
+    const resolved = {
+      ordinal: 2,
+      networkId: "n2",
+      consensus: true,
+      finalRound: 12,
+      finalSpread: 0.5,
+    };
+    expect([0, 1, 2, 3].map((col) => networkSortKey(resolved, col))).toEqual([2, 1, 12, 0.5]);
+
+    const pending = {
+      ordinal: 3,
+      networkId: "n3",
+      consensus: null,
+      finalRound: null,
+      finalSpread: null,
+    };
+    expect([1, 2, 3].map((col) => networkSortKey(pending, col))).toEqual([-1, -1, -1]);
+    expect(networkSortKey({ ...pending, consensus: false }, 1)).toBe(0);
+  });
+
+  it("sortRows keeps ties stable (equal keys return 0)", () => {
+    const tied = [rows[0], rows[1], rows[2]].filter((r) => r !== undefined);
+    const sorted = sortRows(tied, () => 1, 0, "desc");
+    expect(sorted.map((r) => r.index)).toEqual(tied.map((r) => r.index));
   });
 });

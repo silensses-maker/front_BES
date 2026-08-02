@@ -256,6 +256,40 @@ describe("usePlaybackEngine", () => {
       expect(result.current.currentRound).toBe(0);
     });
 
+    it("goToEnd jumps to the final round on a finished run", async () => {
+      const { result } = await renderReady(20);
+      act(() => result.current.seek(3));
+      expect(result.current.currentRound).toBe(3);
+
+      act(() => result.current.goToEnd());
+
+      expect(result.current.currentRound).toBe(20);
+      // A cached seek never leaves the current status
+      expect(result.current.status).toBe("ready");
+    });
+
+    it("pause during seeking cancels the pending seek", async () => {
+      const { result } = await renderReady(1500);
+      let resolveFetch: ((buffer: ArrayBuffer) => void) | undefined;
+      vi.mocked(simulationsApi.getFrames).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      );
+
+      act(() => result.current.seek(1200));
+      expect(result.current.status).toBe("seeking");
+      act(() => result.current.pause());
+      expect(result.current.status).toBe("paused");
+
+      resolveFetch?.(buildChunk(range(1000, 1210)));
+      await waitFor(() => expect(result.current.status).toBe("paused"));
+      // The stale seek result must not render — no frame ever hit the store
+      expect(useSimulationStore.getState().latestFrame).toBeNull();
+      expect(result.current.currentRound).toBe(0);
+    });
+
     it("stepBy moves relative to the viewed round", async () => {
       const { result } = await renderReady(20);
       act(() => result.current.seek(10));
