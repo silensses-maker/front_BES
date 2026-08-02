@@ -50,3 +50,23 @@ export function interpolateOpinion(value: number): string {
   const b = Math.round(from[2] + (to[2] - from[2]) * t);
   return `rgb(${r}, ${g}, ${b})`;
 }
+
+// ─── Public–private divergence scale ────────────────────────────────────────
+
+/** Slate (no divergence) → violet (≥ 0.2). Mockup's "Divergencia púb–priv". */
+export const DIVERGENCE_PALETTE = ["#94a3b8", "#a855f7"] as const;
+
+const DIVERGENCE_RGB = [hexToRgb(DIVERGENCE_PALETTE[0]), hexToRgb(DIVERGENCE_PALETTE[1])] as const;
+
+/**
+ * Maps |public − private| to the divergence scale. The mockup saturates at
+ * 0.2 (t = d·5): small gaps are already visually meaningful.
+ */
+export function interpolateDivergence(divergence: number): string {
+  const t = Math.max(0, Math.min(1, divergence * 5));
+  const [from, to] = DIVERGENCE_RGB;
+  const r = Math.round(from[0] + (to[0] - from[0]) * t);
+  const g = Math.round(from[1] + (to[1] - from[1]) * t);
+  const b = Math.round(from[2] + (to[2] - from[2]) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
 import type { SimulationWsClient } from "@/entities/simulation";
 import { createSimulationWsClient, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
+import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 
 /**
  * Connects the WebSocket stream for a given run.

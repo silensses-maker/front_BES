@@ -26,10 +26,13 @@ interface SimulationConfigState {
   generatedValues: GeneratedSimFormValues;
   customValues: CustomSimFormValues;
   activeTemplate: string | null;
+  /** True when the current draft originated from an imported file (Review shows "Cargada desde archivo"). */
+  loadedFromFile: boolean;
 }
 
 interface SimulationConfigActions {
   setNetworkType: (type: NetworkType) => void;
+  setLoadedFromFile: (loaded: boolean) => void;
   setStep: (step: WizardStep) => void;
   updateGeneratedValues: (patch: Partial<GeneratedSimFormValues>) => void;
   updateCustomValues: (patch: Partial<CustomSimFormValues>) => void;
@@ -43,6 +46,7 @@ const initialState: SimulationConfigState = {
   generatedValues: DEFAULT_FORM,
   customValues: DEFAULT_CUSTOM_FORM,
   activeTemplate: null,
+  loadedFromFile: false,
 };
 
 export const useSimulationConfigStore = create<SimulationConfigState & SimulationConfigActions>()(
@@ -54,7 +58,10 @@ export const useSimulationConfigStore = create<SimulationConfigState & Simulatio
         set({
           networkType: type,
           step: type === "load" ? "load" : "network",
+          loadedFromFile: false,
         }),
+
+      setLoadedFromFile: (loaded) => set({ loadedFromFile: loaded }),
 
       setStep: (step) => set({ step }),
 

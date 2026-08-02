@@ -128,10 +128,8 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
             <InfoTooltip>{t("simulationConfig.agentTypesLabelHint")}</InfoTooltip>
           </h3>
           <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              agentsComplete
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-destructive/10 text-destructive"
+            className={`rounded-full px-2.5 py-0.5 font-mono text-xs font-medium ${
+              agentsComplete ? "bg-ok/15 text-ok" : "bg-destructive/10 text-destructive"
             }`}
           >
             {t("simulationConfig.agentsAssigned", {
@@ -151,15 +149,22 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
         <div className="space-y-2">
           {gen.agentTypes.map((row, i) => {
-            const availableStrategies = SILENCE_STRATEGIES.filter((s) => {
-              if (s.value === row.silenceStrategy) return true;
-              return SILENCE_EFFECTS.some((e) => !usedCombos.includes(`${s.value}-${e.value}`));
-            });
+            // Mockup mechanics: options are DISABLED (with an "· en uso"
+            // suffix) instead of hidden when the (strategy, effect) pair
+            // evaluated against this row's other axis is taken by another row.
+            const strategyOptions = SILENCE_STRATEGIES.map((s) => ({
+              ...s,
+              inUse:
+                s.value !== row.silenceStrategy &&
+                usedCombos.includes(`${s.value}-${row.silenceEffect}`),
+            }));
 
-            const availableEffects = SILENCE_EFFECTS.filter((e) => {
-              if (e.value === row.silenceEffect) return true;
-              return !usedCombos.includes(`${row.silenceStrategy}-${e.value}`);
-            });
+            const effectOptions = SILENCE_EFFECTS.map((e) => ({
+              ...e,
+              inUse:
+                e.value !== row.silenceEffect &&
+                usedCombos.includes(`${row.silenceStrategy}-${e.value}`),
+            }));
 
             const agentPct =
               gen.numberOfAgents > 0 ? ((row.count / gen.numberOfAgents) * 100).toFixed(1) : "0.0";
@@ -171,16 +176,17 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                   variant="ghost"
                   size="icon"
                   className="absolute right-2 top-2 text-muted-foreground hover:text-destructive"
+                  aria-label={t("simulationConfig.removeAgentTypeAria")}
                   disabled={gen.agentTypes.length <= 1}
                   onClick={() => removeAgentRow(i)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
 
-                <CardContent className="space-y-4">
-                  <div className="flex items-end gap-6">
-                    <div className="flex gap-2">
-                      <div className="w-36 shrink-0 space-y-1">
+                <CardContent className="space-y-3 px-4">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="grid w-full grid-cols-2 gap-2">
+                      <div className="min-w-0 space-y-1">
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.silenceStrategy")}
                           <InfoTooltip>{t("simulationConfig.silenceStrategyHint")}</InfoTooltip>
@@ -197,16 +203,20 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableStrategies.map((s) => (
-                              <SelectItem key={s.value} value={String(s.value)}>
-                                {t(s.labelKey as Parameters<typeof t>[0])}
+                            {strategyOptions.map((s) => (
+                              <SelectItem key={s.value} value={String(s.value)} disabled={s.inUse}>
+                                {s.inUse
+                                  ? t("simulationConfig.optionInUse", {
+                                      label: t(s.labelKey as Parameters<typeof t>[0]),
+                                    })
+                                  : t(s.labelKey as Parameters<typeof t>[0])}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <div className="w-36 shrink-0 space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {t("simulationConfig.silenceEffect")}
                           <InfoTooltip>{t("simulationConfig.silenceEffectHint")}</InfoTooltip>
@@ -221,9 +231,13 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableEffects.map((e) => (
-                              <SelectItem key={e.value} value={String(e.value)}>
-                                {t(e.labelKey as Parameters<typeof t>[0])}
+                            {effectOptions.map((e) => (
+                              <SelectItem key={e.value} value={String(e.value)} disabled={e.inUse}>
+                                {e.inUse
+                                  ? t("simulationConfig.optionInUse", {
+                                      label: t(e.labelKey as Parameters<typeof t>[0]),
+                                    })
+                                  : t(e.labelKey as Parameters<typeof t>[0])}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -304,8 +318,14 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
           })}
         </div>
 
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={addAgentRow}>
-          + {t("simulationConfig.addAgentType")}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full border-dashed text-primary"
+          onClick={addAgentRow}
+        >
+          ＋ {t("simulationConfig.addAgentType")}
         </Button>
       </div>
 
@@ -315,13 +335,17 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
         <div className="flex items-center justify-between">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
             {t("simulationConfig.biasTypesLabel")}
-            <InfoTooltip>{t("simulationConfig.biasTypesLabelHint")}</InfoTooltip>
+            <InfoTooltip>
+              {t("simulationConfig.biasTypesLabelHint", {
+                edges: String(maxEdges),
+                density: String(gen.density),
+                agents: String(gen.numberOfAgents),
+              })}
+            </InfoTooltip>
           </h3>
           <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              biasComplete
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-destructive/10 text-destructive"
+            className={`rounded-full px-2.5 py-0.5 font-mono text-xs font-medium ${
+              biasComplete ? "bg-ok/15 text-ok" : "bg-destructive/10 text-destructive"
             }`}
           >
             {t("simulationConfig.biasAssigned", {
@@ -341,9 +365,10 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
         <div className="space-y-2">
           {gen.biasTypes.map((row, i) => {
-            const availableBiases = COGNITIVE_BIASES.filter(
-              (b) => b.value === row.cognitiveBias || !usedBiases.includes(b.value),
-            );
+            const biasOptions = COGNITIVE_BIASES.map((b) => ({
+              ...b,
+              inUse: b.value !== row.cognitiveBias && usedBiases.includes(b.value),
+            }));
 
             const biasPct = maxEdges > 0 ? ((row.count / maxEdges) * 100).toFixed(1) : "0.0";
 
@@ -354,13 +379,14 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                   variant="ghost"
                   size="icon"
                   className="absolute right-2 top-2 text-muted-foreground hover:text-destructive"
+                  aria-label={t("simulationConfig.removeBiasTypeAria")}
                   disabled={gen.biasTypes.length <= 1}
                   onClick={() => removeBiasRow(i)}
                 >
                   <X />
                 </Button>
 
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 px-4">
                   <div className="w-36 shrink-0 space-y-1">
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {t("simulationConfig.cognitiveBias")}
@@ -378,9 +404,13 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableBiases.map((b) => (
-                          <SelectItem key={b.value} value={String(b.value)}>
-                            {t(b.labelKey as Parameters<typeof t>[0])}
+                        {biasOptions.map((b) => (
+                          <SelectItem key={b.value} value={String(b.value)} disabled={b.inUse}>
+                            {b.inUse
+                              ? t("simulationConfig.optionInUse", {
+                                  label: t(b.labelKey as Parameters<typeof t>[0]),
+                                })
+                              : t(b.labelKey as Parameters<typeof t>[0])}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -419,8 +449,14 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
           })}
         </div>
 
-        <Button type="button" variant="link" size="sm" className="px-0" onClick={addBiasRow}>
-          + {t("simulationConfig.addBiasType")}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full border-dashed text-primary"
+          onClick={addBiasRow}
+        >
+          ＋ {t("simulationConfig.addBiasType")}
         </Button>
       </div>
     </div>

@@ -35,7 +35,11 @@ const initialState: SimulationState = {
   topology: null,
   currentRound: 0,
   latestFrame: null,
+  receivedFrame: null,
+  receivedRound: 0,
+  follow: true,
   finalRound: null,
+  consensus: null,
   error: null,
   selectedAgentIndex: null,
 };
@@ -107,6 +111,48 @@ describe("useSimulationStore", () => {
       useSimulationStore.getState().updateFrame(mockFrame);
       expect(useSimulationStore.getState().currentRound).toBe(mockFrame.round);
     });
+
+    it("does not touch the received cursor (viewed round only)", () => {
+      useSimulationStore.getState().updateFrame(mockFrame);
+      expect(useSimulationStore.getState().receivedRound).toBe(0);
+      expect(useSimulationStore.getState().receivedFrame).toBeNull();
+    });
+  });
+
+  describe("ingestLiveFrame", () => {
+    it("always advances receivedFrame and receivedRound", () => {
+      useSimulationStore.getState().ingestLiveFrame(mockFrame);
+      expect(useSimulationStore.getState().receivedFrame).toBe(mockFrame);
+      expect(useSimulationStore.getState().receivedRound).toBe(mockFrame.round);
+    });
+
+    it("renders the frame when follow is on", () => {
+      useSimulationStore.getState().ingestLiveFrame(mockFrame);
+      expect(useSimulationStore.getState().latestFrame).toBe(mockFrame);
+      expect(useSimulationStore.getState().currentRound).toBe(mockFrame.round);
+    });
+
+    it("does NOT render the frame when detached (follow off)", () => {
+      useSimulationStore.getState().setFollow(false);
+      useSimulationStore.setState({ currentRound: 2 });
+      useSimulationStore.getState().ingestLiveFrame(mockFrame);
+      expect(useSimulationStore.getState().latestFrame).toBeNull();
+      expect(useSimulationStore.getState().currentRound).toBe(2);
+      expect(useSimulationStore.getState().receivedRound).toBe(mockFrame.round);
+    });
+
+    it("never regresses receivedRound on an out-of-order frame", () => {
+      useSimulationStore.getState().ingestLiveFrame(mockFrame);
+      useSimulationStore.getState().ingestLiveFrame({ ...mockFrame, round: 3 });
+      expect(useSimulationStore.getState().receivedRound).toBe(mockFrame.round);
+    });
+  });
+
+  describe("setConsensus", () => {
+    it("stores the verdict", () => {
+      useSimulationStore.getState().setConsensus(true);
+      expect(useSimulationStore.getState().consensus).toBe(true);
+    });
   });
 
   describe("setFinalRound", () => {
@@ -170,6 +216,21 @@ describe("useSimulationStore", () => {
       useSimulationStore.setState({ error: "some error" });
       useSimulationStore.getState().reset();
       expect(useSimulationStore.getState().error).toBeNull();
+    });
+
+    it("restores the live cursor and verdict", () => {
+      useSimulationStore.setState({
+        receivedFrame: mockFrame,
+        receivedRound: 9,
+        follow: false,
+        consensus: true,
+      });
+      useSimulationStore.getState().reset();
+      const state = useSimulationStore.getState();
+      expect(state.receivedFrame).toBeNull();
+      expect(state.receivedRound).toBe(0);
+      expect(state.follow).toBe(true);
+      expect(state.consensus).toBeNull();
     });
   });
 });

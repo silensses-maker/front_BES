@@ -1,30 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { logger } from "@/shared/lib/logger";
-import { SimulationWsManager } from "@/shared/lib/ws-manager";
-
-// ─── Context ──────────────────────────────────────────────────────────────────
-
-interface SimulationWsContextValue {
-  manager: SimulationWsManager;
-}
-
-const SimulationWsContext = createContext<SimulationWsContextValue | null>(null);
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-/**
- * Returns the singleton SimulationWsManager.
- * Must be called inside <SimulationWsProvider>.
- */
-export function useSimulationWsManager(): SimulationWsManager {
-  const ctx = useContext(SimulationWsContext);
-  if (ctx === null) {
-    throw new Error("useSimulationWsManager must be used inside <SimulationWsProvider>");
-  }
-  return ctx.manager;
-}
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
+import { SimulationWsContext, SimulationWsManager } from "@/shared/lib/ws-manager";
 
 interface SimulationWsProviderProps {
   children: React.ReactNode;
@@ -33,6 +9,10 @@ interface SimulationWsProviderProps {
 /**
  * Initialises one SimulationWsManager per mount and opens the persistent
  * authenticated WebSocket. Destroys it on unmount.
+ *
+ * Owns only the manager LIFECYCLE — the context object and its consumer hooks
+ * (useSimulationWsManager, useWsAuthState) live in shared/lib/ws-manager so
+ * lower layers never import from app.
  *
  * Place this inside the authenticated layout (DashboardLayout) so it only
  * runs while the user has a valid Firebase session.
@@ -47,9 +27,6 @@ export function SimulationWsProvider({ children }: SimulationWsProviderProps) {
 
   const manager = managerRef.current;
 
-  // useMemo so the context value object is stable across renders
-  const contextValue = useMemo<SimulationWsContextValue>(() => ({ manager }), [manager]);
-
   useEffect(() => {
     manager.connect().catch((err: unknown) => logger.error("SimulationWsProvider.connect", err));
 
@@ -58,7 +35,5 @@ export function SimulationWsProvider({ children }: SimulationWsProviderProps) {
     };
   }, [manager]);
 
-  return (
-    <SimulationWsContext.Provider value={contextValue}>{children}</SimulationWsContext.Provider>
-  );
+  return <SimulationWsContext.Provider value={manager}>{children}</SimulationWsContext.Provider>;
 }

@@ -1,6 +1,8 @@
 import { simulationsApi } from "@/shared/api/backend";
+import { readFrameNetworkId } from "@/shared/lib/simulation-frame";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
+import { useLastRunStore } from "../model/last-run.store";
 import { useSimulationStore } from "../model/simulation.store";
 import type { WsControlEvent } from "../types/simulation.types";
 
@@ -42,6 +44,13 @@ export function createSimulationWsClient(
   let unsubTopology: (() => void) | null = null;
 
   const store = useSimulationStore.getState;
+
+  /** Mirrors run-level lifecycle into the persisted last-run store (header
+   *  chip / rail dot), guarded so a stale client can't clobber a newer run. */
+  function mirrorLastRunStatus(status: "completed" | "error"): void {
+    const lastRun = useLastRunStore.getState();
+    if (lastRun.runId === runId) lastRun.setStatus(status);
+  }
 
   /**
    * Returns true when the event should be processed.
@@ -96,12 +105,15 @@ export function createSimulationWsClient(
         if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setNetworkId(msg.networkId);
         store().setFinalRound(msg.finalRound);
+        store().setConsensus(msg.consensus);
         break;
       case "run_completed":
         store().setStatus("completed");
+        mirrorLastRunStatus("completed");
         break;
       case "error":
         store().setError(msg.message);
+        mirrorLastRunStatus("error");
         break;
     }
   }
@@ -124,6 +136,13 @@ export function createSimulationWsClient(
       // never feed it to the worker (the worker assumes 36-byte frame headers).
       return;
     }
+    // Multi-network runs stream EVERY network's frames on the same socket:
+    // drop other networks' frames here, before the worker — the forward-only
+    // merger and the round cursors must only ever see the watched network
+    // (otherwise "Ronda 552 de 8": another network's rounds pollute recibidas).
+    if (networkId !== null && readFrameNetworkId(buffer) !== networkId) {
+      return;
+    }
     if (!topologyReady) {
       // Worker not initialized yet — buffer frame until topology arrives.
       pendingFrames.push(buffer);
@@ -141,7 +160,10 @@ export function createSimulationWsClient(
         new URL("../../../shared/workers/simulation-frame.worker.ts", import.meta.url),
       );
       worker.onmessage = (event: MessageEvent<MergedFrame>) => {
-        store().updateFrame(event.data);
+        // Live path: advances the "recibidas" cursor; renders only in follow mode
+        store().ingestLiveFrame(event.data);
+        const lastRun = useLastRunStore.getState();
+        if (lastRun.runId === runId) lastRun.setRound(event.data.round);
       };
 
       store().setRunId(runId);

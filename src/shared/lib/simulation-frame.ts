@@ -46,6 +46,15 @@ function reconstructUuid(msb: bigint, lsb: bigint): string {
   return `${m.slice(0, 8)}-${m.slice(8, 12)}-${m.slice(12, 16)}-${l.slice(0, 4)}-${l.slice(4)}`;
 }
 
+/**
+ * Reads ONLY the network UUID from a frame header — cheap relevance check so
+ * multi-network runs can drop other networks' frames before the worker.
+ */
+export function readFrameNetworkId(buffer: ArrayBuffer): string {
+  const view = new DataView(buffer);
+  return reconstructUuid(view.getBigInt64(0, true), view.getBigInt64(8, true));
+}
+
 export function parseSimulationFrame(buffer: ArrayBuffer): SimulationFramePartition {
   const view = new DataView(buffer);
 

@@ -17,4 +17,5 @@ export type {
   SimFormValues,
   WizardStep,
 } from "./types/simulation-config.types";
+export { SimulationLiveSummary } from "./ui/live-summary-panel";
 export { SimulationConfigWizard } from "./ui/simulation-config-wizard";

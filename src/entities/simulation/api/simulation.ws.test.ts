@@ -26,8 +26,9 @@ type MockStoreActions = {
   setStatus: ReturnType<typeof vi.fn>;
   setNetworkId: ReturnType<typeof vi.fn>;
   setTopology: ReturnType<typeof vi.fn>;
-  updateFrame: ReturnType<typeof vi.fn>;
+  ingestLiveFrame: ReturnType<typeof vi.fn>;
   setFinalRound: ReturnType<typeof vi.fn>;
+  setConsensus: ReturnType<typeof vi.fn>;
   setError: ReturnType<typeof vi.fn>;
   topology: unknown;
 };
@@ -41,6 +42,8 @@ type MockWorker = {
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const RUN_ID = "run-abc-123";
+
+import { useLastRunStore } from "../model/last-run.store";
 
 const MOCK_TOPOLOGY = {
   runId: RUN_ID,
@@ -89,8 +92,9 @@ describe("createSimulationWsClient", () => {
       setStatus: vi.fn(),
       setNetworkId: vi.fn(),
       setTopology: vi.fn(),
-      updateFrame: vi.fn(),
+      ingestLiveFrame: vi.fn(),
       setFinalRound: vi.fn(),
+      setConsensus: vi.fn(),
       setError: vi.fn(),
       topology: null,
     };
@@ -158,7 +162,7 @@ describe("createSimulationWsClient", () => {
       );
     });
 
-    it("worker onmessage forwards merged frame to store", async () => {
+    it("worker onmessage forwards merged frame to store via the live-ingest path", async () => {
       const client = createSimulationWsClient(RUN_ID, null, mockManager);
       await client.connect();
 
@@ -172,7 +176,7 @@ describe("createSimulationWsClient", () => {
       };
       mockWorker.onmessage?.({ data: mergedFrame } as MessageEvent);
 
-      expect(mockStore.updateFrame).toHaveBeenCalledWith(mergedFrame);
+      expect(mockStore.ingestLiveFrame).toHaveBeenCalledWith(mergedFrame);
     });
 
     describe("onEvent callback — control events", () => {
@@ -261,6 +265,20 @@ describe("createSimulationWsClient", () => {
 
         expect(mockStore.setNetworkId).toHaveBeenCalledWith("net-1");
         expect(mockStore.setFinalRound).toHaveBeenCalledWith(42);
+      });
+
+      it("stores the consensus verdict on network_converged", async () => {
+        const onEvent = await getEventCallback();
+
+        await onEvent({
+          event: "network_converged",
+          runId: RUN_ID,
+          networkId: "net-1",
+          finalRound: 42,
+          consensus: false,
+        });
+
+        expect(mockStore.setConsensus).toHaveBeenCalledWith(false);
       });
 
       describe("topology_ready idempotency (store already populated)", () => {
@@ -492,6 +510,39 @@ describe("createSimulationWsClient", () => {
           expect.objectContaining({ type: "frame" }),
         );
       });
+
+      it("drops other networks' frames when scoped (multi-network run pollution)", async () => {
+        vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
+        const watchedUuid = "00000000-0000-0000-0000-000000000001";
+        const client = createSimulationWsClient(RUN_ID, watchedUuid, mockManager);
+        await client.connect();
+        const [, onEvent, onBinary] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
+        await (onEvent as (data: unknown) => Promise<void>)({
+          event: "topology_ready",
+          runId: RUN_ID,
+          networkId: watchedUuid,
+        });
+
+        // Frame header carries the network UUID (lsb at offset 8)
+        const frameFor = (networkLsb: number): ArrayBuffer => {
+          const buffer = makeFrameBuffer(MOCK_TOPOLOGY.agentCount);
+          new DataView(buffer).setBigInt64(8, BigInt(networkLsb), true);
+          return buffer;
+        };
+
+        const otherNetworkFrame = frameFor(2);
+        onBinary(otherNetworkFrame);
+        expect(mockWorker.postMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: "frame" }),
+        );
+
+        const watchedFrame = frameFor(1);
+        onBinary(watchedFrame);
+        expect(mockWorker.postMessage).toHaveBeenCalledWith(
+          { type: "frame", buffer: watchedFrame },
+          [watchedFrame],
+        );
+      });
     });
 
     describe("store subscription — topology arriving outside the WS event", () => {
@@ -633,6 +684,53 @@ describe("createSimulationWsClient", () => {
       expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: "replay-buffer", buffer }, [
         buffer,
       ]);
+    });
+  });
+
+  describe("last-run store mirroring", () => {
+    async function connectAndGetEvent(): Promise<(data: unknown) => Promise<void>> {
+      const client = createSimulationWsClient(RUN_ID, null, mockManager);
+      await client.connect();
+      const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
+      return onEvent as (data: unknown) => Promise<void>;
+    }
+
+    it("mirrors run_completed to the last-run store when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "run_completed", runId: RUN_ID });
+
+      expect(useLastRunStore.getState().status).toBe("completed");
+    });
+
+    it("mirrors error events to the last-run store when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "error", message: "boom" });
+
+      expect(useLastRunStore.getState().status).toBe("error");
+    });
+
+    it("does not touch the last-run store when it tracks a different run", async () => {
+      useLastRunStore.getState().startRun({ runId: "other-run", name: null, networkCount: 1 });
+      const onEvent = await connectAndGetEvent();
+
+      await onEvent({ event: "run_completed", runId: RUN_ID });
+
+      expect(useLastRunStore.getState().status).toBe("running");
+    });
+
+    it("mirrors the frame round from the worker when runId matches", async () => {
+      useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
+      const client = createSimulationWsClient(RUN_ID, null, mockManager);
+      await client.connect();
+
+      mockWorker.onmessage?.({ data: { round: 57 } } as MessageEvent);
+
+      expect(useLastRunStore.getState().round).toBe(57);
+      expect(mockStore.ingestLiveFrame).toHaveBeenCalled();
     });
   });
 });

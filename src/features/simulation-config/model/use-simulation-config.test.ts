@@ -2,8 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSimulationWsManager } from "@/app/providers/simulation-ws-provider";
-import { useSimulationStore } from "@/entities/simulation";
+import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import type { SimCreated } from "@/shared/api/backend/types/backend.types";
@@ -22,6 +21,7 @@ import {
   parseEnvelope,
   readJsonFile,
 } from "@/shared/lib/simulation-export";
+import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import type { CustomSimFormValues, GeneratedSimFormValues } from "../types/simulation-config.types";
 import { useSimulationConfigStore } from "./simulation-config.store";
 import { useSimulationConfig } from "./use-simulation-config";
@@ -32,17 +32,22 @@ vi.mock("react-router-dom", () => ({
   useNavigate: vi.fn(),
 }));
 
-vi.mock("@/app/providers/simulation-ws-provider", () => ({
+vi.mock("@/shared/lib/ws-manager", () => ({
   useSimulationWsManager: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-vi.mock("@/entities/simulation", () => ({
-  useSimulationStore: vi.fn(),
-}));
+// Real last-run store (imported by file path to avoid the entity index pulling
+// the WS client → backend API → Firebase chain into the test environment).
+vi.mock("@/entities/simulation", async () => {
+  const { useLastRunStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/last-run.store")
+  >("@/entities/simulation/model/last-run.store");
+  return { useSimulationStore: vi.fn(), useLastRunStore };
+});
 
 vi.mock("@/entities/user", () => ({
   useAuthStore: vi.fn(),
@@ -858,6 +863,27 @@ describe("useSimulationConfig", () => {
         expect(mockSetStatus).toHaveBeenCalledWith("running");
       });
 
+      it("registers the run in the last-run store on launch", async () => {
+        useLastRunStore.getState().clear();
+        vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues(validGeneratedValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const lastRun = useLastRunStore.getState();
+        expect(lastRun.runId).toBe(mockSimCreated.runId);
+        expect(lastRun.status).toBe("running");
+        // Generated runs have no user-facing name
+        expect(lastRun.name).toBeNull();
+        expect(lastRun.networkCount).toBe(mockSimCreated.networkCount);
+      });
+
       it("navigates to the simulation board route after success", async () => {
         vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
         const { result } = renderHook(() => useSimulationConfig());
@@ -1545,6 +1571,112 @@ describe("useSimulationConfig", () => {
 
       expect(result.current.networkType).toBe("load");
       expect(result.current.step).toBe("load");
+    });
+  });
+
+  // ── #110 additions: resetDraft, toasts, loadedFromFile ────────────────────
+
+  describe("resetDraft", () => {
+    it("resets the store to defaults and fires the discard toast", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ numberOfAgents: 500 });
+      });
+      act(() => {
+        result.current.resetDraft();
+      });
+
+      expect(useSimulationConfigStore.getState().generatedValues.numberOfAgents).toBe(10);
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.discardSuccessToast");
+      expect(result.current.errors).toEqual({});
+      expect(result.current.usageLimitError).toBeNull();
+    });
+  });
+
+  describe("wizard toasts (#110)", () => {
+    it("validateAndAdvance fires nextInvalidToast on failure", () => {
+      setupMocks({ maxAgents: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(overAgentLimitValues);
+      });
+      let advanced = true;
+      act(() => {
+        advanced = result.current.validateAndAdvance();
+      });
+
+      expect(advanced).toBe(false);
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.nextInvalidToast");
+    });
+
+    it("submit with invalid values fires launchInvalidToast", async () => {
+      setupMocks({ maxAgents: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(overAgentLimitValues);
+      });
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.launchInvalidToast");
+      expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
+    });
+
+    it("successful submit fires launchSuccessToast", async () => {
+      vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues(validGeneratedValues);
+      });
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.launchSuccessToast");
+    });
+
+    it("applyTemplate fires templateAppliedToast with the resolved name", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.templateAppliedToast");
+    });
+
+    it("exportConfig fires exportSuccessToast", () => {
+      vi.mocked(buildEnvelope).mockReturnValue({} as SimConfigEnvelope);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.exportConfig();
+      });
+
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.exportSuccessToast");
+    });
+  });
+
+  describe("loadedFromFile (#110)", () => {
+    it("is false by default and exposed by the hook", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+      expect(result.current.loadedFromFile).toBe(false);
+    });
+
+    it("is cleared by setNetworkType", () => {
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+      });
+
+      expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
     });
   });
 });

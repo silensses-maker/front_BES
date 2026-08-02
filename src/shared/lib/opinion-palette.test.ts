@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { interpolateOpinion, OPINION_PALETTE } from "./opinion-palette";
+import {
+  DIVERGENCE_PALETTE,
+  interpolateDivergence,
+  interpolateOpinion,
+  OPINION_PALETTE,
+} from "./opinion-palette";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -39,5 +44,29 @@ describe("interpolateOpinion", () => {
 
   it("keeps OPINION_PALETTE as the canonical 3-stop bipolar scale", () => {
     expect(OPINION_PALETTE).toEqual(["#ef4444", "#94a3b8", "#3b82f6"]);
+  });
+});
+
+describe("interpolateDivergence", () => {
+  it("maps 0 to the slate low end", () => {
+    expect(interpolateDivergence(0)).toBe("rgb(148, 163, 184)");
+  });
+
+  it("saturates at 0.2 to the violet high end", () => {
+    expect(interpolateDivergence(0.2)).toBe("rgb(168, 85, 247)");
+    expect(interpolateDivergence(0.9)).toBe("rgb(168, 85, 247)");
+  });
+
+  it("interpolates halfway at 0.1 (t = 0.5)", () => {
+    // Halfway between #94a3b8 (148,163,184) and #a855f7 (168,85,247)
+    expect(interpolateDivergence(0.1)).toBe("rgb(158, 124, 216)");
+  });
+
+  it("clamps negatives to the low end", () => {
+    expect(interpolateDivergence(-1)).toBe(interpolateDivergence(0));
+  });
+
+  it("keeps DIVERGENCE_PALETTE as the canonical slate→violet scale", () => {
+    expect(DIVERGENCE_PALETTE).toEqual(["#94a3b8", "#a855f7"]);
   });
 });

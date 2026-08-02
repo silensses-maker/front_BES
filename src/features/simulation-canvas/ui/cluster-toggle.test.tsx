@@ -23,69 +23,103 @@ vi.mock("@/shared/ui/tooltip", () => ({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const MODE_LABELS: Record<ClusterMode, string> = {
-  strategy: "simulation.canvas.clusterByStrategy",
-  belief: "simulation.canvas.clusterByBelief",
-  effect: "simulation.canvas.clusterByEffect",
+const OPTION_LABELS: Record<string, string> = {
+  none: "runView.groupNone",
+  strategy: "runView.groupStrategy",
+  belief: "runView.groupBelief",
+  effect: "runView.groupEffect",
 };
 
-const ALL_MODES = Object.keys(MODE_LABELS) as ClusterMode[];
+const CLUSTER_MODES: ClusterMode[] = ["strategy", "belief", "effect"];
 
-function getModeButton(mode: ClusterMode): HTMLElement {
-  return screen.getByRole("button", { name: MODE_LABELS[mode] });
+function getOptionButton(option: string): HTMLElement {
+  return screen.getByRole("button", { name: OPTION_LABELS[option] ?? option });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("ClusterToggle", () => {
   describe("label rendering", () => {
-    it("renders one button per clustering axis", () => {
-      render(<ClusterToggle activeMode={null} onToggle={() => undefined} />);
-      expect(screen.getAllByRole("button")).toHaveLength(ALL_MODES.length);
-      for (const mode of ALL_MODES) {
-        expect(getModeButton(mode)).toBeInTheDocument();
+    it("renders Ninguno plus one button per clustering axis", () => {
+      render(<ClusterToggle activeMode={null} onChange={() => undefined} />);
+      expect(screen.getAllByRole("button")).toHaveLength(4);
+      for (const option of Object.keys(OPTION_LABELS)) {
+        expect(getOptionButton(option)).toBeInTheDocument();
       }
     });
 
+    it("marks Ninguno active when no cluster mode is set", () => {
+      render(<ClusterToggle activeMode={null} onChange={() => undefined} />);
+      expect(getOptionButton("none").className).toContain("text-primary");
+      expect(getOptionButton("strategy").className).not.toContain("text-primary");
+    });
+
     it("applies active styling only to the active mode button", () => {
-      render(<ClusterToggle activeMode="strategy" onToggle={() => undefined} />);
-      expect(getModeButton("strategy").className).toContain("bg-primary/10");
-      expect(getModeButton("belief").className).not.toContain("bg-primary/10");
-      expect(getModeButton("effect").className).not.toContain("bg-primary/10");
+      render(<ClusterToggle activeMode="strategy" onChange={() => undefined} />);
+      expect(getOptionButton("strategy").className).toContain("text-primary");
+      expect(getOptionButton("none").className).not.toContain("text-primary");
+      expect(getOptionButton("belief").className).not.toContain("text-primary");
     });
   });
 
   describe("click behaviour", () => {
-    it.each(ALL_MODES)("calls onToggle with '%s' when its button is clicked", (mode) => {
-      const onToggle = vi.fn();
-      render(<ClusterToggle activeMode={null} onToggle={onToggle} />);
+    it.each(CLUSTER_MODES)("calls onChange with '%s' when its button is clicked", (mode) => {
+      const onChange = vi.fn();
+      render(<ClusterToggle activeMode={null} onChange={onChange} />);
 
-      fireEvent.click(getModeButton(mode));
+      fireEvent.click(getOptionButton(mode));
 
-      expect(onToggle).toHaveBeenCalledTimes(1);
-      expect(onToggle).toHaveBeenCalledWith(mode);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith(mode);
     });
 
-    it("does not call onToggle when disabled", () => {
-      const onToggle = vi.fn();
-      render(<ClusterToggle activeMode={null} onToggle={onToggle} disabled />);
+    it("calls onChange with null when Ninguno is clicked", () => {
+      const onChange = vi.fn();
+      render(<ClusterToggle activeMode="belief" onChange={onChange} />);
 
-      fireEvent.click(getModeButton("strategy"));
+      fireEvent.click(getOptionButton("none"));
 
-      expect(onToggle).not.toHaveBeenCalled();
+      expect(onChange).toHaveBeenCalledWith(null);
+    });
+
+    it("does not call onChange when disabled", () => {
+      const onChange = vi.fn();
+      render(<ClusterToggle activeMode={null} onChange={onChange} disabled />);
+
+      fireEvent.click(getOptionButton("strategy"));
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("suspended during auto-advance", () => {
+    it("disables every grouping mode but keeps Ninguno enabled", () => {
+      const onChange = vi.fn();
+      render(<ClusterToggle activeMode={null} onChange={onChange} suspended />);
+
+      expect(getOptionButton("belief")).toBeDisabled();
+      expect(getOptionButton("strategy")).toBeDisabled();
+      expect(getOptionButton("effect")).toBeDisabled();
+      expect(getOptionButton("none")).not.toBeDisabled();
+
+      fireEvent.click(getOptionButton("belief"));
+      fireEvent.click(getOptionButton("strategy"));
+      expect(onChange).not.toHaveBeenCalled();
+      fireEvent.click(getOptionButton("none"));
+      expect(onChange).toHaveBeenCalledWith(null);
     });
   });
 
   describe("disabled state", () => {
     it("renders all buttons with disabled attribute when disabled=true", () => {
-      render(<ClusterToggle activeMode={null} onToggle={() => undefined} disabled />);
+      render(<ClusterToggle activeMode={null} onChange={() => undefined} disabled />);
       for (const button of screen.getAllByRole("button")) {
         expect(button).toBeDisabled();
       }
     });
 
     it("renders buttons without disabled attribute by default", () => {
-      render(<ClusterToggle activeMode={null} onToggle={() => undefined} />);
+      render(<ClusterToggle activeMode={null} onChange={() => undefined} />);
       for (const button of screen.getAllByRole("button")) {
         expect(button).not.toBeDisabled();
       }
