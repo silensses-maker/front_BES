@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SimulationWsProvider } from "@/app/providers/simulation-ws-provider";
 import { cn } from "@/shared/lib/utils";
 import type { DashboardOutletContext, SidebarPanel } from "@/shared/types/dashboard";
@@ -16,17 +16,25 @@ export type { DashboardOutletContext } from "@/shared/types/dashboard";
  *
  * State managed here (single source of truth for the shell):
  *  - sidebarCollapsed: whether the sidebar is in icon-only mode
- *  - activePanel:      which panel the sidebar renders ("new-simulation" | "my-experiments")
  *  - fullscreen:       whether the sidebar is completely hidden for visualization focus
  *  - sidebarContent:  ReactNode injected by the page via OutletContext.setSidebarContent
  *
+ * The active panel lives in the URL (/board/new-simulation | /board/experiments)
+ * so tabs, sidebar title and breadcrumb all derive from one navigable source.
  * No business logic lives here — only structural toggle mechanics.
  */
 export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activePanel, setActivePanel] = useState<SidebarPanel>("new-simulation");
   const [fullscreen, setFullscreen] = useState(false);
   const [sidebarContent, setSidebarContent] = useState<ReactNode>(null);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  const activePanel: SidebarPanel = pathname.startsWith("/board/experiments")
+    ? "my-experiments"
+    : "new-simulation";
+  const setActivePanel = (panel: SidebarPanel) =>
+    navigate(panel === "my-experiments" ? "/board/experiments" : "/board/new-simulation");
 
   const handleSidebarToggle = () => setSidebarCollapsed((prev) => !prev);
   const handleFullscreenToggle = () => setFullscreen((prev) => !prev);
@@ -46,7 +54,6 @@ export function DashboardLayout() {
       >
         {/* ── Top header (full width, sticky) ──────────────────── */}
         <DashboardHeader
-          activePanel={activePanel}
           onPanelChange={setActivePanel}
           fullscreen={fullscreen}
           onFullscreenToggle={handleFullscreenToggle}

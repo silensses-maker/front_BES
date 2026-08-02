@@ -1,4 +1,5 @@
 import { simulationsApi } from "@/shared/api/backend";
+import { readFrameNetworkId } from "@/shared/lib/simulation-frame";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { useLastRunStore } from "../model/last-run.store";
@@ -133,6 +134,13 @@ export function createSimulationWsClient(
       // strategies) still come from REST GET /topology, so we skip the CSR
       // here. If we ever need WS-driven edges, parse it on the main thread —
       // never feed it to the worker (the worker assumes 36-byte frame headers).
+      return;
+    }
+    // Multi-network runs stream EVERY network's frames on the same socket:
+    // drop other networks' frames here, before the worker — the forward-only
+    // merger and the round cursors must only ever see the watched network
+    // (otherwise "Ronda 552 de 8": another network's rounds pollute recibidas).
+    if (networkId !== null && readFrameNetworkId(buffer) !== networkId) {
       return;
     }
     if (!topologyReady) {

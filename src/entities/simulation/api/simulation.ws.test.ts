@@ -510,6 +510,39 @@ describe("createSimulationWsClient", () => {
           expect.objectContaining({ type: "frame" }),
         );
       });
+
+      it("drops other networks' frames when scoped (multi-network run pollution)", async () => {
+        vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
+        const watchedUuid = "00000000-0000-0000-0000-000000000001";
+        const client = createSimulationWsClient(RUN_ID, watchedUuid, mockManager);
+        await client.connect();
+        const [, onEvent, onBinary] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
+        await (onEvent as (data: unknown) => Promise<void>)({
+          event: "topology_ready",
+          runId: RUN_ID,
+          networkId: watchedUuid,
+        });
+
+        // Frame header carries the network UUID (lsb at offset 8)
+        const frameFor = (networkLsb: number): ArrayBuffer => {
+          const buffer = makeFrameBuffer(MOCK_TOPOLOGY.agentCount);
+          new DataView(buffer).setBigInt64(8, BigInt(networkLsb), true);
+          return buffer;
+        };
+
+        const otherNetworkFrame = frameFor(2);
+        onBinary(otherNetworkFrame);
+        expect(mockWorker.postMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: "frame" }),
+        );
+
+        const watchedFrame = frameFor(1);
+        onBinary(watchedFrame);
+        expect(mockWorker.postMessage).toHaveBeenCalledWith(
+          { type: "frame", buffer: watchedFrame },
+          [watchedFrame],
+        );
+      });
     });
 
     describe("store subscription — topology arriving outside the WS event", () => {

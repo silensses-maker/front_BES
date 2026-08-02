@@ -22,9 +22,7 @@ import { DashboardRunChip } from "./dashboard-run-chip";
 import { type BreadcrumbSegment, useDashboardBreadcrumb } from "./use-dashboard-breadcrumb";
 
 interface DashboardHeaderProps {
-  /** Currently active sidebar panel */
-  activePanel: SidebarPanel;
-  /** Called when a header tab is clicked; signals the sidebar what to render */
+  /** Navigates to the clicked panel's route (the panel lives in the URL) */
   onPanelChange: (panel: SidebarPanel) => void;
   /** Whether the main content is currently in fullscreen/sidebar-hidden mode */
   fullscreen: boolean;
@@ -69,7 +67,6 @@ function CrumbChip({ chip }: { chip: NonNullable<BreadcrumbSegment["chip"]> }) {
  *         sidebar collapse toggle · SettingsDropdown.
  */
 export function DashboardHeader({
-  activePanel,
   onPanelChange,
   fullscreen,
   onFullscreenToggle,
@@ -81,9 +78,6 @@ export function DashboardHeader({
   const wsAuthState = useWsAuthState();
   const { resolvedTheme, setTheme } = useTheme();
   const { pathname } = useLocation();
-
-  // Per mockup, panel tabs deactivate while viewing a run
-  const onRunRoute = pathname.startsWith("/board/simulation/");
 
   const FullscreenIcon = fullscreen ? Minimize2 : Maximize2;
   const SidebarIcon = sidebarCollapsed ? PanelLeft : PanelLeftClose;
@@ -148,10 +142,12 @@ export function DashboardHeader({
         </Breadcrumb>
       </div>
 
-      {/* ── Center: Segmented panel tabs ──────────────────────── */}
+      {/* ── Center: Segmented panel tabs ──────────────────────────
+          Absolutely centered so breadcrumb/chip width changes on the
+          sides never shift the tabs. */}
       <nav
         aria-label={t("nav.board")}
-        className="hidden items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5 md:flex"
+        className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5 md:flex"
       >
         {(
           [
@@ -165,12 +161,18 @@ export function DashboardHeader({
             },
           ] satisfies Array<{ panel: SidebarPanel; label: string }>
         ).map(({ panel, label }) => {
-          const active = !onRunRoute && activePanel === panel;
+          // URL-driven: active only on that panel's route — run routes and
+          // /profile leave both tabs inactive (mockup behavior)
+          const active =
+            (panel === "new-simulation" && pathname.startsWith("/board/new-simulation")) ||
+            (panel === "my-experiments" && pathname.startsWith("/board/experiments"));
           return (
             <button
               key={panel}
               type="button"
               aria-pressed={active}
+              // The panel lives in the URL — onPanelChange navigates to it,
+              // which also leaves a run view (mockup goNueva/goExp)
               onClick={() => onPanelChange(panel)}
               className={cn(
                 "rounded-md px-3 py-1 font-sans text-sm transition-colors",

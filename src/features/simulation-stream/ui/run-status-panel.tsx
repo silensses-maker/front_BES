@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { ScrollArea } from "@/shared/ui/scroll-area";
-import { type CompositionEntry, compositionBy } from "../lib/topology-composition";
+import { NetworkCompositionCard } from "./network-composition-card";
 import { NodeInspectorCard } from "./node-inspector-card";
 
 // ─── Status display (mockup stMap) ────────────────────────────────────────────
@@ -49,9 +49,6 @@ const STATUS_KEYS: Record<DisplayStatus, string> = {
   error: "runView.statusError",
 };
 
-/** Cycling categorical palette — chart tokens (same family as Resumen en vivo). */
-const CHART_CLASSES = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5"];
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -59,45 +56,6 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
     <p className="mb-2 font-sans text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
       {children}
     </p>
-  );
-}
-
-function CompositionBlock({
-  title,
-  entries,
-  labelFor,
-}: {
-  title: string;
-  entries: CompositionEntry[];
-  labelFor: (value: number) => string;
-}) {
-  const { i18n } = useTranslation();
-  return (
-    <div>
-      <p className="mb-1 font-sans text-[11.5px] text-muted-foreground">{title}</p>
-      <div className="mb-1.5 flex h-2 overflow-hidden rounded-sm">
-        {entries.map((entry, i) => (
-          <div
-            key={entry.value}
-            className={cn("h-full", CHART_CLASSES[i % CHART_CLASSES.length])}
-            style={{ width: `${entry.pct}%` }}
-          />
-        ))}
-      </div>
-      {entries.map((entry, i) => (
-        <div key={entry.value} className="flex items-center gap-1.5 py-px text-[11.5px]">
-          <span
-            className={cn(
-              "size-2.25 flex-none rounded-[3px]",
-              CHART_CLASSES[i % CHART_CLASSES.length],
-            )}
-            aria-hidden="true"
-          />
-          <span className="flex-1 text-muted-foreground">{labelFor(entry.value)}</span>
-          <span className="font-mono">{formatNumber(entry.count, i18n.language)}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -121,6 +79,8 @@ interface RunStatusPanelProps {
   networkTotal: number | null;
   /** Fallback "diferencia final entre creencias" from /results (limited viewer). */
   resultsSpread: number | null;
+  /** "Redes (N)" browser injected by the page for multi-network runs (#112). */
+  networksSlot?: React.ReactNode;
 }
 
 /**
@@ -135,6 +95,7 @@ export function RunStatusPanel({
   networkOrdinal,
   networkTotal,
   resultsSpread,
+  networksSlot,
 }: RunStatusPanelProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -202,33 +163,6 @@ export function RunStatusPanel({
       : 0
     : 100;
 
-  const strategyLabel = useCallback(
-    (value: number): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceStrategy.degroot"),
-        1: t("enums.silenceStrategy.majority"),
-        2: t("enums.silenceStrategy.threshold"),
-        3: t("enums.silenceStrategy.confidence"),
-      };
-      return map[value] ?? String(value);
-    },
-    [t],
-  );
-  const effectLabel = useCallback(
-    (value: number): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceEffect.degroot"),
-        1: t("enums.silenceEffect.memory"),
-        2: t("enums.silenceEffect.memoryless"),
-      };
-      return map[value] ?? String(value);
-    },
-    [t],
-  );
-
-  const byStrategy = topology ? compositionBy(topology.agents, "silenceStrategy") : [];
-  const byEffect = topology ? compositionBy(topology.agents, "silenceEffect") : [];
-
   const showVerdict = status === "completed" && consensus !== null;
 
   return (
@@ -291,6 +225,9 @@ export function RunStatusPanel({
             </div>
           )}
 
+          {/* ── Networks browser (#112, multi-network runs) ── */}
+          {networksSlot}
+
           {/* ── Red card ────────────────────────────────────── */}
           <Card className="gap-0 rounded-[10px] px-3.5 py-3">
             <Eyebrow>{t("runView.networkCardTitle")}</Eyebrow>
@@ -313,21 +250,7 @@ export function RunStatusPanel({
           </Card>
 
           {/* ── Composición card ────────────────────────────── */}
-          {topology !== null && (
-            <Card className="gap-2.5 rounded-[10px] px-3.5 py-3">
-              <Eyebrow>{t("runView.compositionTitle")}</Eyebrow>
-              <CompositionBlock
-                title={t("runView.compositionByStrategy")}
-                entries={byStrategy}
-                labelFor={strategyLabel}
-              />
-              <CompositionBlock
-                title={t("runView.compositionByEffect")}
-                entries={byEffect}
-                labelFor={effectLabel}
-              />
-            </Card>
-          )}
+          {topology !== null && <NetworkCompositionCard topology={topology} />}
 
           {/* ── Node inspector ──────────────────────────────── */}
           <NodeInspectorCard />
@@ -362,7 +285,8 @@ export function RunStatusPanel({
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={() => navigate("/board")}
+          // Mockup volverTablero: back to the board's history panel
+          onClick={() => navigate("/board/experiments")}
         >
           {t("runView.backToBoard")}
         </Button>

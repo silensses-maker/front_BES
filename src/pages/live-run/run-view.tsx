@@ -31,7 +31,9 @@ import type { DashboardOutletContext } from "@/shared/types/dashboard";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
+import { NetworkBrowser } from "./network-browser";
 import { decodeRunHotkey } from "./run-hotkeys";
+import { useFinalSpreads } from "./use-final-spreads";
 import { useNetworkConsensus } from "./use-network-consensus";
 
 type MainTab = "grafo" | "tabla";
@@ -73,7 +75,7 @@ export function RunView({ runId, networkId }: RunViewProps) {
   const [runMeta, setRunMeta] = useState<{ iterationLimit: number } | null>(null);
   const [networkIds, setNetworkIds] = useState<string[]>([]);
   const [resultAgents, setResultAgents] = useState<ResultAgent[] | null>(null);
-  const [finalSpreads, setFinalSpreads] = useState<Record<string, number>>({});
+  const { finalSpreads, requestSpreads } = useFinalSpreads(runId);
 
   const limited = engine.status === "unavailable";
   const isFinished = status === "completed" || status === "cancelled";
@@ -202,41 +204,11 @@ export function RunView({ runId, networkId }: RunViewProps) {
   // ── Lazy final-spread fetch for the VISIBLE page of the Redes dataset ──────
   useEffect(() => {
     if (table.dataset !== "networks") return;
-    const missing = table.pageNetworkRows.filter(
-      (row) => row.consensus !== null && row.finalSpread === null,
-    );
-    if (missing.length === 0) return;
-    let cancelled = false;
-    Promise.all(
-      missing.map(async (row) => {
-        try {
-          const results = await simulationsApi.getResults(runId, row.networkId, {
-            limit: RESULTS_AGENT_LIMIT,
-          });
-          if (results === null) return null;
-          const spread = computeFinalSpread(results.agents);
-          return spread === null ? null : { networkId: row.networkId, spread };
-        } catch (err) {
-          logger.error("RunView.finalSpread", err);
-          return null;
-        }
-      }),
-    ).then((resolved) => {
-      if (cancelled) return;
-      const additions = resolved.filter(
-        (r): r is { networkId: string; spread: number } => r !== null,
-      );
-      if (additions.length === 0) return;
-      setFinalSpreads((prev) => {
-        const next = { ...prev };
-        for (const { networkId: id, spread } of additions) next[id] = spread;
-        return next;
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [table.dataset, table.pageNetworkRows, runId]);
+    const missing = table.pageNetworkRows
+      .filter((row) => row.consensus !== null && row.finalSpread === null)
+      .map((row) => row.networkId);
+    if (missing.length > 0) requestSpreads(missing);
+  }, [table.dataset, table.pageNetworkRows, requestSpreads]);
 
   // ── Sidebar injection ──────────────────────────────────────────────────────
   const resultsSpread = useMemo(
@@ -251,17 +223,36 @@ export function RunView({ runId, networkId }: RunViewProps) {
         networkOrdinal={networkOrdinal}
         networkTotal={multiNet ? networkIds.length : null}
         resultsSpread={resultsSpread}
+        networksSlot={
+          multiNet ? (
+            <NetworkBrowser
+              runId={runId}
+              networkIds={networkIds}
+              currentNetworkId={networkId}
+              consensus={consensusEntries}
+              finalSpreads={finalSpreads}
+              onVisibleNetworks={requestSpreads}
+              agentCount={topology?.agentCount ?? null}
+              defaultOpen={false}
+            />
+          ) : undefined
+        }
       />,
     );
     return () => setSidebarContent(null);
   }, [
     setSidebarContent,
     runId,
+    networkId,
     runMeta,
     networkOrdinal,
     multiNet,
-    networkIds.length,
+    networkIds,
     resultsSpread,
+    consensusEntries,
+    finalSpreads,
+    requestSpreads,
+    topology?.agentCount,
   ]);
 
   // ── Timeline domain ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard";
 import { LandingLayout } from "@/app/layouts/landing";
 import { ProtectedRoute } from "@/features/auth";
@@ -27,7 +27,10 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route path="/board" element={<BoardPage />} />
+          {/* Board panels live in the URL (tabs/breadcrumb derive from it) */}
+          <Route path="/board" element={<Navigate to="/board/new-simulation" replace />} />
+          <Route path="/board/new-simulation" element={<BoardPage />} />
+          <Route path="/board/experiments" element={<BoardPage />} />
           {/* Live-run routes — both point to LiveRunPage; the page handles the
               network-discovery / selector / run-view branching internally. */}
           <Route path="/board/simulation/:runId" element={<LiveRunPage />} />

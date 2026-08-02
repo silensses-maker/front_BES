@@ -289,6 +289,20 @@ export function usePlaybackEngine(
 
       const end = clampMax();
       const target = Math.min(Math.floor(playheadRef.current), end);
+
+      if (finalRoundRef.current === null && target >= end) {
+        // Live tail caught up: render arrivals straight from the WS frame —
+        // never via REST (a chunk ending at the old tail would be invalidated
+        // and refetched on EVERY new round). Keeps pace with the backend.
+        playheadRef.current = end;
+        const received = useSimulationStore.getState().receivedFrame;
+        if (received !== null && received.round !== renderedRoundRef.current) {
+          useSimulationStore.getState().updateFrame(received);
+          renderedRoundRef.current = received.round;
+        }
+        return;
+      }
+
       if (target !== renderedRoundRef.current) {
         if (!renderFromCache(target)) {
           // Chunk miss: suspend playback while the chunk downloads
@@ -298,15 +312,10 @@ export function usePlaybackEngine(
         }
       }
       if (target >= end && finalRoundRef.current !== null) {
-        // Persisted end reached — stop. On a live tail we just idle and keep
-        // polling clampMax() as new rounds arrive.
+        // Persisted end reached — stop
         stopDriver();
         playheadRef.current = end;
         transition("paused");
-      } else if (target >= end) {
-        // Live tail caught up: hold position, keep the driver running so
-        // playback resumes as soon as more rounds arrive.
-        playheadRef.current = end;
       }
     };
     rafRef.current = requestAnimationFrame(step);

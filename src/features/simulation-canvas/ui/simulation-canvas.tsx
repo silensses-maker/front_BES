@@ -160,6 +160,11 @@ export function SimulationCanvas({
     return map;
   }, [topology]);
 
+  const hasSelfLoops = useMemo(
+    () => topology?.edges.some((edge) => edge.source === edge.target) ?? false,
+    [topology],
+  );
+
   const strategyLegendEntries = useMemo(() => {
     if (!topology) return [];
     const present = [...new Set(topology.agents.map((a) => a.silenceStrategy))].sort(
@@ -493,7 +498,7 @@ export function SimulationCanvas({
         <div className="flex flex-col items-center gap-3">
           <p className="font-sans text-sm text-destructive">{t("simulation.errorStream")}</p>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/board">{t("simulation.backToBoard")}</Link>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
           </Button>
         </div>
       </div>
@@ -511,7 +516,7 @@ export function SimulationCanvas({
             {t("simulation.statusCancelled")}
           </p>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/board">{t("simulation.backToBoard")}</Link>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
           </Button>
         </div>
       </div>
@@ -526,7 +531,7 @@ export function SimulationCanvas({
             {t("simulation.simulationComplete")}
           </p>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/board">{t("simulation.backToBoard")}</Link>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
           </Button>
         </div>
       </div>
@@ -551,7 +556,7 @@ export function SimulationCanvas({
             {t("simulation.canvas.dataPrepError")}
           </p>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/board">{t("simulation.backToBoard")}</Link>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
           </Button>
         </div>
       </div>
@@ -650,6 +655,7 @@ export function SimulationCanvas({
         colorBy={colorBy}
         strategyLegend={strategyLegendEntries}
         showSpeakingLegend={frame !== null && currentRound > 0}
+        showSelfLoopLegend={hasSelfLoops}
       />
 
       {/* Links toggle + zoom group — bottom-left (mockup) */}

@@ -322,7 +322,7 @@ describe("usePlaybackEngine", () => {
     });
 
     it("seek detaches from the tail and renders from a chunk clamped to recibidas", async () => {
-      setupLive(10);
+      setupLive(5);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
 
       act(() => result.current.seek(3));
@@ -332,28 +332,28 @@ describe("usePlaybackEngine", () => {
       expect(useSimulationStore.getState().follow).toBe(false);
       expect(simulationsApi.getFrames).toHaveBeenCalledWith("run-001", "net-001", {
         from: 0,
-        to: 10,
+        to: 5,
       });
       expect(result.current.status).toBe("paused");
     });
 
     it("clamps live seeks to receivedRound", async () => {
-      setupLive(10);
+      setupLive(5);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
 
       act(() => result.current.seek(500));
 
-      await waitFor(() => expect(result.current.currentRound).toBe(10));
+      await waitFor(() => expect(result.current.currentRound).toBe(5));
     });
 
     it("invalidates a partial live chunk once newer rounds are needed", async () => {
-      setupLive(10);
+      setupLive(5);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
 
       act(() => result.current.seek(3));
       await waitFor(() => expect(result.current.currentRound).toBe(3));
 
-      // More rounds arrive; the cached [0..10] chunk cannot serve round 20
+      // More rounds arrive; the cached [0..5] chunk cannot serve round 20
       act(() => useSimulationStore.setState({ receivedRound: 25 }));
       act(() => result.current.seek(20));
 
@@ -365,7 +365,7 @@ describe("usePlaybackEngine", () => {
     });
 
     it("returnToLive re-attaches and renders the latest received frame", async () => {
-      setupLive(10);
+      setupLive(5);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
       act(() => result.current.seek(3));
       await waitFor(() => expect(result.current.currentRound).toBe(3));
@@ -374,11 +374,11 @@ describe("usePlaybackEngine", () => {
 
       expect(result.current.status).toBe("live");
       expect(useSimulationStore.getState().follow).toBe(true);
-      expect(result.current.currentRound).toBe(10);
+      expect(result.current.currentRound).toBe(5);
     });
 
     it("play while following restarts at round 0 over the received prefix", async () => {
-      setupLive(10);
+      setupLive(5);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
       act(() => result.current.setSpeed(1));
 
@@ -394,7 +394,7 @@ describe("usePlaybackEngine", () => {
     });
 
     it("blocks live scrubbing when the frames endpoint 404s mid-run", async () => {
-      setupLive(10);
+      setupLive(5);
       vi.mocked(simulationsApi.getFrames).mockResolvedValue(null);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
 
@@ -412,16 +412,16 @@ describe("usePlaybackEngine", () => {
     });
 
     it("finalizes in place when the run completes while mounted", async () => {
-      setupLive(30);
+      setupLive(4);
       const { result } = renderHook(() => usePlaybackEngine("run-001", "net-001", AGENT_COUNT));
       expect(result.current.status).toBe("live");
 
       act(() => {
-        useSimulationStore.setState({ status: "completed", finalRound: 30 });
+        useSimulationStore.setState({ status: "completed", finalRound: 4 });
       });
 
       await waitFor(() => expect(result.current.status).toBe("paused"));
-      expect(result.current.finalRound).toBe(30);
+      expect(result.current.finalRound).toBe(4);
       expect(result.current.isLive).toBe(false);
       // No probe — frames were received in this session
       const probeCalls = vi

@@ -99,6 +99,9 @@ export function BoardPage() {
 
   useEffect(() => {
     setSidebarContent(sidebarContent);
+    // Cleanup on unmount — otherwise the history panel leaks into run routes
+    // that inject nothing (e.g. the "gone" state)
+    return () => setSidebarContent(null);
   }, [sidebarContent, setSidebarContent]);
 
   // ── Board panels ──────────────────────────────────────────────────────────

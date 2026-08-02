@@ -1,6 +1,6 @@
 import { ChevronLeft, List, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { type LastRunStatus, useLastRunStore } from "@/entities/simulation";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -66,6 +66,9 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // Mockup sideTitle: run routes show "Ejecución en vivo" instead of the tab name
+  const isRunRoute = pathname.startsWith("/board/simulation/");
   const lastRunId = useLastRunStore((s) => s.runId);
   const lastRunStatus = useLastRunStore((s) => s.status);
   const lastRunRound = useLastRunStore((s) => s.round);
@@ -95,6 +98,8 @@ export function DashboardSidebar({
                   type="button"
                   aria-label={t("dashboard.tabNewSimulation")}
                   onClick={() => {
+                    // onPanelChange navigates (panel lives in the URL) —
+                    // also leaves a run view, mockup railNueva
                     onPanelChange("new-simulation");
                     onToggle();
                   }}
@@ -154,9 +159,11 @@ export function DashboardSidebar({
             {/* Section header: title + inline collapse button (mockup "‹") */}
             <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
               <span className="font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {activePanel === "new-simulation"
-                  ? t("dashboard.sidebarNewSimulation")
-                  : t("dashboard.sidebarMyExperiments")}
+                {isRunRoute
+                  ? t("dashboard.sidebarLiveRun")
+                  : activePanel === "new-simulation"
+                    ? t("dashboard.sidebarNewSimulation")
+                    : t("dashboard.sidebarMyExperiments")}
               </span>
               <button
                 type="button"

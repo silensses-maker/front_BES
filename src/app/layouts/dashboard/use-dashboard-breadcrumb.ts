@@ -32,10 +32,13 @@ export function useDashboardBreadcrumb(): BreadcrumbSegment[] {
   const lastRunName = useLastRunStore((s) => s.name);
   // runId → fetched name (null = run has no name; absent = not fetched yet)
   const [fetchedNames, setFetchedNames] = useState<Record<string, string | null>>({});
+  // runId → ordered network ids (gives the ":networkId" segment its "Red N" identity, #112)
+  const [fetchedNetworks, setFetchedNetworks] = useState<Record<string, string[]>>({});
 
   const parts = pathname.split("/").filter(Boolean);
   const isRunRoute = parts[0] === "board" && parts[1] === "simulation" && parts.length >= 3;
   const routeRunId = isRunRoute ? (parts[2] ?? null) : null;
+  const routeNetworkId = isRunRoute ? (parts[3] ?? null) : null;
 
   // Resolve the run name for runs other than the tracked last-run.
   useEffect(() => {
@@ -58,12 +61,36 @@ export function useDashboardBreadcrumb(): BreadcrumbSegment[] {
     };
   }, [routeRunId, lastRunId, fetchedNames]);
 
+  // Resolve the network ordinal ("Red N") once per run, cached like the names.
+  useEffect(() => {
+    if (routeRunId === null || routeNetworkId === null) return;
+    if (routeRunId in fetchedNetworks) return;
+    let cancelled = false;
+    simulationsApi
+      .listNetworks(routeRunId)
+      .then(({ networks }) => {
+        if (cancelled) return;
+        setFetchedNetworks((prev) => ({ ...prev, [routeRunId]: networks }));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        logger.error("useDashboardBreadcrumb.listNetworks", err);
+        setFetchedNetworks((prev) => ({ ...prev, [routeRunId]: [] }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [routeRunId, routeNetworkId, fetchedNetworks]);
+
   const segmentKeyMap: Record<string, string> = {
     board: t("dashboard.breadcrumbBoard"),
     profile: t("dashboard.breadcrumbProfile"),
     simulation: t("dashboard.breadcrumbSimulation"),
     step: t("dashboard.breadcrumbStep"),
     configure: t("dashboard.breadcrumbConfigure"),
+    // Board panels — the panel state lives in the URL (UX decision)
+    "new-simulation": t("dashboard.sidebarNewSimulation"),
+    experiments: t("dashboard.sidebarMyExperiments"),
   };
 
   const segments: BreadcrumbSegment[] = [];
@@ -96,9 +123,13 @@ export function useDashboardBreadcrumb(): BreadcrumbSegment[] {
     }
 
     if (isRunRoute && index === 3) {
-      // Network segment — chip with the truncated opaque id ("Red N" in #112)
+      // Network segment (#112): "Red N" by listNetworks order, keeping the
+      // mono id chip (superset). Falls back to chip-only while loading or if
+      // the id is not in the run's list.
+      const networks = routeRunId !== null ? fetchedNetworks[routeRunId] : undefined;
+      const ordinal = networks ? networks.indexOf(segment) : -1;
       segments.push({
-        label: "",
+        label: ordinal >= 0 ? t("dashboard.breadcrumbNetwork", { n: ordinal + 1 }) : "",
         to: isLast ? undefined : to,
         chip: { text: segment.slice(0, 8) },
       });

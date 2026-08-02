@@ -11,6 +11,8 @@ interface CanvasLegendProps {
   strategyLegend: Array<{ label: string; color: string }>;
   /** Speaking/silent size legend only makes sense once a round is on screen. */
   showSpeakingLegend: boolean;
+  /** Square/circle shape legend — shown when the network has self-loops. */
+  showSelfLoopLegend: boolean;
 }
 
 /**
@@ -18,7 +20,12 @@ interface CanvasLegendProps {
  * per-strategy dots depending on "Colorear por", plus the speaking/silent
  * size hint. Collapsible (superset over the mockup).
  */
-export function CanvasLegend({ colorBy, strategyLegend, showSpeakingLegend }: CanvasLegendProps) {
+export function CanvasLegend({
+  colorBy,
+  strategyLegend,
+  showSpeakingLegend,
+  showSelfLoopLegend,
+}: CanvasLegendProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -81,6 +88,19 @@ export function CanvasLegend({ colorBy, strategyLegend, showSpeakingLegend }: Ca
                   <span className="font-sans text-[11px] text-muted-foreground">{entry.label}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Shape legend — squares are agents with a self-loop (w_ii > 0) */}
+          {showSelfLoopLegend && (
+            <div className="flex items-center gap-2 border-t border-border pt-1.5">
+              <span
+                className="inline-block size-2.5 shrink-0 rounded-[2px] bg-muted-foreground"
+                aria-hidden="true"
+              />
+              <span className="font-sans text-[11px] text-muted-foreground">
+                {t("runView.legendSelfLoop")}
+              </span>
             </div>
           )}
 
