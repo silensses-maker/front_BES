@@ -240,7 +240,7 @@ Usage limit display comes from `entities/user` (`usePermissions` hook lives at `
 
 ---
 
-## Experiment Management (Issues #44–#46, Milestone 3)
+## Experiment Management (Issues #44-#46, Milestone 3)
 
 A new entity is needed:
 

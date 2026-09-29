@@ -444,7 +444,7 @@ const en = {
     iterationLimitHint:
       "Maximum simulation rounds. The run stops when this limit is hit OR when the network converges (stop threshold), whichever comes first.",
     stopThresholdHint:
-      "Convergence criterion. The run stops when the average belief change between rounds drops below this value. Lower = stricter convergence. Typical: 0.01–0.001.",
+      "Convergence criterion. The run stops when the average belief change between rounds drops below this value. Lower = stricter convergence. Typical: 0.01-0.001.",
     seedHint:
       "Random seed for reproducibility. Same seed produces the same topology and dynamics. Leave random for fresh exploration.",
     // ── Field-level tooltips (agents step) ──────────────────────────────────
@@ -526,7 +526,7 @@ const en = {
     liveBiasOnEdges: "Biases on edges",
     liveCardQuota: "Your quota · {{role}}",
     liveCardValidation: "Validation",
-    liveEdgesBarabasi: "Edges (Barabási–Albert)",
+    liveEdgesBarabasi: "Edges (Barabási-Albert)",
     liveDefinedAgents: "Defined agents",
     liveDefinedEdges: "Defined edges",
     liveQuotaUsage: "{{used}} / {{limit}}",
@@ -560,6 +560,7 @@ const en = {
     loadErrorParseFailed: "The file could not be read. Make sure it is a valid simulation JSON.",
     loadNoCsv: "CSV import is not supported. Export your simulation as JSON from the Review step.",
     loadDownloadExample: "Download example",
+    loadDownloadPrompt: "Download AI prompt",
   },
   simulationHistory: {
     filterAll: "All",
@@ -642,7 +643,7 @@ const en = {
     totalRounds_one: "{{display}} round",
     totalRounds_other: "{{display}} rounds",
     hoverNotReceived: "not received yet",
-    fineDetail: "Detail · rounds {{from}}–{{to}} (drag for 1-round precision)",
+    fineDetail: "Detail · rounds {{from}}-{{to}} (drag for 1-round precision)",
     timelineAria: "Round timeline",
     fineTimelineAria: "Fine round timeline",
     noMoreEventsAfter: "No more events after this round.",
@@ -704,7 +705,7 @@ const en = {
     rowCount_other: "{{display}} rows",
     filteredSuffix: "· filtered",
     pageLabel: "Page {{page}} of {{pages}}",
-    rangeLabel: "Rows {{from}}–{{to}}",
+    rangeLabel: "Rows {{from}}-{{to}}",
     rangeEmpty: "No rows",
     rowsPerPage: "Rows per page",
     firstPageAria: "First page",
@@ -724,7 +725,7 @@ const en = {
     tabParticipation: "Participation",
     sampleNote: "Showing 50 of {{total}} agents · uniform sampling · color = initial belief",
     divergenceNote:
-      "The only place where the public–private divergence lives — now one click away.",
+      "The only place where the public-private divergence lives — now one click away.",
     distributionTitle: "Public belief · round {{round}}",
     seriesPublic: "Public",
     seriesPrivate: "Private",
@@ -738,7 +739,7 @@ const en = {
     colorByLabel: "Color by",
     colorPublic: "Public belief",
     colorPrivate: "Private belief",
-    colorDivergence: "Public–private divergence",
+    colorDivergence: "Public-private divergence",
     colorStrategy: "Strategy",
     zoomInAria: "Zoom in",
     zoomOutAria: "Zoom out",
@@ -803,7 +804,7 @@ const en = {
     inspectorDeselectAria: "Deselect node",
     inspectorPublic: "Public belief",
     inspectorPrivate: "Private belief",
-    inspectorDivergence: "Public–private divergence",
+    inspectorDivergence: "Public-private divergence",
     inspectorDivergenceTip:
       "The gap between what the agent expresses and what it actually thinks this round.",
     inspectorInfluences: "Influences ({{count}})",
@@ -887,8 +888,8 @@ const en = {
     },
     beliefGroup: {
       q1: "Very low (< 0.25)",
-      q2: "Low-mid (0.25–0.5)",
-      q3: "Mid-high (0.5–0.75)",
+      q2: "Low-mid (0.25-0.5)",
+      q3: "Mid-high (0.5-0.75)",
       q4: "Very high (≥ 0.75)",
     },
     cognitiveBias: {

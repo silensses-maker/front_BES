@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
+import { LLM_NETWORK_PROMPT } from "../lib/llm-prompt";
 import { CONSENSUS_PURSUIT_TEMPLATE } from "../lib/templates";
 
 interface StepLoadProps {
@@ -21,10 +22,9 @@ export function StepLoad({ onLoad, loading }: StepLoadProps) {
     const example = {
       _guide: {
         description:
-          "BES simulation configuration file. Drop it in the 'Load file' tab to pre-fill the wizard.",
+          "SiLEnSeSS simulation configuration file. Drop it in the 'Load file' tab to pre-fill the wizard.",
         networkType: "'generated' = random network  |  'custom' = manually defined network",
-        saveMode:
-          "0=FULL  1=STANDARD  2=STANDARD_LIGHT  3=ROUNDLESS  4=AGENTLESS_TYPED  5=AGENTLESS  6=PERFORMANCE  7=DEBUG",
+        saveMode: "0=FULL  1=STANDARD  2=STANDARD_LIGHT",
         silenceStrategy: "0=DeGroot  1=Majority  2=Threshold  3=Confidence",
         silenceEffect: "0=DeGroot  1=Memory  2=Memoryless",
         cognitiveBias: "0=None  1=Confirmation  2=Backfire  3=Authority  4=Insular",
@@ -45,6 +45,16 @@ export function StepLoad({ onLoad, loading }: StepLoadProps) {
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = "bes-config-example.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPrompt = () => {
+    const blob = new Blob([LLM_NETWORK_PROMPT], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "bes-llm-prompt.txt";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -84,7 +94,16 @@ export function StepLoad({ onLoad, loading }: StepLoadProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs"
+          onClick={handleDownloadPrompt}
+        >
+          {t("simulationConfig.loadDownloadPrompt")}
+        </Button>
         <Button
           type="button"
           variant="link"

@@ -21,7 +21,7 @@ Open `results-placeholder.md.ts` and append a new object to `RESULT_ARTICLES`:
   slug: "degroot-polarization-2025",   // URL-safe identifier, must be unique
   date: "2025-11-20",                  // ISO 8601 date (YYYY-MM-DD)
   title: "Polarization under DeGroot", // Card title (plain text)
-  summary: "Short excerpt shown in …", // 1–2 sentences shown collapsed
+  summary: "Short excerpt shown in …", // 1-2 sentences shown collapsed
   content: `                           // Full article in Markdown
 ## Background
 ...

@@ -112,7 +112,7 @@ export function HomePage() {
           <div className="flex flex-col gap-2">
             <h3 className="font-sans font-semibold text-foreground">Consensus under DeGroot</h3>
             <p className="text-muted-foreground leading-relaxed">
-              A 500-agent Barabási–Albert network with uniform influence weights converges to a
+              A 500-agent Barabási-Albert network with uniform influence weights converges to a
               shared opinion within ~300 iterations. Hub nodes dominate early; peripheral agents
               follow after sufficient exposure.
             </p>
@@ -121,7 +121,7 @@ export function HomePage() {
           <div className="flex flex-col gap-2">
             <h3 className="font-sans font-semibold text-foreground">Silencing cascade</h3>
             <p className="text-muted-foreground leading-relaxed">
-              In a polarized Erdős–Rényi network calibrated with 2022 Colombian election data, the
+              In a polarized Erdős-Rényi network calibrated with 2022 Colombian election data, the
               minority cluster begins suppressing its opinion at iteration 80, producing a cascade
               that amplifies the majority position far beyond its initial share.
             </p>

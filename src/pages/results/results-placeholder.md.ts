@@ -15,7 +15,7 @@ export const FEATURED_RESULT = `
 **Published:** 15 March 2025 · **Authors:** PROMUEVA Research Group · **Model:** DeGroot
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut
-labore et dolore magna aliqua. In this landmark simulation, a **500-agent Barabási–Albert
+labore et dolore magna aliqua. In this landmark simulation, a **500-agent Barabási-Albert
 network** was subjected to 1 000 update iterations under the classic DeGroot averaging rule.
 The results reveal how hub nodes — agents with disproportionately high connectivity — drive
 rapid early convergence, while peripheral agents follow several hundred iterations later.
@@ -55,7 +55,7 @@ with pre-election opinion survey data from Colombia's 2022 presidential race.
 ### Methodology
 
 Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. A **400-agent Erdős–Rényi network** (p = 0.08) was initialised with opinion values
+pariatur. A **400-agent Erdős-Rényi network** (p = 0.08) was initialised with opinion values
 drawn from the survey distribution. Tolerance radii were set per agent cluster to reflect
 observed partisan affiliation strength.
 
@@ -74,7 +74,7 @@ id est laborum.
     date: "2024-03-22",
     title: "Convergence Benchmarks Across Network Topologies",
     summary:
-      "A systematic comparison of DeGroot convergence speed across Erdős–Rényi, Barabási–Albert, and Watts–Strogatz topologies using uniform influence weights.",
+      "A systematic comparison of DeGroot convergence speed across Erdős-Rényi, Barabási-Albert, and Watts-Strogatz topologies using uniform influence weights.",
     content: `
 ### Overview
 
@@ -87,15 +87,15 @@ to quantify how structure affects convergence.
 
 | Topology | Parameters | Mean Convergence Iteration |
 |---|---|---|
-| Erdős–Rényi | p = 0.06 | 187 |
-| Barabási–Albert | m = 3 | 142 |
-| Watts–Strogatz | k = 6, β = 0.3 | 221 |
+| Erdős-Rényi | p = 0.06 | 187 |
+| Barabási-Albert | m = 3 | 142 |
+| Watts-Strogatz | k = 6, β = 0.3 | 221 |
 
 ### Key Takeaway
 
 Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
-commodo consequat. Scale-free (Barabási–Albert) networks consistently converge fastest due
-to the centralising effect of hub nodes. Small-world networks (Watts–Strogatz) are the
+commodo consequat. Scale-free (Barabási-Albert) networks consistently converge fastest due
+to the centralising effect of hub nodes. Small-world networks (Watts-Strogatz) are the
 slowest because their regular local structure limits long-range opinion diffusion.
 `,
   },
@@ -117,7 +117,7 @@ simulation outcome switches from global consensus to stable polarization.
 
 - **Tolerance radius (τ):** swept from 0.05 to 0.50 in steps of 0.05
 - **Majority threshold (M):** swept from 0.20 to 0.80 in steps of 0.10
-- Network: 200-agent Barabási–Albert, 300 iterations, 10 independent runs per parameter pair
+- Network: 200-agent Barabási-Albert, 300 iterations, 10 independent runs per parameter pair
 
 ### Critical Boundary
 
