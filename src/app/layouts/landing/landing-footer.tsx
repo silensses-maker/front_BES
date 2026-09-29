@@ -1,8 +1,5 @@
 import { NavLink } from "react-router-dom";
-import avispaLogo from "@/shared/assets/logos/AVISPA.jpg";
-import javerianaLogo from "@/shared/assets/logos/javeriana.png";
-import promuevaSvg from "@/shared/assets/logos/promueva.svg";
-import univalleSvg from "@/shared/assets/logos/univalle.svg";
+import { PARTNERS } from "@/shared/config/partners";
 import { useTranslation } from "@/shared/i18n";
 import { Logo } from "@/shared/ui/logo";
 
@@ -80,43 +77,18 @@ export function LandingFooter() {
           <p className="text-xs text-muted-foreground">
             © {year} PROMUEVA — Universidad del Valle. {t("footer.rights")}
           </p>
-          <div className="flex items-center gap-3">
-            <a
-              href="https://www.univalle.edu.co/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center rounded-md px-2 py-1 opacity-70 transition-opacity hover:opacity-100 dark:bg-white"
-            >
-              <img src={univalleSvg} alt="Universidad del Valle" className="h-6 w-auto" />
-            </a>
-            <a
-              href="https://sites.google.com/view/promueva/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center rounded-md px-2 py-1 opacity-70 transition-opacity hover:opacity-100 dark:bg-white"
-            >
-              <img src={promuevaSvg} alt="PROMUEVA" className="h-6 w-auto" />
-            </a>
-            <a
-              href="https://www.javerianacali.edu.co/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center rounded-md px-2 py-1 opacity-70 transition-opacity hover:opacity-100 dark:bg-white"
-            >
-              <img
-                src={javerianaLogo}
-                alt="Pontificia Universidad Javeriana"
-                className="h-6 w-auto"
-              />
-            </a>
-            <a
-              href="https://eisc.univalle.edu.co/index.php/grupos-investigacion/avispa"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center rounded-md px-2 py-1 opacity-70 transition-opacity hover:opacity-100 dark:bg-white"
-            >
-              <img src={avispaLogo} alt="AVISPA" className="h-6 w-auto" />
-            </a>
+          <div className="flex flex-wrap items-center gap-3">
+            {PARTNERS.map(({ id, src, alt, href }) => (
+              <a
+                key={id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center rounded-md px-2 py-1 opacity-70 transition-opacity hover:opacity-100 dark:bg-white"
+              >
+                <img src={src} alt={alt} className="h-6 w-auto" />
+              </a>
+            ))}
           </div>
         </div>
       </div>
