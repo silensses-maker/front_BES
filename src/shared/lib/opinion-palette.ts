@@ -51,9 +51,9 @@ export function interpolateOpinion(value: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// ─── Public–private divergence scale ────────────────────────────────────────
+// ─── Public-private divergence scale ────────────────────────────────────────
 
-/** Slate (no divergence) → violet (≥ 0.2). Mockup's "Divergencia púb–priv". */
+/** Slate (no divergence) → violet (≥ 0.2). Mockup's "Divergencia púb-priv". */
 export const DIVERGENCE_PALETTE = ["#94a3b8", "#a855f7"] as const;
 
 const DIVERGENCE_RGB = [hexToRgb(DIVERGENCE_PALETTE[0]), hexToRgb(DIVERGENCE_PALETTE[1])] as const;

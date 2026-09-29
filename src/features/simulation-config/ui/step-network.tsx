@@ -169,7 +169,7 @@ export function StepNetwork({
           value={gen.density}
           onChange={(e) => onUpdate({ density: Number(e.target.value) } as Partial<SimFormValues>)}
         />
-        {/* Mockup: derived Barabási–Albert edge count */}
+        {/* Mockup: derived Barabási-Albert edge count */}
         <p className="text-xs text-muted-foreground">
           {t("simulationConfig.densityEdgesHint", {
             edges: formatNumber(maxEdges, i18n.language),

@@ -450,7 +450,7 @@ const es = {
     iterationLimitHint:
       "Máximo de rondas. La simulación se detiene al alcanzar este límite O al converger (umbral de parada), lo que pase primero.",
     stopThresholdHint:
-      "Criterio de convergencia. La simulación se detiene cuando el cambio promedio de creencias entre rondas baja de este valor. Menor = convergencia más estricta. Típico: 0.01–0.001.",
+      "Criterio de convergencia. La simulación se detiene cuando el cambio promedio de creencias entre rondas baja de este valor. Menor = convergencia más estricta. Típico: 0.01-0.001.",
     seedHint:
       "Semilla aleatoria para reproducibilidad. La misma semilla produce la misma topología y dinámica. Déjala aleatoria para exploración libre.",
     // ── Tooltips por campo (paso de agentes) ───────────────────────────────
@@ -534,7 +534,7 @@ const es = {
     liveBiasOnEdges: "Sesgos sobre aristas",
     liveCardQuota: "Tu cuota · {{role}}",
     liveCardValidation: "Validación",
-    liveEdgesBarabasi: "Aristas (Barabási–Albert)",
+    liveEdgesBarabasi: "Aristas (Barabási-Albert)",
     liveDefinedAgents: "Agentes definidos",
     liveDefinedEdges: "Aristas definidas",
     liveQuotaUsage: "{{used}} / {{limit}}",
@@ -572,6 +572,7 @@ const es = {
     loadNoCsv:
       "La importación CSV no está soportada. Exporta tu simulación como JSON desde el paso de Revisión.",
     loadDownloadExample: "Descargar ejemplo",
+    loadDownloadPrompt: "Descargar prompt para IA",
   },
   simulationHistory: {
     filterAll: "Todos",
@@ -654,7 +655,7 @@ const es = {
     totalRounds_one: "{{display}} ronda",
     totalRounds_other: "{{display}} rondas",
     hoverNotReceived: "aún no recibida",
-    fineDetail: "Detalle · rondas {{from}}–{{to}} (arrastra para precisión de 1 ronda)",
+    fineDetail: "Detalle · rondas {{from}}-{{to}} (arrastra para precisión de 1 ronda)",
     timelineAria: "Línea de tiempo de rondas",
     fineTimelineAria: "Línea de tiempo fina de rondas",
     noMoreEventsAfter: "No hay más eventos después de esta ronda.",
@@ -716,7 +717,7 @@ const es = {
     rowCount_other: "{{display}} filas",
     filteredSuffix: "· filtradas",
     pageLabel: "Página {{page}} de {{pages}}",
-    rangeLabel: "Filas {{from}}–{{to}}",
+    rangeLabel: "Filas {{from}}-{{to}}",
     rangeEmpty: "Sin filas",
     rowsPerPage: "Filas por página",
     firstPageAria: "Primera página",
@@ -735,7 +736,7 @@ const es = {
     tabPublicPrivate: "Pública vs. privada",
     tabParticipation: "Participación",
     sampleNote: "Mostrando 50 de {{total}} agentes · muestreo uniforme · color = creencia inicial",
-    divergenceNote: "El único lugar donde vive la divergencia público–privado — ahora a un clic.",
+    divergenceNote: "El único lugar donde vive la divergencia público-privado — ahora a un clic.",
     distributionTitle: "Creencia pública · ronda {{round}}",
     seriesPublic: "Pública",
     seriesPrivate: "Privada",
@@ -749,7 +750,7 @@ const es = {
     colorByLabel: "Colorear por",
     colorPublic: "Creencia pública",
     colorPrivate: "Creencia privada",
-    colorDivergence: "Divergencia púb–priv",
+    colorDivergence: "Divergencia púb-priv",
     colorStrategy: "Estrategia",
     zoomInAria: "Acercar",
     zoomOutAria: "Alejar",
@@ -814,7 +815,7 @@ const es = {
     inspectorDeselectAria: "Deseleccionar nodo",
     inspectorPublic: "Creencia pública",
     inspectorPrivate: "Creencia privada",
-    inspectorDivergence: "Divergencia púb–priv",
+    inspectorDivergence: "Divergencia púb-priv",
     inspectorDivergenceTip:
       "Diferencia entre lo que el agente expresa y lo que realmente piensa en esta ronda.",
     inspectorInfluences: "Influye en ({{count}})",
@@ -899,8 +900,8 @@ const es = {
     },
     beliefGroup: {
       q1: "Muy baja (< 0.25)",
-      q2: "Baja-media (0.25–0.5)",
-      q3: "Media-alta (0.5–0.75)",
+      q2: "Baja-media (0.25-0.5)",
+      q3: "Media-alta (0.5-0.75)",
       q4: "Muy alta (≥ 0.75)",
     },
     cognitiveBias: {

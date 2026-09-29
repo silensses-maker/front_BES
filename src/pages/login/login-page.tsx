@@ -1,13 +1,12 @@
 import { motion, type Variants } from "motion/react";
+import { Fragment } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/entities/user";
 import { AuthLayout, LoginButton } from "@/features/auth/login";
 import { LanguageSwitcher } from "@/features/language-switch";
-import avispaLogo from "@/shared/assets/logos/AVISPA.jpg";
-import javerianaLogo from "@/shared/assets/logos/javeriana.png";
-import promuevaSrc from "@/shared/assets/logos/promueva.svg";
-import univalleLogo from "@/shared/assets/logos/univalle.svg";
+import { PARTNERS, type PartnerId } from "@/shared/config/partners";
 import { useTranslation } from "@/shared/i18n";
+import { cn } from "@/shared/lib/utils";
 import { Logo } from "@/shared/ui/logo";
 
 /** Stagger container — each child animates in sequence */
@@ -20,6 +19,19 @@ const container: Variants = {
 const item: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
+
+/**
+ * Per-logo optical tweaks for the muted partner strip. Monochrome-friendly
+ * marks are flattened to white in dark mode; logos whose shape depends on
+ * their fill (Javeriana's crest, CNRS's white-on-navy letters) keep their colors.
+ */
+const PARTNER_LOGO_CLASS: Record<PartnerId, string> = {
+  univalle: "h-6 opacity-60 dark:brightness-0 dark:invert dark:opacity-40",
+  promueva: "h-5 opacity-60 dark:brightness-0 dark:invert dark:opacity-40",
+  avispa: "h-5 opacity-70 dark:brightness-0 dark:invert dark:opacity-40",
+  javeriana: "h-5 rounded-sm opacity-80 dark:opacity-50",
+  cnrs: "h-6 opacity-70 dark:opacity-60",
 };
 
 export function LoginPage() {
@@ -77,30 +89,16 @@ export function LoginPage() {
           </motion.div>
         </div>
 
-        <motion.div variants={item} className="flex items-center gap-5 mt-8 mb-4">
-          <img
-            src={univalleLogo}
-            alt="Universidad del Valle"
-            className="h-6 w-auto opacity-60 dark:brightness-0 dark:invert dark:opacity-40"
-          />
-          <span className="text-border">·</span>
-          <img
-            src={promuevaSrc}
-            alt="PROMUEVA"
-            className="h-5 w-auto opacity-60 dark:brightness-0 dark:invert dark:opacity-40"
-          />
-          <span className="text-border">·</span>
-          <img
-            src={avispaLogo}
-            alt="AVISPA"
-            className="h-5 w-auto opacity-70 dark:brightness-0 dark:invert dark:opacity-40"
-          />
-          <span className="text-border">·</span>
-          <img
-            src={javerianaLogo}
-            alt="Pontificia Universidad Javeriana"
-            className="h-5 w-auto rounded-sm opacity-80 dark:opacity-50"
-          />
+        <motion.div
+          variants={item}
+          className="flex flex-wrap items-center justify-center gap-5 mt-8 mb-4"
+        >
+          {PARTNERS.map(({ id, src, alt }, index) => (
+            <Fragment key={id}>
+              {index > 0 && <span className="text-border">·</span>}
+              <img src={src} alt={alt} className={cn("w-auto", PARTNER_LOGO_CLASS[id])} />
+            </Fragment>
+          ))}
         </motion.div>
       </motion.div>
     </AuthLayout>

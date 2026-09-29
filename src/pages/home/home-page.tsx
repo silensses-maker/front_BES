@@ -1,10 +1,7 @@
 import { motion, type Variants } from "motion/react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/entities/user";
-import avispaLogo from "@/shared/assets/logos/AVISPA.jpg";
-import javerianaLogo from "@/shared/assets/logos/javeriana.png";
-import promuevaSvg from "@/shared/assets/logos/promueva.svg";
-import univalleSvg from "@/shared/assets/logos/univalle.svg";
+import { PARTNERS } from "@/shared/config/partners";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
@@ -17,21 +14,6 @@ const item: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
-
-const PARTNERS = [
-  { src: univalleSvg, alt: "Universidad del Valle", href: "https://www.univalle.edu.co/" },
-  { src: promuevaSvg, alt: "PROMUEVA", href: "https://sites.google.com/view/promueva/" },
-  {
-    src: avispaLogo,
-    alt: "AVISPA",
-    href: "https://eisc.univalle.edu.co/index.php/grupos-investigacion/avispa",
-  },
-  {
-    src: javerianaLogo,
-    alt: "Pontificia Universidad Javeriana",
-    href: "https://www.javerianacali.edu.co/",
-  },
-] as const;
 
 export function HomePage() {
   const { t } = useTranslation();
@@ -71,9 +53,9 @@ export function HomePage() {
         <motion.div variants={item} className="flex flex-col gap-6 pt-8">
           <p className="text-sm font-medium text-muted-foreground">{t("home.participation")}</p>
           <div className="flex flex-wrap items-center gap-4">
-            {PARTNERS.map(({ src, alt, href }) => (
+            {PARTNERS.map(({ id, src, alt, href }) => (
               <a
-                key={alt}
+                key={id}
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -112,7 +94,7 @@ export function HomePage() {
           <div className="flex flex-col gap-2">
             <h3 className="font-sans font-semibold text-foreground">Consensus under DeGroot</h3>
             <p className="text-muted-foreground leading-relaxed">
-              A 500-agent Barabási–Albert network with uniform influence weights converges to a
+              A 500-agent Barabási-Albert network with uniform influence weights converges to a
               shared opinion within ~300 iterations. Hub nodes dominate early; peripheral agents
               follow after sufficient exposure.
             </p>
@@ -121,7 +103,7 @@ export function HomePage() {
           <div className="flex flex-col gap-2">
             <h3 className="font-sans font-semibold text-foreground">Silencing cascade</h3>
             <p className="text-muted-foreground leading-relaxed">
-              In a polarized Erdős–Rényi network calibrated with 2022 Colombian election data, the
+              In a polarized Erdős-Rényi network calibrated with 2022 Colombian election data, the
               minority cluster begins suppressing its opinion at iteration 80, producing a cascade
               that amplifies the majority position far beyond its initial share.
             </p>
