@@ -499,7 +499,7 @@ export function usePlaybackEngine(
       }
     };
 
-    init();
+    void init();
 
     return () => {
       cancelled = true;

@@ -266,7 +266,7 @@ export function SimulationCanvas({
       }
     };
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;

@@ -35,6 +35,88 @@ const baseParams = (): CustomSimulationParams => ({
   edges: [makeEdge()],
 });
 
+/**
+ * Minimal TS port of the backend reader (Server.scala `parseCustomRun`): same
+ * offsets, same 4-byte alignment after the header and after the agent names,
+ * same "optional chunks until EOF" rule. Lets the tests assert what the backend
+ * would actually decode instead of hand-computed offsets.
+ */
+function decodeLikeBackend(buffer: ArrayBuffer) {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  const utf8 = new TextDecoder();
+  let offset = 0;
+
+  const readNames = (count: number): string[] => {
+    const names: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const length = view.getUint8(offset);
+      offset += 1;
+      names.push(utf8.decode(bytes.slice(offset, offset + length)));
+      offset += length;
+    }
+    return names;
+  };
+  const readFloats = (count: number): number[] => {
+    const values: number[] = [];
+    for (let i = 0; i < count; i++) values.push(view.getFloat32(offset + 4 * i, true));
+    offset += 4 * count;
+    return values;
+  };
+  const readBytes = (count: number): number[] => {
+    const values = Array.from(bytes.slice(offset, offset + count));
+    offset += count;
+    return values;
+  };
+  const align = (): void => {
+    while (offset % 4 !== 0) offset += 1;
+  };
+
+  // Header
+  const stopThreshold = view.getFloat32(0, true);
+  const iterationLimit = view.getInt32(4, true);
+  const saveMode = view.getUint8(8);
+  const nameLength = view.getUint8(9);
+  const networkName = utf8.decode(bytes.slice(10, 10 + nameLength));
+  offset = 10 + nameLength;
+  align();
+
+  // Agents
+  const n = view.getInt32(offset, true);
+  offset += 4;
+  const beliefs = readFloats(n);
+  readFloats(n); // toleranceRadius
+  readFloats(n); // toleranceOffset
+  const strategies = readBytes(n);
+  const effects = readBytes(n);
+  const names = readNames(n);
+  align();
+
+  // Edges
+  const m = view.getInt32(offset, true);
+  offset += 4;
+  readFloats(m); // influences
+  const biases = readBytes(m);
+  const sources = readNames(m);
+  const targets = readNames(m);
+
+  return {
+    stopThreshold,
+    iterationLimit,
+    saveMode,
+    networkName,
+    beliefs,
+    strategies,
+    effects,
+    names,
+    biases,
+    sources,
+    targets,
+    /** Bytes the backend would parse as optional 12-byte threshold/confidence chunks. */
+    trailingBytes: bytes.length - offset,
+  };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("estimateJsonSize", () => {
@@ -213,58 +295,73 @@ describe("encodeCustomSimulation", () => {
     });
   });
 
-  describe("optional majority/confidence chunks", () => {
-    it("produces a larger buffer for agents with silenceStrategy 1", () => {
-      const paramsBase = baseParams();
-      paramsBase.agents = [makeAgent({ silenceStrategy: 0 })];
-
-      const paramsMajority = baseParams();
-      paramsMajority.agents = [makeAgent({ silenceStrategy: 1, majorityThreshold: 0.6 })];
-
-      const sizeBase = encodeCustomSimulation(paramsBase).byteLength;
-      const sizeMajority = encodeCustomSimulation(paramsMajority).byteLength;
-      expect(sizeMajority).toBeGreaterThan(sizeBase);
-    });
-
-    it("produces a larger buffer for agents with silenceStrategy 3", () => {
-      const paramsBase = baseParams();
-      paramsBase.agents = [makeAgent({ silenceStrategy: 0 })];
-
-      const paramsConfidence = baseParams();
-      paramsConfidence.agents = [
-        makeAgent({ silenceStrategy: 3, majorityThreshold: 0.6, confidence: 0.9 }),
-      ];
-
-      const sizeBase = encodeCustomSimulation(paramsBase).byteLength;
-      const sizeConfidence = encodeCustomSimulation(paramsConfidence).byteLength;
-      expect(sizeConfidence).toBeGreaterThan(sizeBase);
-    });
-
-    it("uses 0 as default when majorityThreshold is absent for strategy 1", () => {
-      expect(() =>
-        encodeCustomSimulation({
-          ...baseParams(),
-          agents: [makeAgent({ silenceStrategy: 1 })],
-        }),
-      ).not.toThrow();
-    });
-
-    it("uses 2.0 as default confidence when strategy is 1 (not 3)", () => {
-      // strategy 1 encodes confidence as 2.0 — buffer should contain 2.0 as a Float32
+  describe("canonical enums (#120)", () => {
+    it("encodes Confidence (3) / Memoryless (2) and Insular (4) bytes where the backend reads them", () => {
       const params: CustomSimulationParams = {
         ...baseParams(),
-        agents: [makeAgent({ silenceStrategy: 1, majorityThreshold: 0.5 })],
+        agents: [
+          makeAgent({ name: "A", silenceStrategy: 3, silenceEffect: 2 }),
+          makeAgent({ name: "B", silenceStrategy: 2, silenceEffect: 1 }),
+          makeAgent({ name: "C", silenceStrategy: 1, silenceEffect: 0 }),
+        ],
+        edges: [
+          makeEdge({ source: "A", target: "B", bias: 4 }),
+          makeEdge({ source: "B", target: "C", bias: 3 }),
+        ],
       };
-      const buf = encodeCustomSimulation(params);
-      const view = new DataView(buf);
-      let found = false;
-      for (let offset = 0; offset <= buf.byteLength - 4; offset++) {
-        if (Math.abs(view.getFloat32(offset, true) - 2.0) < 0.0001) {
-          found = true;
-          break;
-        }
+      const decoded = decodeLikeBackend(encodeCustomSimulation(params));
+
+      expect(decoded.strategies).toEqual([3, 2, 1]);
+      expect(decoded.effects).toEqual([2, 1, 0]);
+      expect(decoded.names).toEqual(["A", "B", "C"]);
+      expect(decoded.biases).toEqual([4, 3]);
+      expect(decoded.sources).toEqual(["A", "B"]);
+      expect(decoded.targets).toEqual(["B", "C"]);
+    });
+
+    it("round-trips the header and agent floats through the backend layout", () => {
+      const params: CustomSimulationParams = {
+        ...baseParams(),
+        networkName: "Net",
+        stopThreshold: 0.001,
+        iterationLimit: 250,
+        saveMode: 1,
+        agents: [makeAgent({ name: "A", belief: 0.25 }), makeAgent({ name: "B", belief: 0.75 })],
+        edges: [makeEdge({ source: "A", target: "B" })],
+      };
+      const decoded = decodeLikeBackend(encodeCustomSimulation(params));
+
+      expect(decoded.stopThreshold).toBeCloseTo(0.001, 6);
+      expect(decoded.iterationLimit).toBe(250);
+      expect(decoded.saveMode).toBe(1);
+      expect(decoded.networkName).toBe("Net");
+      expect(decoded.beliefs[0]).toBeCloseTo(0.25, 5);
+      expect(decoded.beliefs[1]).toBeCloseTo(0.75, 5);
+    });
+
+    it("writes no optional threshold/confidence chunks, for any strategy", () => {
+      for (const silenceStrategy of [0, 1, 2, 3] as const) {
+        const params: CustomSimulationParams = {
+          ...baseParams(),
+          agents: [makeAgent({ name: "A", silenceStrategy }), makeAgent({ name: "B" })],
+          edges: [makeEdge({ source: "A", target: "B" })],
+        };
+        const decoded = decodeLikeBackend(encodeCustomSimulation(params));
+        // The backend reads 12-byte chunks while bytes remain after the target
+        // names; nothing must remain (values are fixed by the simulator).
+        expect(decoded.trailingBytes).toBe(0);
       }
-      expect(found).toBe(true);
+    });
+
+    it("produces the same size for Threshold/Confidence agents as for DeGroot agents", () => {
+      const withStrategy = (silenceStrategy: 0 | 1 | 2 | 3) =>
+        encodeCustomSimulation({
+          ...baseParams(),
+          agents: [makeAgent({ name: "A", silenceStrategy }), makeAgent({ name: "B" })],
+        }).byteLength;
+
+      expect(withStrategy(2)).toBe(withStrategy(0));
+      expect(withStrategy(3)).toBe(withStrategy(0));
     });
   });
 

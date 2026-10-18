@@ -27,7 +27,7 @@ export function NetworkSelectorWaiting({ runId }: NetworkSelectorWaitingProps) {
 
   useEffect(() => {
     if (topology?.networkId) {
-      navigate(`/board/simulation/${runId}/${topology.networkId}`, { replace: true });
+      void navigate(`/board/simulation/${runId}/${topology.networkId}`, { replace: true });
     }
   }, [topology, runId, navigate]);
 

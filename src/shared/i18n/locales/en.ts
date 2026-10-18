@@ -120,6 +120,8 @@ const en = {
       majorityDesc_proportion: "proportion",
       majorityDesc_2: "of neighbors that agent",
       majorityDesc_3: "needs to perceive as supportive to be willing to speak.",
+      fixedValuesNote:
+        "In SiLEnSeSS these thresholds are fixed by the simulator: Majority agents need at least half of their speaking neighbors to be supportive, Threshold agents use a threshold of 0.1, and Confidence agents start with a random confidence and speak once it exceeds a threshold of 0.1.",
       coreIdeaTitle: "Core Idea",
       takeawayTitle: "Simulation Takeaway",
       tabMemoryless: "SOM (Memoryless) Model",
@@ -398,8 +400,6 @@ const en = {
     count: "Count",
     silenceStrategy: "Silence strategy",
     silenceEffect: "Silence effect",
-    majorityThreshold: "Majority threshold",
-    confidence: "Confidence",
     cognitiveBias: "Cognitive bias",
     addAgentType: "Add agent type",
     addBiasType: "Add bias type",
@@ -426,8 +426,6 @@ const en = {
     reviewAgentDistribution: "Agent distribution",
     reviewBiasDistribution: "Bias distribution",
     reviewColCount: "Count",
-    reviewThreshold: "τ = {{value}}",
-    reviewConfidence: "conf = {{value}}",
     back: "Back",
     next: "Next",
     submit: "Launch simulation",
@@ -449,13 +447,12 @@ const en = {
       "Random seed for reproducibility. Same seed produces the same topology and dynamics. Leave random for fresh exploration.",
     // ── Field-level tooltips (agents step) ──────────────────────────────────
     silenceStrategyHint:
-      "How an agent decides whether to express its opinion each round. DeGroot: always speaks. Majority: speaks only if a majority of neighbors agree. Threshold: requires a configurable fraction. Confidence: speaks when its own certainty exceeds a threshold.",
+      "How an agent decides whether to express its opinion each round. DeGroot: always speaks. Majority: speaks only if a majority of neighbors agree. Threshold: requires a minimum fraction of agreeing neighbors, fixed at 0.1 by the simulator. Confidence: speaks when its own certainty exceeds a threshold, fixed at 0.1 (initial confidence is random).",
     silenceEffectHint:
       "How a silent agent influences neighbors' belief updates. DeGroot: not silent (no effect, classic model). Memory: neighbors use the agent's last expressed opinion. Memoryless: neighbors ignore the silent agent.",
-    majorityThresholdHint:
-      "Fraction of neighbors who must agree (within tolerance) for the agent to speak. 0.5 = half. Higher means harder to speak.",
-    confidenceHint:
-      "Confidence threshold for the Confidence strategy. The agent speaks when its own subjective certainty in its current opinion exceeds this value.",
+    // Read-only: the simulator fixes these values (#120)
+    thresholdFixedHint: "Fixed by the simulator: 0.1",
+    confidenceFixedHint: "Random initial confidence, threshold fixed at 0.1",
     cognitiveBiasHint:
       "How an agent processes incoming opinions. None: pure averaging (DeGroot). Confirmation: weighs agreeing opinions more. Backfire: rejects strongly disagreeing opinions and hardens. Authority: defers to high-influence neighbors. Insular: ignores most outside opinions.",
     agentTypesLabelHint:

@@ -87,7 +87,7 @@ export function NetworkBrowser({
     current !== null ? filtered.findIndex((e) => e.networkId === current.networkId) : -1;
 
   const openNetwork = (networkId: string) => {
-    navigate(`/board/simulation/${runId}/${networkId}`);
+    void navigate(`/board/simulation/${runId}/${networkId}`);
   };
 
   const goAdjacent = (dir: 1 | -1) => {

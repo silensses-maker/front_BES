@@ -43,7 +43,7 @@ export function useFinalSpreads(runId: string): UseFinalSpreadsReturn {
       if (missing.length === 0) return;
       for (const id of missing) inflightRef.current.add(id);
 
-      Promise.all(
+      void Promise.all(
         missing.map(async (id) => {
           try {
             const results = await simulationsApi.getResults(runId, id, {

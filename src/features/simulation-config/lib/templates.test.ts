@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GeneratedSimFormValues } from "../types/simulation-config.types";
 import { CONSENSUS_PURSUIT_TEMPLATE, POLARIZATION_TEMPLATE } from "./templates";
+import { generatedSimSchema } from "./validation";
 
 describe("CONSENSUS_PURSUIT_TEMPLATE", () => {
   it("matches the shape of GeneratedSimFormValues", () => {
@@ -60,5 +61,26 @@ describe("POLARIZATION_TEMPLATE", () => {
     expect(biasTypes).toHaveLength(2);
     expect(biasTypes[0]?.id).toBe("pol-b0");
     expect(biasTypes[1]?.id).toBe("pol-b1");
+  });
+});
+
+describe("templates and the simulator-fixed values (#120)", () => {
+  const templates = [
+    ["CONSENSUS_PURSUIT_TEMPLATE", CONSENSUS_PURSUIT_TEMPLATE],
+    ["POLARIZATION_TEMPLATE", POLARIZATION_TEMPLATE],
+  ] as const;
+
+  it.each(templates)("%s has no threshold/confidence fields on its agent rows", (_, template) => {
+    for (const row of template.agentTypes) {
+      expect(row).not.toHaveProperty("majorityThreshold");
+      expect(row).not.toHaveProperty("confidence");
+      expect(Object.keys(row).sort()).toEqual(["count", "id", "silenceEffect", "silenceStrategy"]);
+    }
+  });
+
+  it.each(templates)("%s passes generatedSimSchema", (_, template) => {
+    const result = generatedSimSchema.safeParse(template);
+    expect(result.error?.issues).toBeUndefined();
+    expect(result.success).toBe(true);
   });
 });

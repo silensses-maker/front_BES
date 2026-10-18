@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseSimulationFrame } from "./simulation-frame";
 
@@ -10,7 +12,8 @@ interface AgentData {
 }
 
 /**
- * Builds a well-formed little-endian binary frame for testing.
+ * Builds a well-formed little-endian binary frame for testing, in the backend's
+ * block layout: [n × public float32][n × private float32][n × speaking uint8].
  * networkId is reconstructed from the two int64 halves following Java UUID encoding.
  */
 function buildFrameBuffer({
@@ -38,9 +41,10 @@ function buildFrameBuffer({
   view.setInt32(24, agentCount, true);
   view.setInt32(28, round, true);
   view.setInt32(32, startsAt, true);
+  const privateBase = 36 + agentCount * 4;
   for (let i = 0; i < agentCount; i++) {
-    view.setFloat32(36 + i * 8, agents[i]!.pub, true);
-    view.setFloat32(36 + i * 8 + 4, agents[i]!.priv, true);
+    view.setFloat32(36 + i * 4, agents[i]!.pub, true);
+    view.setFloat32(privateBase + i * 4, agents[i]!.priv, true);
   }
   const speakingBase = 36 + agentCount * 8;
   for (let i = 0; i < agentCount; i++) {
@@ -166,7 +170,7 @@ describe("parseSimulationFrame", () => {
   });
 
   describe("belief data parsing", () => {
-    it("de-interleaves publicBelief and privateBelief correctly", () => {
+    it("reads publicBelief and privateBelief from their separate blocks", () => {
       const buf = buildFrameBuffer({
         networkIdMsb: NETWORK_ID_MSB,
         networkIdLsb: NETWORK_ID_LSB,
@@ -199,6 +203,44 @@ describe("parseSimulationFrame", () => {
       const bigEndianMisparse = new DataView(buf).getFloat32(36, false);
       expect(publicBelief[0]).toBeCloseTo(0.1, 5);
       expect(bigEndianMisparse).not.toBeCloseTo(0.1, 5);
+    });
+
+    it("regression (#118): maps each agent's public/private pair from the block layout", () => {
+      // The backend (AgentProcessor.sendRoundToWebSocketServer) writes the beliefs
+      // as two blocks through one float view: put(public × n), then put(private × n).
+      // The old parser read them as interleaved pairs (36 + 8i, 36 + 8i + 4), which
+      // gave agent i the values of agents 2i and 2i+1 and hid public ≠ private.
+      const pub = [0.11, 0.22, 0.33, 0.44, 0.55, 0.66];
+      const priv = [0.91, 0.82, 0.73, 0.64, 0.05, 0.16];
+      const speak = [1, 0, 0, 1, 1, 0];
+      const n = pub.length;
+      const buf = new ArrayBuffer(36 + 9 * n);
+      const view = new DataView(buf);
+      view.setInt32(24, n, true);
+      view.setInt32(28, 12, true);
+      view.setInt32(32, 0, true);
+      let offset = 36;
+      for (const v of [...pub, ...priv]) {
+        view.setFloat32(offset, v, true);
+        offset += 4;
+      }
+      for (const s of speak) {
+        view.setUint8(offset, s);
+        offset += 1;
+      }
+
+      const frame = parseSimulationFrame(buf);
+      for (let i = 0; i < n; i++) {
+        expect(frame.publicBelief[i]).toBeCloseTo(pub[i]!, 5);
+        expect(frame.privateBelief[i]).toBeCloseTo(priv[i]!, 5);
+        expect(frame.speaking[i]).toBe(speak[i]);
+      }
+
+      // What the old interleaved reading returned for agent 0's private belief:
+      // agent 1's public value.
+      const oldPrivate0 = view.getFloat32(36 + 4, true);
+      expect(oldPrivate0).toBeCloseTo(pub[1]!, 5);
+      expect(frame.privateBelief[0]).not.toBeCloseTo(oldPrivate0, 5);
     });
   });
 
@@ -328,6 +370,77 @@ describe("parseSimulationFrame", () => {
       expect(frame.publicBelief).toBeInstanceOf(Float32Array);
       expect(frame.privateBelief).toBeInstanceOf(Float32Array);
       expect(frame.speaking).toBeInstanceOf(Uint8Array);
+    });
+  });
+
+  // ─── Real backend frames ──────────────────────────────────────────────────
+  //
+  // Byte-for-byte copies of `network_frames.frame` (what GET /frames returns and
+  // what the WS stream sends) from a local 40-agent run split into two
+  // partitions (startsAt 0 → 32 agents, startsAt 32 → 8 agents).
+  // No agent in this run diverges (no MEMORY effect), so public === private for
+  // every agent — an equality that only holds when the bytes are read as blocks.
+
+  describe("real backend frames (__fixtures__)", () => {
+    const REAL_RUN_ID = "342521980018098176";
+    const REAL_NETWORK_ID = "0019fc5d-9a84-f1f7-9573-5864db9fc473";
+
+    // Path-based on purpose: happy-dom replaces the global URL, so a file:// URL
+    // built with `new URL(..., import.meta.url)` would not resolve to disk.
+    function loadFixture(name: string): ArrayBuffer {
+      return new Uint8Array(readFileSync(join(import.meta.dirname, "__fixtures__", name))).buffer;
+    }
+
+    it("round 0, startsAt 0: decodes the header", () => {
+      const buf = loadFixture("ws-frame-round0.bin");
+      const frame = parseSimulationFrame(buf);
+      expect(buf.byteLength).toBe(36 + 9 * 32);
+      expect(frame.runId).toBe(REAL_RUN_ID);
+      expect(frame.networkId).toBe(REAL_NETWORK_ID);
+      expect(frame.agentCount).toBe(32);
+      expect(frame.round).toBe(0);
+      expect(frame.startsAt).toBe(0);
+    });
+
+    it("round 0, startsAt 0: public === private for every agent, with the initial beliefs", () => {
+      const buf = loadFixture("ws-frame-round0.bin");
+      const { publicBelief, privateBelief, speaking } = parseSimulationFrame(buf);
+      // Initial beliefs repeat 1.0, 0.9, 0.1, 0.0 across agents.
+      const initial = [1, Math.fround(0.9), Math.fround(0.1), 0];
+      for (let i = 0; i < 32; i++) {
+        expect(privateBelief[i]).toBe(publicBelief[i]);
+        expect(publicBelief[i]).toBe(initial[i % 4]);
+        expect(speaking[i]).toBe(1);
+      }
+    });
+
+    it("round 0, startsAt 0: the old interleaved reading pairs values of different agents", () => {
+      const view = new DataView(loadFixture("ws-frame-round0.bin"));
+      // Agent 0's "private" under the old parser is agent 1's belief (0.9 vs 1.0).
+      expect(view.getFloat32(36, true)).toBe(1);
+      expect(view.getFloat32(36 + 4, true)).toBe(Math.fround(0.9));
+      for (let i = 0; i < 32; i++) {
+        expect(view.getFloat32(36 + i * 8, true)).not.toBe(view.getFloat32(36 + i * 8 + 4, true));
+      }
+    });
+
+    it("round 1, startsAt 32: decodes a non-zero partition with silent agents", () => {
+      const buf = loadFixture("ws-frame-round1-starts32.bin");
+      const frame = parseSimulationFrame(buf);
+      expect(buf.byteLength).toBe(36 + 9 * 8);
+      expect(frame.runId).toBe(REAL_RUN_ID);
+      expect(frame.networkId).toBe(REAL_NETWORK_ID);
+      expect(frame.agentCount).toBe(8);
+      expect(frame.round).toBe(1);
+      expect(frame.startsAt).toBe(32);
+
+      // Global agents 32..39 after one update; every agent is silent in this round.
+      const expected = [0.483, 0.583, 0.425, 0.525, 0.483, 0.583, 0.425, 0.325];
+      for (let i = 0; i < 8; i++) {
+        expect(frame.privateBelief[i]).toBe(frame.publicBelief[i]);
+        expect(frame.publicBelief[i]).toBeCloseTo(expected[i]!, 6);
+        expect(frame.speaking[i]).toBe(0);
+      }
     });
   });
 });

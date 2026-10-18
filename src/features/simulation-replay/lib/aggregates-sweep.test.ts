@@ -31,8 +31,8 @@ function buildSlice(round: number): ArrayBuffer {
   view.setInt32(28, round, true);
   view.setInt32(32, 0, true);
   for (let i = 0; i < AGENT_COUNT; i++) {
-    view.setFloat32(36 + i * 8, 0.5, true);
-    view.setFloat32(36 + i * 8 + 4, 0.5, true);
+    view.setFloat32(36 + i * 4, 0.5, true);
+    view.setFloat32(36 + AGENT_COUNT * 4 + i * 4, 0.5, true);
     view.setUint8(36 + AGENT_COUNT * 8 + i, 1);
   }
   return buffer;

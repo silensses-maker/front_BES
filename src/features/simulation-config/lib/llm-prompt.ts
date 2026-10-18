@@ -34,10 +34,8 @@ SHAPE 1 — "generated": a random network built from agent-type and bias-type di
     {
       "id": "<unique string>",
       "count": <integer >= 1>,                  // how many agents get this combination
-      "silenceStrategy": <0 | 1 | 2 | 3>,       // 0=DeGroot (always speaks) 1=Majority (speaks if enough neighbors agree) 2=Threshold (speaks above a configurable agreement fraction) 3=Confidence (speaks when own certainty passes a threshold)
-      "silenceEffect": <0 | 1 | 2>,             // 0=DeGroot (no silence, classic model) 1=Memory (neighbors use the agent's last expressed opinion) 2=Memoryless (neighbors ignore the silent agent entirely)
-      "majorityThreshold": <number 0-1, optional>, // required when silenceStrategy is 1 or 2: fraction of neighbors that must agree (within tolerance) for the agent to speak
-      "confidence": <number 0-1, optional>       // required when silenceStrategy is 3: the agent's own certainty threshold to speak
+      "silenceStrategy": <0 | 1 | 2 | 3>,       // 0=DeGroot (always speaks) 1=Majority (speaks if at least half of its speaking neighbors agree) 2=Threshold (speaks if at least a fixed fraction, 0.1, of its speaking neighbors agree) 3=Confidence (starts with a random confidence; speaks when it passes a fixed threshold of 0.1)
+      "silenceEffect": <0 | 1 | 2>              // 0=DeGroot (no silence, classic model) 1=Memory (neighbors use the agent's last expressed opinion) 2=Memoryless (neighbors ignore the silent agent entirely)
     }
     // ... more rows as needed
   ],
@@ -50,6 +48,8 @@ SHAPE 1 — "generated": a random network built from agent-type and bias-type di
     // ... more rows as needed
   ]
 }
+
+Threshold and confidence values are fixed by the simulator and cannot be configured: do NOT add "majorityThreshold" or "confidence" fields (they are ignored).
 
 Hard invariants for "generated" (the app rejects the file otherwise):
 - sum of agentTypes[].count MUST equal numberOfAgents exactly.
@@ -73,8 +73,8 @@ SHAPE 2 — "custom": an explicit list of agents and directed edges
       "belief": <number 0-1>,                   // initial opinion/position
       "toleranceRadius": <number 0-1>,          // how far another opinion can be from this agent's belief and still count as "close enough"
       "toleranceOffset": <number -1 to 1>,      // shifts the tolerance window asymmetrically around the belief
-      "silenceStrategy": <0 | 1 | 2>,           // same meaning as above; note: value 3 (Confidence) is NOT available for custom agents
-      "silenceEffect": <0 | 1>                  // same meaning as above; note: value 2 (Memoryless) is NOT available for custom agents
+      "silenceStrategy": <0 | 1 | 2 | 3>,       // same meaning as above (thresholds also fixed by the simulator)
+      "silenceEffect": <0 | 1 | 2>              // same meaning as above
     }
     // ... more agents
   ],
@@ -83,7 +83,7 @@ SHAPE 2 — "custom": an explicit list of agents and directed edges
       "source": "<agent name>",                 // must match an entry in agents[].name
       "target": "<agent name>",                 // must match an entry in agents[].name
       "influence": <number 0-1>,                // weight applied when target incorporates source's opinion
-      "bias": <0 | 1 | 2 | 3>                   // same meaning as above; note: value 4 (Insular) is NOT available for custom edges
+      "bias": <0 | 1 | 2 | 3 | 4>               // same meaning as above (cognitiveBias)
     }
     // ... more edges
   ]
@@ -109,7 +109,7 @@ Worked example — "generated" (10 agents, 2 opinion camps, mild disagreement ha
   "saveMode": 1,
   "agentTypes": [
     { "id": "a0", "count": 8, "silenceStrategy": 0, "silenceEffect": 0 },
-    { "id": "a1", "count": 2, "silenceStrategy": 2, "silenceEffect": 1, "majorityThreshold": 0.4 }
+    { "id": "a1", "count": 2, "silenceStrategy": 2, "silenceEffect": 1 }
   ],
   "biasTypes": [
     { "id": "b0", "count": 34, "cognitiveBias": 0 }

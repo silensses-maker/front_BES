@@ -40,6 +40,34 @@ interface SimulationConfigActions {
   reset: () => void;
 }
 
+/**
+ * Persisted-draft migration. v0 drafts may carry `majorityThreshold` /
+ * `confidence` on generated agent-type rows (removed in #120: the simulator
+ * fixes those values). They are dropped here so they never come back via
+ * "Export JSON"; everything else is kept as-is. Never throws.
+ */
+export function migrateSimulationConfigDraft(persisted: unknown, version: number): unknown {
+  if (version >= 1 || persisted === null || typeof persisted !== "object") return persisted;
+  const state = persisted as { generatedValues?: { agentTypes?: unknown } };
+  const agentTypes = state.generatedValues?.agentTypes;
+  if (!Array.isArray(agentTypes)) return persisted;
+  return {
+    ...state,
+    generatedValues: {
+      ...state.generatedValues,
+      agentTypes: agentTypes.map((row: unknown) => {
+        if (row === null || typeof row !== "object") return row;
+        const {
+          majorityThreshold: _threshold,
+          confidence: _confidence,
+          ...rest
+        } = row as Record<string, unknown>;
+        return rest;
+      }),
+    },
+  };
+}
+
 const initialState: SimulationConfigState = {
   networkType: "generated",
   step: "network",
@@ -81,6 +109,11 @@ export const useSimulationConfigStore = create<SimulationConfigState & Simulatio
     }),
     {
       name: "bes-simulation-config",
+      // v1 (#120): agent-type rows lost majorityThreshold / confidence.
+      version: 1,
+      migrate: (persisted, version) =>
+        migrateSimulationConfigDraft(persisted, version) as SimulationConfigState &
+          SimulationConfigActions,
     },
   ),
 );

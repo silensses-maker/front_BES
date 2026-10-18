@@ -32,9 +32,10 @@ function buildSlice(round: number, startsAt: number, agents: AgentData[]): Array
   view.setInt32(24, agentCount, true);
   view.setInt32(28, round, true);
   view.setInt32(32, startsAt, true);
+  // Block layout: [n × public][n × private][n × speaking].
   for (let i = 0; i < agentCount; i++) {
-    view.setFloat32(36 + i * 8, agents[i]!.pub, true);
-    view.setFloat32(36 + i * 8 + 4, agents[i]!.priv, true);
+    view.setFloat32(36 + i * 4, agents[i]!.pub, true);
+    view.setFloat32(36 + agentCount * 4 + i * 4, agents[i]!.priv, true);
     view.setUint8(36 + agentCount * 8 + i, agents[i]!.speaking);
   }
   return buffer;
@@ -174,6 +175,8 @@ describe("mergeRoundFromChunk", () => {
     expect(frame!.publicBelief[0]).toBeCloseTo(0.1, 5);
     expect(frame!.publicBelief[3]).toBeCloseTo(0.5, 5);
     expect(frame!.publicBelief[5]).toBeCloseTo(0.52, 5);
+    expect(frame!.privateBelief[0]).toBeCloseTo(0.9, 5);
+    expect(frame!.privateBelief[5]).toBeCloseTo(0.48, 5);
   });
 
   it("merges rounds in backward order (fresh merger per call)", () => {

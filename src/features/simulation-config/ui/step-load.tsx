@@ -25,7 +25,8 @@ export function StepLoad({ onLoad, loading }: StepLoadProps) {
           "SiLEnSeSS simulation configuration file. Drop it in the 'Load file' tab to pre-fill the wizard.",
         networkType: "'generated' = random network  |  'custom' = manually defined network",
         saveMode: "0=FULL  1=STANDARD  2=STANDARD_LIGHT",
-        silenceStrategy: "0=DeGroot  1=Majority  2=Threshold  3=Confidence",
+        silenceStrategy:
+          "0=DeGroot  1=Majority  2=Threshold (fixed by the simulator: 0.1)  3=Confidence (random initial confidence, threshold fixed at 0.1)",
         silenceEffect: "0=DeGroot  1=Memory  2=Memoryless",
         cognitiveBias: "0=None  1=Confirmation  2=Backfire  3=Authority  4=Insular",
         seed: "null = random seed each run  |  integer = fixed reproducible seed",

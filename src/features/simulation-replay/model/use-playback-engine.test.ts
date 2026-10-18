@@ -70,8 +70,8 @@ function buildSlice(round: number, startsAt: number, agentCount = AGENT_COUNT): 
   view.setInt32(28, round, true);
   view.setInt32(32, startsAt, true);
   for (let i = 0; i < agentCount; i++) {
-    view.setFloat32(36 + i * 8, round / 100 + i * 0.001, true);
-    view.setFloat32(36 + i * 8 + 4, 0.5, true);
+    view.setFloat32(36 + i * 4, round / 100 + i * 0.001, true);
+    view.setFloat32(36 + agentCount * 4 + i * 4, 0.5, true);
     view.setUint8(36 + agentCount * 8 + i, i % 2);
   }
   return buffer;

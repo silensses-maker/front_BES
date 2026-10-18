@@ -48,7 +48,7 @@ export function BoardPage() {
   const prevPanel = useRef<string | null>(null);
   useEffect(() => {
     if (activePanel === "my-experiments" && prevPanel.current !== "my-experiments") {
-      loadInitial();
+      void loadInitial();
     }
     prevPanel.current = activePanel;
   }, [activePanel, loadInitial]);

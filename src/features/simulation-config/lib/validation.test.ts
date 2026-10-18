@@ -188,6 +188,62 @@ describe("generatedSimSchema", () => {
       );
       expect(result.success).toBe(false);
     });
+
+    it("accepts every canonical silenceStrategy (0-3) and silenceEffect (0-2)", () => {
+      for (const silenceStrategy of [0, 1, 2, 3] as const) {
+        for (const silenceEffect of [0, 1, 2] as const) {
+          const result = generatedSimSchema.safeParse(
+            makeGeneratedInput({
+              agentTypes: [{ ...baseAgentType, count: 5, silenceStrategy, silenceEffect }],
+            }),
+          );
+          expect(result.success).toBe(true);
+        }
+      }
+    });
+
+    it("accepts every canonical cognitiveBias (0-4)", () => {
+      const maxEdges = computeMaxEdges(2, 5);
+      for (const cognitiveBias of [0, 1, 2, 3, 4] as const) {
+        const result = generatedSimSchema.safeParse(
+          makeGeneratedInput({ biasTypes: [{ ...baseBiasType, count: maxEdges, cognitiveBias }] }),
+        );
+        expect(result.success).toBe(true);
+      }
+    });
+  });
+
+  describe("legacy threshold/confidence fields (#120)", () => {
+    const legacyRow = (extra: Record<string, unknown>) =>
+      ({
+        ...baseAgentType,
+        count: 5,
+        silenceStrategy: 2,
+        ...extra,
+      }) as GeneratedSimSchemaInput["agentTypes"][number];
+
+    it("accepts rows that still carry majorityThreshold / confidence and drops them", () => {
+      const result = generatedSimSchema.safeParse(
+        makeGeneratedInput({
+          agentTypes: [legacyRow({ majorityThreshold: 0.4, confidence: 0.9 })],
+        }),
+      );
+      expect(result.success).toBe(true);
+      const row = result.data?.agentTypes[0];
+      expect(row).toBeDefined();
+      expect(row).not.toHaveProperty("majorityThreshold");
+      expect(row).not.toHaveProperty("confidence");
+      expect(row).toEqual({ id: "agent-type-1", count: 5, silenceStrategy: 2, silenceEffect: 0 });
+    });
+
+    it("never errors on legacy values, even outside the old 0-1 range or of the wrong type", () => {
+      const result = generatedSimSchema.safeParse(
+        makeGeneratedInput({
+          agentTypes: [legacyRow({ majorityThreshold: 5, confidence: "high" })],
+        }),
+      );
+      expect(result.success).toBe(true);
+    });
   });
 
   describe("custom refinements", () => {
@@ -429,6 +485,74 @@ describe("customSimSchema", () => {
         }),
       );
       expect(resultPos.success).toBe(true);
+    });
+  });
+
+  describe("canonical enums on custom agents and edges (#120)", () => {
+    it("accepts every silenceStrategy (0-3) and silenceEffect (0-2) on an agent", () => {
+      for (const silenceStrategy of [0, 1, 2, 3] as const) {
+        for (const silenceEffect of [0, 1, 2] as const) {
+          const result = customSimSchema.safeParse(
+            makeCustomInput({
+              agents: [
+                { ...baseCustomAgent, name: "Alice", silenceStrategy, silenceEffect },
+                { ...baseCustomAgent, name: "Bob" },
+              ],
+            }),
+          );
+          expect(result.success).toBe(true);
+        }
+      }
+    });
+
+    it("accepts every cognitive bias (0-4) on an edge", () => {
+      for (const bias of [0, 1, 2, 3, 4] as const) {
+        const result = customSimSchema.safeParse(
+          makeCustomInput({ edges: [{ ...baseCustomEdge, bias }] }),
+        );
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it("rejects values outside the canonical enums", () => {
+      const badStrategy = customSimSchema.safeParse(
+        makeCustomInput({
+          agents: [
+            { ...baseCustomAgent, name: "Alice", silenceStrategy: 4 as 0 },
+            { ...baseCustomAgent, name: "Bob" },
+          ],
+        }),
+      );
+      const badEffect = customSimSchema.safeParse(
+        makeCustomInput({
+          agents: [
+            { ...baseCustomAgent, name: "Alice", silenceEffect: 3 as 0 },
+            { ...baseCustomAgent, name: "Bob" },
+          ],
+        }),
+      );
+      const badBias = customSimSchema.safeParse(
+        makeCustomInput({ edges: [{ ...baseCustomEdge, bias: 5 as 0 }] }),
+      );
+      expect(badStrategy.success).toBe(false);
+      expect(badEffect.success).toBe(false);
+      expect(badBias.success).toBe(false);
+    });
+
+    it("accepts and drops legacy threshold/confidence keys on custom agents", () => {
+      const legacyAgent = {
+        ...baseCustomAgent,
+        name: "Alice",
+        silenceStrategy: 3,
+        majorityThreshold: 0.6,
+        confidence: 0.9,
+      } as CustomSimSchemaInput["agents"][number];
+      const result = customSimSchema.safeParse(
+        makeCustomInput({ agents: [legacyAgent, { ...baseCustomAgent, name: "Bob" }] }),
+      );
+      expect(result.success).toBe(true);
+      expect(result.data?.agents[0]).not.toHaveProperty("majorityThreshold");
+      expect(result.data?.agents[0]).not.toHaveProperty("confidence");
     });
   });
 

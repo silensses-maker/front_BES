@@ -10,8 +10,6 @@ export interface EncoderAgentSpec {
   toleranceOffset: number;
   silenceStrategy: EncoderSilenceStrategy;
   silenceEffect: EncoderSilenceEffect;
-  majorityThreshold?: number;
-  confidence?: number;
 }
 
 export interface EncoderEdgeSpec {
@@ -94,14 +92,14 @@ export function encodeCustomSimulation(params: CustomSimulationParams): ArrayBuf
   for (const e of params.edges) writeString(e.source);
   for (const e of params.edges) writeString(e.target);
 
-  // 4. Optional Majority/Confidence chunks
-  params.agents.forEach((a, i) => {
-    if (a.silenceStrategy === 1 || a.silenceStrategy === 3) {
-      writeInt32(i);
-      writeFloat32(a.majorityThreshold ?? 0);
-      writeFloat32(a.silenceStrategy === 3 ? (a.confidence ?? 0) : 2.0);
-    }
-  });
+  // 4. Optional threshold/confidence chunks — intentionally NOT written (#120).
+  // The section is optional (parseCustomRun reads 12-byte chunks only while
+  // bytes remain). Its values only end up in custom_agents.majority_threshold /
+  // confidence (DB metadata) and never reach the simulation: AgentProcessor
+  // fixes THRESHOLD to 0.1 and CONFIDENCE to a random confidence with a 0.1
+  // threshold. The wizard does not collect them, so writing chunks would only
+  // persist made-up values. Omitting them matches the JSON path, which stores
+  // NULL for both columns.
 
   return new Uint8Array(bytes).buffer;
 }

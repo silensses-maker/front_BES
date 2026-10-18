@@ -22,7 +22,11 @@ import {
   readJsonFile,
 } from "@/shared/lib/simulation-export";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
-import type { CustomSimFormValues, GeneratedSimFormValues } from "../types/simulation-config.types";
+import type {
+  AgentTypeRow,
+  CustomSimFormValues,
+  GeneratedSimFormValues,
+} from "../types/simulation-config.types";
 import { useSimulationConfigStore } from "./simulation-config.store";
 import { useSimulationConfig } from "./use-simulation-config";
 
@@ -915,6 +919,47 @@ describe("useSimulationConfig", () => {
       });
     });
 
+    describe("generated network — request body (#120)", () => {
+      it("sends only silenceStrategy/silenceEffect/count per agent type, full enum range, no threshold/confidence", async () => {
+        vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        // A stale row (e.g. from an old draft) still carrying the removed fields.
+        const staleRow = {
+          id: "a1",
+          count: 2,
+          silenceStrategy: 3,
+          silenceEffect: 2,
+          majorityThreshold: 0.4,
+          confidence: 0.9,
+        } as AgentTypeRow;
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            agentTypes: [{ id: "a0", count: 8, silenceStrategy: 2, silenceEffect: 1 }, staleRow],
+            biasTypes: [{ id: "b0", count: 34, cognitiveBias: 4 }],
+          });
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(simulationsApi.startGenerated).toHaveBeenCalledOnce();
+        const body = vi.mocked(simulationsApi.startGenerated).mock.calls[0]?.[0];
+        expect(body?.agentTypes).toEqual([
+          { silenceStrategy: 2, silenceEffect: 1, count: 8 },
+          { silenceStrategy: 3, silenceEffect: 2, count: 2 },
+        ]);
+        expect(body?.biasTypes).toEqual([{ biasType: 4, count: 34 }]);
+        for (const agentType of body?.agentTypes ?? []) {
+          expect(agentType).not.toHaveProperty("majorityThreshold");
+          expect(agentType).not.toHaveProperty("confidence");
+        }
+      });
+    });
+
     describe("generated network — validation guard", () => {
       it("does not call any API when the form has errors", async () => {
         setupMocks({ maxIterations: 50 });
@@ -1069,6 +1114,42 @@ describe("useSimulationConfig", () => {
 
         expect(simulationsApi.startCustomBinary).toHaveBeenCalledOnce();
         expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+      });
+
+      it("passes the full canonical enums to the encoder unchanged (#120)", async () => {
+        vi.mocked(estimateJsonSize).mockReturnValue(BINARY_THRESHOLD_BYTES + 1);
+        vi.mocked(encodeCustomSimulation).mockReturnValue(new ArrayBuffer(8));
+        vi.mocked(simulationsApi.startCustomBinary).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+        });
+        act(() => {
+          result.current.updateValues({
+            ...validCustomValues,
+            agents: [
+              { ...validCustomValues.agents[0]!, silenceStrategy: 3, silenceEffect: 2 },
+              { ...validCustomValues.agents[1]!, silenceStrategy: 2, silenceEffect: 1 },
+            ],
+            edges: [{ source: "A", target: "B", influence: 0.5, bias: 4 }],
+          });
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const params = vi.mocked(encodeCustomSimulation).mock.calls[0]?.[0];
+        expect(params?.agents.map((a) => [a.silenceStrategy, a.silenceEffect])).toEqual([
+          [3, 2],
+          [2, 1],
+        ]);
+        expect(params?.edges.map((e) => e.bias)).toEqual([4]);
+        for (const agent of params?.agents ?? []) {
+          expect(agent).not.toHaveProperty("majorityThreshold");
+          expect(agent).not.toHaveProperty("confidence");
+        }
       });
     });
 
@@ -1433,6 +1514,36 @@ describe("useSimulationConfig", () => {
       );
     });
 
+    it("accepts a legacy generated file with majorityThreshold / confidence and ignores them (#120)", async () => {
+      const legacyPayload = {
+        ...validGeneratedValues,
+        agentTypes: [
+          { id: "a0", count: 8, silenceStrategy: 2, silenceEffect: 1, majorityThreshold: 0.4 },
+          { id: "a1", count: 2, silenceStrategy: 3, silenceEffect: 2, confidence: 0.9 },
+        ],
+      };
+      vi.mocked(readJsonFile).mockResolvedValue(legacyPayload);
+      vi.mocked(parseEnvelope).mockReturnValue({
+        createdAt: "2024-01-01T00:00:00.000Z",
+        appVersion: "1.0.0",
+        payload: legacyPayload as unknown as Record<string, unknown>,
+      });
+
+      const { result } = renderHook(() => useSimulationConfig());
+
+      await act(async () => {
+        await result.current.handleImportFile(dummyFile);
+      });
+
+      expect(result.current.errors).toEqual({});
+      expect(toast.error).not.toHaveBeenCalled();
+      const rows = (result.current.values as GeneratedSimFormValues).agentTypes;
+      expect(rows).toEqual([
+        { id: "a0", count: 8, silenceStrategy: 2, silenceEffect: 1 },
+        { id: "a1", count: 2, silenceStrategy: 3, silenceEffect: 2 },
+      ]);
+    });
+
     it("surfaces agentLimitExceeded after importing generated values that exceed user limit", async () => {
       setupMocks({ maxAgents: 5 });
 
@@ -1659,6 +1770,36 @@ describe("useSimulationConfig", () => {
       });
 
       expect(toast.success).toHaveBeenCalledWith("simulationConfig.exportSuccessToast");
+    });
+  });
+
+  describe("persisted v0 drafts (#120)", () => {
+    it("rehydrates a draft whose rows still carry majorityThreshold / confidence without them", async () => {
+      const legacyState = {
+        ...useSimulationConfigStore.getState(),
+        step: "agents",
+        generatedValues: {
+          ...validGeneratedValues,
+          agentTypes: [
+            { id: "a0", count: 8, silenceStrategy: 2, silenceEffect: 1, majorityThreshold: 0.4 },
+            { id: "a1", count: 2, silenceStrategy: 3, silenceEffect: 0, confidence: 0.5 },
+          ],
+        },
+      };
+      localStorage.setItem(
+        "bes-simulation-config",
+        JSON.stringify({ state: legacyState, version: 0 }),
+      );
+
+      await useSimulationConfigStore.persist.rehydrate();
+
+      const state = useSimulationConfigStore.getState();
+      expect(state.step).toBe("agents");
+      expect(state.generatedValues.agentTypes).toEqual([
+        { id: "a0", count: 8, silenceStrategy: 2, silenceEffect: 1 },
+        { id: "a1", count: 2, silenceStrategy: 3, silenceEffect: 0 },
+      ]);
+      localStorage.removeItem("bes-simulation-config");
     });
   });
 

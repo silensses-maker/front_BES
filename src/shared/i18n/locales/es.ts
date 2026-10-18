@@ -123,6 +123,8 @@ const es = {
       majorityDesc_proportion: "proporción",
       majorityDesc_2: "de vecinos de los que el agente",
       majorityDesc_3: "necesita apoyo para estar dispuesto a hablar.",
+      fixedValuesNote:
+        "En SiLEnSeSS estos umbrales los fija el simulador: los agentes de Mayoría necesitan el apoyo de al menos la mitad de sus vecinos que hablan, los de Umbral usan un umbral de 0.1 y los de Confianza parten de una confianza aleatoria y hablan cuando esta supera un umbral de 0.1.",
       coreIdeaTitle: "Idea central",
       takeawayTitle: "Conclusión de la simulación",
       tabMemoryless: "Modelo SOM (sin memoria)",
@@ -403,8 +405,6 @@ const es = {
     count: "Cantidad",
     silenceStrategy: "Estrategia de silencio",
     silenceEffect: "Efecto de silencio",
-    majorityThreshold: "Umbral de mayoría",
-    confidence: "Confianza",
     cognitiveBias: "Sesgo cognitivo",
     addAgentType: "Agregar tipo de agente",
     addBiasType: "Agregar tipo de sesgo",
@@ -432,8 +432,6 @@ const es = {
     reviewAgentDistribution: "Distribución de agentes",
     reviewBiasDistribution: "Distribución de sesgos",
     reviewColCount: "Cantidad",
-    reviewThreshold: "τ = {{value}}",
-    reviewConfidence: "conf = {{value}}",
     back: "Atrás",
     next: "Siguiente",
     submit: "Lanzar simulación",
@@ -455,13 +453,12 @@ const es = {
       "Semilla aleatoria para reproducibilidad. La misma semilla produce la misma topología y dinámica. Déjala aleatoria para exploración libre.",
     // ── Tooltips por campo (paso de agentes) ───────────────────────────────
     silenceStrategyHint:
-      "Cómo decide un agente si expresa su opinión cada ronda. DeGroot: siempre habla. Mayoría: habla solo si la mayoría de vecinos está de acuerdo. Umbral: requiere una fracción configurable. Confianza: habla cuando su propia certeza supera un umbral.",
+      "Cómo decide un agente si expresa su opinión cada ronda. DeGroot: siempre habla. Mayoría: habla solo si la mayoría de vecinos está de acuerdo. Umbral: requiere una fracción mínima de vecinos de acuerdo, fijada en 0.1 por el simulador. Confianza: habla cuando su propia certeza supera un umbral, fijado en 0.1 (la confianza inicial es aleatoria).",
     silenceEffectHint:
       "Cómo influye un agente silencioso en la actualización de sus vecinos. DeGroot: no hay silencio (modelo clásico). Memoria: los vecinos usan la última opinión expresada del agente. Sin memoria: los vecinos ignoran al agente silencioso.",
-    majorityThresholdHint:
-      "Fracción de vecinos que deben estar de acuerdo (dentro de la tolerancia) para que el agente hable. 0.5 = mitad. Mayor implica más difícil hablar.",
-    confidenceHint:
-      "Umbral de confianza para la estrategia de Confianza. El agente habla cuando su certeza subjetiva en su opinión actual supera este valor.",
+    // Solo lectura: el simulador fija estos valores (#120)
+    thresholdFixedHint: "Fijado por el simulador: 0.1",
+    confidenceFixedHint: "Confianza inicial aleatoria, umbral fijo en 0.1",
     cognitiveBiasHint:
       "Cómo procesa un agente las opiniones entrantes. Ninguno: promedio puro (DeGroot). Confirmación: pondera más las opiniones que confirman. Backfire: rechaza opiniones muy distintas y endurece la propia. Autoridad: defiere a vecinos de alta influencia. Insular: ignora la mayoría de opiniones externas.",
     agentTypesLabelHint:

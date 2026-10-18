@@ -137,7 +137,7 @@ export function DashboardSidebar({
                     type="button"
                     aria-label={railRunTip}
                     onClick={() => {
-                      navigate(`/board/simulation/${lastRunId}`);
+                      void navigate(`/board/simulation/${lastRunId}`);
                       onToggle();
                     }}
                     className={RAIL_BUTTON_CLASS}
