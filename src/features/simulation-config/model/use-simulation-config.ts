@@ -197,13 +197,15 @@ export function useSimulationConfig() {
           stopThreshold: generatedValues.stopThreshold,
           seed: generatedValues.seed ?? undefined,
           saveMode: generatedValues.saveMode,
+          // AgentTypeReq is { silenceStrategy, silenceEffect, count } — the API has
+          // no threshold/confidence fields (the simulator fixes them, #120).
           agentTypes: generatedValues.agentTypes.map((row) => ({
-            silenceStrategy: row.silenceStrategy as 0 | 1 | 2,
-            silenceEffect: row.silenceEffect as 0 | 1,
+            silenceStrategy: row.silenceStrategy,
+            silenceEffect: row.silenceEffect,
             count: row.count,
           })),
           biasTypes: generatedValues.biasTypes.map((row) => ({
-            biasType: row.cognitiveBias as 0 | 1 | 2 | 3,
+            biasType: row.cognitiveBias,
             count: row.count,
           })),
           persistFrames: true,
@@ -225,14 +227,14 @@ export function useSimulationConfig() {
               belief: a.belief,
               toleranceRadius: a.toleranceRadius,
               toleranceOffset: a.toleranceOffset,
-              silenceStrategy: a.silenceStrategy as 0 | 1 | 2 | 3,
-              silenceEffect: a.silenceEffect as 0 | 1 | 2,
+              silenceStrategy: a.silenceStrategy,
+              silenceEffect: a.silenceEffect,
             })),
             edges: customValues.edges.map((e) => ({
               source: e.source,
               target: e.target,
               influence: e.influence,
-              bias: e.bias as 0 | 1 | 2 | 3 | 4,
+              bias: e.bias,
             })),
           });
           result = await simulationsApi.startCustomBinary(buffer);

@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
 import { formatNumber, listValidationMessages } from "../lib/live-summary";
 import { computeMaxEdges } from "../lib/validation";
 import type {
@@ -199,19 +200,18 @@ export function StepReview({
                     const effectLabel = t(
                       EFFECT_KEYS[row.silenceEffect] as Parameters<typeof t>[0],
                     );
-                    const extra =
-                      (row.silenceStrategy === 1 || row.silenceStrategy === 2) &&
-                      row.majorityThreshold !== undefined
-                        ? ` · ${t("simulationConfig.reviewThreshold", { value: String(row.majorityThreshold) })}`
-                        : row.silenceStrategy === 3 && row.confidence !== undefined
-                          ? ` · ${t("simulationConfig.reviewConfidence", { value: String(row.confidence) })}`
-                          : "";
+                    // Fixed by the simulator (#120) — shown read-only, never user input.
+                    const fixedHintKey = fixedStrategyHintKey(row.silenceStrategy);
 
                     return (
                       <tr key={row.id}>
                         <td className="px-4 py-1.5">
                           {strategyLabel}
-                          {extra && <span className="text-xs text-muted-foreground">{extra}</span>}
+                          {fixedHintKey !== null && (
+                            <span className="block text-xs text-muted-foreground">
+                              {t(fixedHintKey)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-muted-foreground">{effectLabel}</td>
                         <td className="px-4 py-1.5 text-right font-mono tabular-nums">

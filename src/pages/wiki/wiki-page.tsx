@@ -133,6 +133,9 @@ export function WikiPage() {
             {t("wiki.som.majorityDesc_2")} <Mi tex="i" /> {t("wiki.som.majorityDesc_3")}
           </li>
         </ul>
+        <p className="text-lg tracking-tight text-muted-foreground">
+          {t("wiki.som.fixedValuesNote")}
+        </p>
 
         <Tabs defaultValue="som" className="w-full mt-4" onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-2">

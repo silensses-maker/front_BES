@@ -7,6 +7,7 @@ import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { Slider } from "@/shared/ui/slider";
+import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
 import { computeMaxEdges } from "../lib/validation";
 import type {
   AgentTypeRow,
@@ -169,6 +170,10 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
             const agentPct =
               gen.numberOfAgents > 0 ? ((row.count / gen.numberOfAgents) * 100).toFixed(1) : "0.0";
 
+            // Threshold / Confidence values are fixed by the simulator (#120):
+            // read-only hint instead of an input.
+            const fixedHintKey = fixedStrategyHintKey(row.silenceStrategy);
+
             return (
               <Card key={row.id} className="relative">
                 <Button
@@ -245,44 +250,8 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                       </div>
                     </div>
 
-                    {(row.silenceStrategy === 1 || row.silenceStrategy === 2) && (
-                      <div className="space-y-1">
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {t("simulationConfig.majorityThreshold")}
-                          <InfoTooltip>{t("simulationConfig.majorityThresholdHint")}</InfoTooltip>
-                        </p>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={row.majorityThreshold ?? 0.5}
-                          className="h-8 w-20"
-                          onChange={(e) =>
-                            updateAgentRow(i, { majorityThreshold: Number(e.target.value) })
-                          }
-                        />
-                      </div>
-                    )}
-
-                    {row.silenceStrategy === 3 && (
-                      <div className="space-y-1">
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {t("simulationConfig.confidence")}
-                          <InfoTooltip>{t("simulationConfig.confidenceHint")}</InfoTooltip>
-                        </p>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={row.confidence ?? 0.5}
-                          className="h-8 w-20"
-                          onChange={(e) =>
-                            updateAgentRow(i, { confidence: Number(e.target.value) })
-                          }
-                        />
-                      </div>
+                    {fixedHintKey !== null && (
+                      <p className="text-xs text-muted-foreground">{t(fixedHintKey)}</p>
                     )}
                   </div>
 

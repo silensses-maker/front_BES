@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CUSTOM_FORM,
   DEFAULT_FORM,
+  migrateSimulationConfigDraft,
   useSimulationConfigStore,
 } from "./simulation-config.store";
 
@@ -206,5 +207,63 @@ describe("useSimulationConfigStore", () => {
       useSimulationConfigStore.getState().reset();
       expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
     });
+  });
+});
+
+// ─── Persisted-draft migration (#120) ────────────────────────────────────────
+
+describe("migrateSimulationConfigDraft", () => {
+  const legacyDraft = () => ({
+    networkType: "generated",
+    step: "agents",
+    activeTemplate: null,
+    loadedFromFile: false,
+    customValues: DEFAULT_CUSTOM_FORM,
+    generatedValues: {
+      ...DEFAULT_FORM,
+      agentTypes: [
+        { id: "a0", count: 8, silenceStrategy: 0, silenceEffect: 0 },
+        { id: "a1", count: 2, silenceStrategy: 2, silenceEffect: 1, majorityThreshold: 0.4 },
+        { id: "a2", count: 0, silenceStrategy: 3, silenceEffect: 2, confidence: 0.9 },
+      ],
+    },
+  });
+
+  it("drops majorityThreshold / confidence from v0 agent rows and keeps the rest", () => {
+    const migrated = migrateSimulationConfigDraft(legacyDraft(), 0) as ReturnType<
+      typeof legacyDraft
+    >;
+
+    expect(migrated.generatedValues.agentTypes).toEqual([
+      { id: "a0", count: 8, silenceStrategy: 0, silenceEffect: 0 },
+      { id: "a1", count: 2, silenceStrategy: 2, silenceEffect: 1 },
+      { id: "a2", count: 0, silenceStrategy: 3, silenceEffect: 2 },
+    ]);
+    expect(migrated.step).toBe("agents");
+    expect(migrated.generatedValues.numberOfAgents).toBe(DEFAULT_FORM.numberOfAgents);
+    expect(migrated.customValues).toEqual(DEFAULT_CUSTOM_FORM);
+  });
+
+  it("does not mutate the persisted object", () => {
+    const draft = legacyDraft();
+    migrateSimulationConfigDraft(draft, 0);
+    expect(draft.generatedValues.agentTypes[1]).toHaveProperty("majorityThreshold", 0.4);
+  });
+
+  it("returns already-migrated (v1) state untouched", () => {
+    const draft = legacyDraft();
+    expect(migrateSimulationConfigDraft(draft, 1)).toBe(draft);
+  });
+
+  it("tolerates malformed persisted values without throwing", () => {
+    expect(migrateSimulationConfigDraft(null, 0)).toBeNull();
+    expect(migrateSimulationConfigDraft("garbage", 0)).toBe("garbage");
+    expect(migrateSimulationConfigDraft({}, 0)).toEqual({});
+    expect(migrateSimulationConfigDraft({ generatedValues: { agentTypes: "x" } }, 0)).toEqual({
+      generatedValues: { agentTypes: "x" },
+    });
+    expect(migrateSimulationConfigDraft({ generatedValues: { agentTypes: [null, 3] } }, 0)).toEqual(
+      { generatedValues: { agentTypes: [null, 3] } },
+    );
   });
 });

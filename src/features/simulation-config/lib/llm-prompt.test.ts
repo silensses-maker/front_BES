@@ -45,3 +45,36 @@ describe("LLM_NETWORK_PROMPT worked examples", () => {
     }
   });
 });
+
+// ─── Simulator-fixed values and full custom enums (#120) ─────────────────────
+
+describe("LLM_NETWORK_PROMPT field documentation", () => {
+  it("does not document majorityThreshold / confidence as JSON fields", () => {
+    expect(LLM_NETWORK_PROMPT).not.toMatch(/"majorityThreshold"\s*:/);
+    expect(LLM_NETWORK_PROMPT).not.toMatch(/"confidence"\s*:/);
+    expect(LLM_NETWORK_PROMPT).not.toMatch(/required when silenceStrategy/);
+  });
+
+  it("states the values the simulator fixes", () => {
+    expect(LLM_NETWORK_PROMPT).toContain("fixed fraction, 0.1");
+    expect(LLM_NETWORK_PROMPT).toContain("random confidence");
+  });
+
+  it("no longer restricts the custom shape to a subset of the enums", () => {
+    expect(LLM_NETWORK_PROMPT).not.toContain("NOT available");
+    const customShape = LLM_NETWORK_PROMPT.slice(LLM_NETWORK_PROMPT.indexOf('SHAPE 2 — "custom"'));
+    expect(customShape).toContain('"silenceStrategy": <0 | 1 | 2 | 3>');
+    expect(customShape).toContain('"silenceEffect": <0 | 1 | 2>');
+    expect(customShape).toContain('"bias": <0 | 1 | 2 | 3 | 4>');
+  });
+
+  it("worked examples carry no threshold/confidence keys", () => {
+    const generated = extractWorkedExample("generated") as {
+      agentTypes: Record<string, unknown>[];
+    };
+    for (const row of generated.agentTypes) {
+      expect(row).not.toHaveProperty("majorityThreshold");
+      expect(row).not.toHaveProperty("confidence");
+    }
+  });
+});

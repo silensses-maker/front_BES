@@ -15,6 +15,7 @@ import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
+import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
 import type {
   CustomSimFormValues,
   SimConfigValidationErrors,
@@ -22,16 +23,19 @@ import type {
 } from "../types/simulation-config.types";
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
+// Full canonical enums: the backend custom path accepts every value (#120).
 
 const SILENCE_STRATEGIES: { value: SilenceStrategy; labelKey: string }[] = [
   { value: 0, labelKey: "simulationConfig.strategyDegroot" },
   { value: 1, labelKey: "simulationConfig.strategyMajority" },
   { value: 2, labelKey: "simulationConfig.strategyThreshold" },
+  { value: 3, labelKey: "simulationConfig.strategyConfidence" },
 ];
 
 const SILENCE_EFFECTS: { value: SilenceEffect; labelKey: string }[] = [
   { value: 0, labelKey: "simulationConfig.effectDegroot" },
   { value: 1, labelKey: "simulationConfig.effectMemory" },
+  { value: 2, labelKey: "simulationConfig.effectMemoryless" },
 ];
 
 const COGNITIVE_BIASES: { value: CognitiveBias; labelKey: string }[] = [
@@ -39,6 +43,7 @@ const COGNITIVE_BIASES: { value: CognitiveBias; labelKey: string }[] = [
   { value: 1, labelKey: "simulationConfig.biasConfirmation" },
   { value: 2, labelKey: "simulationConfig.biasBackfire" },
   { value: 3, labelKey: "simulationConfig.biasAuthority" },
+  { value: 4, labelKey: "simulationConfig.biasInsular" },
 ];
 
 // ─── Stable-key helpers ───────────────────────────────────────────────────────
@@ -68,6 +73,14 @@ function FieldLabel({ label, tooltip }: { label: string; tooltip: string }) {
       </Tooltip>
     </div>
   );
+}
+
+/** Read-only note for strategies whose values the simulator fixes (#120). */
+function FixedStrategyHint({ strategy }: { strategy: SilenceStrategy }) {
+  const { t } = useTranslation();
+  const hintKey = fixedStrategyHintKey(strategy);
+  if (hintKey === null) return null;
+  return <p className="text-xs text-muted-foreground">{t(hintKey)}</p>;
 }
 
 interface StepAgentsCustomProps {
@@ -266,6 +279,7 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
                       </Select>
                     </div>
                   </div>
+                  <FixedStrategyHint strategy={agent.silenceStrategy} />
 
                   {/* Belief / tolerance row */}
                   <div className="grid grid-cols-3 gap-2">

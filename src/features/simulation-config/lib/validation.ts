@@ -10,6 +10,20 @@ export function computeMaxEdges(density: number, numberOfAgents: number): number
   return density * (density - 1) + (numberOfAgents - density) * 2 * density;
 }
 
+// ─── Canonical enums (openapi.yaml, mirrored in backend.types.ts) ────────────
+// Shared by the generated and custom paths: the backend accepts the full range
+// on both (#120).
+
+const silenceStrategySchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
+const silenceEffectSchema = z.union([z.literal(0), z.literal(1), z.literal(2)]);
+const cognitiveBiasSchema = z.union([
+  z.literal(0),
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+]);
+
 // ─── Custom simulation sub-schemas ────────────────────────────────────────────
 
 const customAgentSchema = z.object({
@@ -17,30 +31,31 @@ const customAgentSchema = z.object({
   belief: z.number().min(0).max(1),
   toleranceRadius: z.number().min(0).max(1),
   toleranceOffset: z.number().min(-1).max(1),
-  silenceStrategy: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  silenceEffect: z.union([z.literal(0), z.literal(1)]),
+  silenceStrategy: silenceStrategySchema,
+  silenceEffect: silenceEffectSchema,
 });
 
 const customEdgeSchema = z.object({
   source: z.string().min(1),
   target: z.string().min(1),
   influence: z.number().min(0).max(1),
-  bias: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
+  bias: cognitiveBiasSchema,
 });
 
+// z.object strips unknown keys (non-strict), so legacy files that still carry
+// `majorityThreshold` / `confidence` on a row are accepted and those keys are
+// dropped from the parsed result (#120).
 const agentTypeRowSchema = z.object({
   id: z.string(),
   count: z.number().int().min(1),
-  silenceStrategy: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
-  silenceEffect: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-  majorityThreshold: z.number().min(0).max(1).optional(),
-  confidence: z.number().min(0).max(1).optional(),
+  silenceStrategy: silenceStrategySchema,
+  silenceEffect: silenceEffectSchema,
 });
 
 const biasRowSchema = z.object({
   id: z.string(),
   count: z.number().int().min(1),
-  cognitiveBias: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  cognitiveBias: cognitiveBiasSchema,
 });
 
 export const generatedSimSchema = z

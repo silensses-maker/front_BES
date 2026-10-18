@@ -9,13 +9,16 @@ export type { EncoderSilenceStrategy as SilenceStrategy };
 export type { EncoderSilenceEffect as SilenceEffect };
 export type { EncoderCognitiveBias as CognitiveBias };
 
+/**
+ * One agent-type distribution row. There are no threshold/confidence fields:
+ * the simulator fixes them itself (THRESHOLD → 0.1; CONFIDENCE → random initial
+ * confidence, threshold 0.1) and the API does not accept them (#120).
+ */
 export interface AgentTypeRow {
   id: string;
   count: number;
   silenceStrategy: EncoderSilenceStrategy;
   silenceEffect: EncoderSilenceEffect;
-  majorityThreshold?: number;
-  confidence?: number;
 }
 
 export interface BiasRow {
