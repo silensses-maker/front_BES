@@ -26,8 +26,33 @@ const cognitiveBiasSchema = z.union([
 
 // ─── Custom simulation sub-schemas ────────────────────────────────────────────
 
+/**
+ * The backend stores the custom network name and every agent name in `varchar(32)` columns
+ * and rejects longer names with 400 (#122). `.max` counts UTF-16 units, like the inputs'
+ * `maxLength`, which is never laxer than the characters Postgres counts.
+ */
+export const MAX_CUSTOM_NAME_LENGTH = 32;
+
+const customNameSchema = z.string().min(1).max(MAX_CUSTOM_NAME_LENGTH, "nameTooLong");
+
+/**
+ * Names used by more than one agent. The backend keys `custom_agents` by `(run_id, name)` and
+ * edges refer to agents by name, so it rejects repeated names with 400 (#122). Exact,
+ * case-sensitive match, like that key; empty names are left to the required-name rule.
+ */
+export function findDuplicateAgentNames(agents: readonly { name: string }[]): Set<string> {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const { name } of agents) {
+    if (name === "") continue;
+    if (seen.has(name)) duplicates.add(name);
+    else seen.add(name);
+  }
+  return duplicates;
+}
+
 const customAgentSchema = z.object({
-  name: z.string().min(1),
+  name: customNameSchema,
   belief: z.number().min(0).max(1),
   toleranceRadius: z.number().min(0).max(1),
   toleranceOffset: z.number().min(-1).max(1),
@@ -84,6 +109,16 @@ export const generatedSimSchema = z
       });
     }
 
+    // Barabási–Albert: the dense core has density + 1 agents, so density must stay below
+    // the agents per network — the backend rejects it with 400 otherwise (#122).
+    if (data.density >= data.numberOfAgents) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "densityExceedsAgents",
+        path: ["density"],
+      });
+    }
+
     if (totalBias !== maxEdges) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -100,7 +135,7 @@ export type GeneratedSimSchemaInput = z.input<typeof generatedSimSchema>;
 export const customSimSchema = z
   .object({
     networkType: z.literal("custom"),
-    networkName: z.string().min(1),
+    networkName: customNameSchema,
     iterationLimit: z.number().int().min(1),
     stopThreshold: z.number().gt(0).lt(1),
     saveMode: z.union([z.literal(0), z.literal(1), z.literal(2)]),
@@ -110,6 +145,23 @@ export const customSimSchema = z
   .superRefine((data, ctx) => {
     const agentNames = new Set(data.agents.map((a) => a.name));
     const seenDirections = new Set<string>();
+
+    // Every repeat (not the first use) gets an issue carrying the name, so the first one
+    // reported is the same name the backend's 400 names (#122).
+    const seenNames = new Set<string>();
+    data.agents.forEach((agent, i) => {
+      if (agent.name === "") return;
+      if (seenNames.has(agent.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "duplicateAgentName",
+          path: ["agents", i, "name"],
+          params: { name: agent.name },
+        });
+      } else {
+        seenNames.add(agent.name);
+      }
+    });
 
     data.edges.forEach((edge, i) => {
       if (!agentNames.has(edge.source)) {
@@ -144,7 +196,16 @@ export type CustomSimSchemaInput = z.input<typeof customSimSchema>;
 
 // ─── Form validators (shared by the wizard hook and the live summary) ─────────
 
-export function validateCustomForm(values: CustomSimFormValues): SimConfigValidationErrors {
+/**
+ * Custom networks are a single network, so only the agent and iteration quotas apply. The
+ * agent count is the number of defined agents — same quota (and message) as the generated
+ * path, enforced by the backend on both the JSON and the binary variants (#122).
+ */
+export function validateCustomForm(
+  values: CustomSimFormValues,
+  maxAgents?: number,
+  maxIterations?: number,
+): SimConfigValidationErrors {
   const errors: SimConfigValidationErrors = {};
   const result = customSimSchema.safeParse(values);
 
@@ -152,9 +213,17 @@ export function validateCustomForm(values: CustomSimFormValues): SimConfigValida
     for (const issue of result.error.issues) {
       const msg = issue.message;
       const path = issue.path[0];
+      // path[0] is "agents" / "edges" for the array itself AND for every row field
+      // (["agents", i, "name"]); only the array's own min(1) has no index after it (#122).
+      const inRow = issue.path.length > 1;
 
       if (msg === "duplicateEdge") {
         errors.customEdgeDuplicate = true;
+      } else if (msg === "nameTooLong") {
+        if (path === "networkName") errors.customNetworkNameTooLong = true;
+        else errors.customAgentNameTooLong = true;
+      } else if (msg === "duplicateAgentName") {
+        errors.customAgentNameDuplicate = true;
       } else if (msg === "edgeUnknownAgent") {
         errors.customEdgeUnknownAgent = true;
       } else if (path === "networkName") {
@@ -162,23 +231,27 @@ export function validateCustomForm(values: CustomSimFormValues): SimConfigValida
       } else if (path === "stopThreshold") {
         errors.stopThresholdOutOfRange = true;
       } else if (path === "agents") {
-        // min(1) fires at the "agents" root path
-        errors.customNoAgents = true;
+        if (inRow) errors.customAgentInvalid = true;
+        else errors.customNoAgents = true;
       } else if (path === "edges") {
-        // min(1) fires at the "edges" root path
-        errors.customNoEdges = true;
-      } else if (typeof path === "string") {
-        errors.countsInvalid = true;
+        if (inRow) errors.customEdgeInvalid = true;
+        else errors.customNoEdges = true;
       } else {
-        // Nested path: agents[i].* or edges[i].*
-        const parentKey = issue.path[0];
-        if (parentKey === "agents") {
-          errors.customAgentInvalid = true;
-        } else {
-          errors.customEdgeInvalid = true;
-        }
+        errors.countsInvalid = true;
       }
     }
+  }
+
+  if (maxAgents !== undefined && maxAgents !== null && values.agents.length > maxAgents) {
+    errors.agentLimitExceeded = true;
+  }
+
+  if (
+    maxIterations !== undefined &&
+    maxIterations !== null &&
+    values.iterationLimit > maxIterations
+  ) {
+    errors.iterationLimitExceeded = true;
   }
 
   return errors;
@@ -188,6 +261,7 @@ export function validateGeneratedForm(
   values: GeneratedSimFormValues,
   maxAgents: number | undefined,
   maxIterations: number | undefined,
+  maxNetworks?: number,
 ): SimConfigValidationErrors {
   const errors: SimConfigValidationErrors = {};
   const result = generatedSimSchema.safeParse(values);
@@ -201,6 +275,8 @@ export function validateGeneratedForm(
         errors.agentCountMismatch = true;
       } else if (msg === "biasCountMismatch") {
         errors.biasCountMismatch = true;
+      } else if (msg === "densityExceedsAgents") {
+        errors.densityExceedsAgents = true;
       } else if (path === "stopThreshold") {
         errors.stopThresholdOutOfRange = true;
       } else {
@@ -221,6 +297,10 @@ export function validateGeneratedForm(
 
   if (maxAgents !== undefined && maxAgents !== null && totalAgents > maxAgents) {
     errors.agentLimitExceeded = true;
+  }
+
+  if (maxNetworks !== undefined && maxNetworks !== null && values.numberOfNetworks > maxNetworks) {
+    errors.networkLimitExceeded = true;
   }
 
   return errors;

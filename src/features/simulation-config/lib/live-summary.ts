@@ -2,6 +2,7 @@ import type {
   GeneratedSimFormValues,
   SimConfigValidationErrors,
 } from "../types/simulation-config.types";
+import { MAX_CUSTOM_NAME_LENGTH } from "./validation";
 
 /**
  * Pure helpers for the "Resumen en vivo" panel (and the review error panel).
@@ -86,6 +87,12 @@ export interface ValidationMessageContext {
   requested?: string;
   limit?: string;
   iterationLimit?: string;
+  /** Requested numberOfNetworks and the role's maxNetworks (#122). */
+  networks?: string;
+  networkLimit?: string;
+  /** Density and agents per network, for the density-vs-agents rule (#122). */
+  density?: string;
+  agents?: string;
   expected?: string;
   actual?: string;
   bias?: string;
@@ -106,6 +113,8 @@ export function listValidationMessages(
     messages.push(params ? { key, params } : { key });
 
   if (errors.customNetworkNameEmpty) push("simulationConfig.errorCustomNetworkNameEmpty");
+  if (errors.customNetworkNameTooLong)
+    push("simulationConfig.errorCustomNetworkNameTooLong", { max: MAX_CUSTOM_NAME_LENGTH });
   if (errors.agentLimitExceeded)
     push("simulationConfig.errorAgentLimit", {
       requested: ctx.requested ?? "",
@@ -113,6 +122,11 @@ export function listValidationMessages(
     });
   if (errors.iterationLimitExceeded)
     push("simulationConfig.errorIterationLimit", { limit: ctx.iterationLimit ?? ctx.limit ?? "" });
+  if (errors.networkLimitExceeded)
+    push("simulationConfig.errorNetworkLimit", {
+      requested: ctx.networks ?? "",
+      limit: ctx.networkLimit ?? "",
+    });
   if (errors.stopThresholdOutOfRange) push("simulationConfig.errorStopThreshold");
   if (errors.agentCountMismatch)
     push("simulationConfig.errorAgentCountMismatch", {
@@ -124,9 +138,17 @@ export function listValidationMessages(
       bias: ctx.bias ?? "",
       maxEdges: ctx.maxEdges ?? "",
     });
+  if (errors.densityExceedsAgents)
+    push("simulationConfig.errorDensityExceedsAgents", {
+      density: ctx.density ?? "",
+      agents: ctx.agents ?? "",
+    });
   if (errors.customNoAgents) push("simulationConfig.errorCustomNoAgents");
   if (errors.customNoEdges) push("simulationConfig.errorCustomNoEdges");
   if (errors.customAgentInvalid) push("simulationConfig.errorCustomAgentInvalid");
+  if (errors.customAgentNameTooLong)
+    push("simulationConfig.errorCustomAgentNameTooLong", { max: MAX_CUSTOM_NAME_LENGTH });
+  if (errors.customAgentNameDuplicate) push("simulationConfig.errorCustomAgentNameDuplicate");
   if (errors.customEdgeInvalid) push("simulationConfig.errorCustomEdgeInvalid");
   if (errors.customEdgeUnknownAgent) push("simulationConfig.errorCustomEdgeUnknownAgent");
   if (errors.customEdgeDuplicate) push("simulationConfig.errorCustomEdgeDuplicate");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UserRole } from "../types/user.types";
-import { getRoleLimits, getRolePermissions, ROLE_LIMITS } from "./permissions";
+import { getRoleLimits, getRolePermissions, ROLE_LIMITS, resolveMaxNetworks } from "./permissions";
 
 describe("getRoleLimits", () => {
   it("returns Administrator limits when Administrator is present", () => {
@@ -49,6 +49,66 @@ describe("getRoleLimits", () => {
     expect(getRoleLimits(["Researcher", "BaseUser"])).toEqual(ROLE_LIMITS.Researcher);
     expect(getRoleLimits(["BaseUser", "Guest"])).toEqual(ROLE_LIMITS.BaseUser);
     expect(getRoleLimits(["Administrator", "Guest"])).toEqual(ROLE_LIMITS.Administrator);
+  });
+});
+
+describe("ROLE_LIMITS.maxNetworks (#122, mirrors the backend role limits)", () => {
+  it("caps networks per role: Guest 1, BaseUser 5, Researcher 20, Administrator unlimited", () => {
+    expect(ROLE_LIMITS.Guest.maxNetworks).toBe(1);
+    expect(ROLE_LIMITS.BaseUser.maxNetworks).toBe(5);
+    expect(ROLE_LIMITS.Researcher.maxNetworks).toBe(20);
+    expect(ROLE_LIMITS.Administrator.maxNetworks).toBe(Infinity);
+  });
+
+  it("is returned by getRoleLimits for the highest role", () => {
+    expect(getRoleLimits(["Guest", "BaseUser"]).maxNetworks).toBe(5);
+  });
+});
+
+describe("resolveMaxNetworks", () => {
+  it("uses the session value when usageLimits carries maxNetworks", () => {
+    expect(
+      resolveMaxNetworks({
+        roles: ["Guest"],
+        usageLimits: { maxAgents: 10, maxIterations: 10, densityFactor: 0.5, maxNetworks: 3 },
+      }),
+    ).toBe(3);
+  });
+
+  it("keeps an unlimited (Infinity) session value", () => {
+    expect(
+      resolveMaxNetworks({
+        roles: ["Administrator"],
+        usageLimits: {
+          maxAgents: Infinity,
+          maxIterations: Infinity,
+          densityFactor: 1,
+          maxNetworks: Infinity,
+        },
+      }),
+    ).toBe(Infinity);
+  });
+
+  it.each([
+    ["Guest", 1],
+    ["BaseUser", 5],
+    ["Researcher", 20],
+    ["Administrator", Infinity],
+  ] as const)("falls back to the %s role table when usageLimits predates maxNetworks", (role, expected) => {
+    expect(
+      resolveMaxNetworks({
+        roles: [role],
+        usageLimits: { maxAgents: 10, maxIterations: 10, densityFactor: 0.5 },
+      }),
+    ).toBe(expected);
+  });
+
+  it("falls back to the role table when usageLimits is missing entirely", () => {
+    expect(resolveMaxNetworks({ roles: ["Researcher"] })).toBe(20);
+  });
+
+  it("falls back to Guest when roles are missing", () => {
+    expect(resolveMaxNetworks({ roles: undefined as unknown as UserRole[] })).toBe(1);
   });
 });
 

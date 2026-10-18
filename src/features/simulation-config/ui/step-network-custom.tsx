@@ -3,6 +3,7 @@ import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { MAX_CUSTOM_NAME_LENGTH } from "../lib/validation";
 import type {
   CustomSimFormValues,
   SimConfigValidationErrors,
@@ -29,6 +30,8 @@ export function StepNetworkCustom({
 }: StepNetworkCustomProps) {
   const { t } = useTranslation();
   const custom = values as CustomSimFormValues;
+  // maxLength stops typing past the limit; a longer name can still come from an older draft.
+  const nameTooLong = custom.networkName.length > MAX_CUSTOM_NAME_LENGTH;
 
   return (
     <div className="space-y-6">
@@ -41,13 +44,19 @@ export function StepNetworkCustom({
           id="customNetworkName"
           type="text"
           placeholder={t("simulationConfig.customNetworkNamePlaceholder")}
-          aria-invalid={errors.customNetworkNameEmpty || undefined}
+          maxLength={MAX_CUSTOM_NAME_LENGTH}
+          aria-invalid={errors.customNetworkNameEmpty || nameTooLong || undefined}
           value={custom.networkName}
           onChange={(e) => onUpdate({ networkName: e.target.value } as Partial<SimFormValues>)}
         />
         {errors.customNetworkNameEmpty && (
           <p className="text-xs text-destructive">
             {t("simulationConfig.errorCustomNetworkNameEmpty")}
+          </p>
+        )}
+        {nameTooLong && (
+          <p className="text-xs text-destructive">
+            {t("simulationConfig.errorCustomNetworkNameTooLong", { max: MAX_CUSTOM_NAME_LENGTH })}
           </p>
         )}
       </div>

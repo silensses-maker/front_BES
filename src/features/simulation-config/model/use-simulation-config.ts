@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
-import { useAuthStore } from "@/entities/user";
+import { resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
@@ -25,6 +25,7 @@ import {
   customSimSchema,
   generatedSimSchema,
   hasValidationErrors,
+  MAX_CUSTOM_NAME_LENGTH,
   validateCustomForm,
   validateGeneratedForm,
 } from "../lib/validation";
@@ -36,6 +37,12 @@ import type {
   WizardStep,
 } from "../types/simulation-config.types";
 import { useSimulationConfigStore } from "./simulation-config.store";
+
+/**
+ * Frame persistence requested for custom runs. The JSON body carries it as fields; the binary
+ * payload has no such fields, so `startCustomBinary` sends the same values as query params.
+ */
+const CUSTOM_RUN_FRAME_OPTIONS = { persistFrames: true, frameRetention: "ephemeral" } as const;
 
 /**
  * When network-level params change (`numberOfAgents`, `density`), rebalance
@@ -82,6 +89,8 @@ export function useSimulationConfig() {
 
   const maxAgents = user?.usageLimits?.maxAgents;
   const maxIterations = user?.usageLimits?.maxIterations;
+  // Falls back to the role table when the session's usageLimits predate maxNetworks (#122).
+  const maxNetworks = user ? resolveMaxNetworks(user) : undefined;
 
   // Persistent wizard state from store
   const networkType = useSimulationConfigStore((s) => s.networkType);
@@ -145,18 +154,21 @@ export function useSimulationConfig() {
         generatedValues,
         maxAgents ?? undefined,
         maxIterations ?? undefined,
+        maxNetworks,
       );
     } else if (step === "network") {
       // custom: step "network" only checks the header fields
       errs = {};
       if (!customValues.networkName.trim()) errs.customNetworkNameEmpty = true;
+      if (customValues.networkName.length > MAX_CUSTOM_NAME_LENGTH)
+        errs.customNetworkNameTooLong = true;
       if (customValues.stopThreshold <= 0 || customValues.stopThreshold >= 1)
         errs.stopThresholdOutOfRange = true;
       if (maxIterations != null && customValues.iterationLimit > maxIterations)
         errs.iterationLimitExceeded = true;
     } else {
-      // custom: step "agents" — full validation
-      errs = validateCustomForm(customValues);
+      // custom: step "agents" — full validation, including the agent/iteration quotas
+      errs = validateCustomForm(customValues, maxAgents ?? undefined, maxIterations ?? undefined);
     }
     setErrors(errs);
     if (hasValidationErrors(errs)) {
@@ -176,8 +188,13 @@ export function useSimulationConfig() {
 
     const launchErrs =
       networkType === "generated"
-        ? validateGeneratedForm(generatedValues, maxAgents ?? undefined, maxIterations ?? undefined)
-        : validateCustomForm(customValues);
+        ? validateGeneratedForm(
+            generatedValues,
+            maxAgents ?? undefined,
+            maxIterations ?? undefined,
+            maxNetworks,
+          )
+        : validateCustomForm(customValues, maxAgents ?? undefined, maxIterations ?? undefined);
     setErrors(launchErrs);
     if (hasValidationErrors(launchErrs)) {
       toast.error(t("simulationConfig.launchInvalidToast"));
@@ -237,7 +254,7 @@ export function useSimulationConfig() {
               bias: e.bias,
             })),
           });
-          result = await simulationsApi.startCustomBinary(buffer);
+          result = await simulationsApi.startCustomBinary(buffer, CUSTOM_RUN_FRAME_OPTIONS);
         } else {
           result = await simulationsApi.startCustom({
             name: customValues.networkName,
@@ -246,8 +263,7 @@ export function useSimulationConfig() {
             saveMode: customValues.saveMode,
             agents: customValues.agents,
             edges: customValues.edges,
-            persistFrames: true,
-            frameRetention: "ephemeral",
+            ...CUSTOM_RUN_FRAME_OPTIONS,
           });
         }
       }
@@ -354,13 +370,35 @@ export function useSimulationConfig() {
       if (maxIterations != null && imported.iterationLimit > maxIterations) {
         limitErrors.iterationLimitExceeded = true;
       }
+      if (maxNetworks != null && imported.numberOfNetworks > maxNetworks) {
+        limitErrors.networkLimitExceeded = true;
+      }
       setErrors(limitErrors);
       setUsageLimitError(null);
     } else if (payload.networkType === "custom") {
       const result = customSimSchema.safeParse(payload);
       if (!result.success) {
         setErrors({ importInvalid: true });
-        toast.error(t("simulationConfig.importError"));
+        // Names over the backend's varchar(32) and repeated agent names get their own message:
+        // the file is rejected rather than loaded, since every edge refers to the agents by
+        // name (#122).
+        const nameTooLong = result.error.issues.some((issue) => issue.message === "nameTooLong");
+        const duplicate = result.error.issues.find(
+          (issue) => issue.message === "duplicateAgentName",
+        );
+        if (nameTooLong) {
+          toast.error(
+            t("simulationConfig.errorImportNameTooLong", { max: MAX_CUSTOM_NAME_LENGTH }),
+          );
+        } else if (duplicate?.code === "custom") {
+          toast.error(
+            t("simulationConfig.errorImportDuplicateAgentName", {
+              name: String(duplicate.params?.name ?? ""),
+            }),
+          );
+        } else {
+          toast.error(t("simulationConfig.importError"));
+        }
         return;
       }
       const imported = result.data as CustomSimFormValues;
@@ -369,6 +407,9 @@ export function useSimulationConfig() {
 
       // Re-validate usage limits for custom path
       const limitErrors: SimConfigValidationErrors = {};
+      if (maxAgents != null && imported.agents.length > maxAgents) {
+        limitErrors.agentLimitExceeded = true;
+      }
       if (maxIterations != null && imported.iterationLimit > maxIterations) {
         limitErrors.iterationLimitExceeded = true;
       }
@@ -410,6 +451,7 @@ export function useSimulationConfig() {
     loadedFromFile,
     maxAgents: maxAgents ?? null,
     maxIterations: maxIterations ?? null,
+    maxNetworks: maxNetworks ?? null,
     userRole: user?.roles?.[0] ?? null,
     updateValues,
     setNetworkType,

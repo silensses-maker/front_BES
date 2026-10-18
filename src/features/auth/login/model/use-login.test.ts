@@ -129,6 +129,67 @@ describe("useLogin", () => {
       expect(mockSetUser).toHaveBeenCalledWith(expect.objectContaining({ photo: "" }));
     });
 
+    it("passes maxNetworks through when the backend sends it (#122)", async () => {
+      vi.mocked(signInWithPopup).mockResolvedValue(
+        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
+      );
+      vi.mocked(usersApi.sync).mockResolvedValue({
+        ...mockSyncResponse,
+        usageLimits: { ...mockSyncResponse.usageLimits, maxNetworks: 5 },
+      });
+
+      const { login } = useLogin();
+      await login();
+
+      expect(mockSetUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usageLimits: { maxAgents: 100, maxIterations: 100, densityFactor: 0.5, maxNetworks: 5 },
+        }),
+      );
+    });
+
+    it("maps a null maxNetworks (Administrator) to Infinity", async () => {
+      vi.mocked(signInWithPopup).mockResolvedValue(
+        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
+      );
+      vi.mocked(usersApi.sync).mockResolvedValue({
+        ...mockSyncResponse,
+        usageLimits: {
+          maxAgents: null,
+          maxIterations: null,
+          densityFactor: 1.0,
+          maxNetworks: null,
+        },
+      });
+
+      const { login } = useLogin();
+      await login();
+
+      expect(mockSetUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usageLimits: {
+            maxAgents: Infinity,
+            maxIterations: Infinity,
+            densityFactor: 1.0,
+            maxNetworks: Infinity,
+          },
+        }),
+      );
+    });
+
+    it("omits maxNetworks when the backend does not send it, so the role table applies", async () => {
+      vi.mocked(signInWithPopup).mockResolvedValue(
+        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
+      );
+      vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
+
+      const { login } = useLogin();
+      await login();
+
+      const user = mockSetUser.mock.calls[0]?.[0] as { usageLimits: Record<string, unknown> };
+      expect(user.usageLimits).not.toHaveProperty("maxNetworks");
+    });
+
     it("maps null usageLimits fields to Infinity", async () => {
       vi.mocked(signInWithPopup).mockResolvedValue(
         undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,

@@ -18,6 +18,8 @@ interface StepNetworkProps {
   values: SimFormValues;
   maxAgents: number | null;
   maxIterations: number | null;
+  /** Role cap on numberOfNetworks (#122); null when unknown. */
+  maxNetworks?: number | null;
   errors?: SimConfigValidationErrors;
   onUpdate: (patch: Partial<SimFormValues>) => void;
 }
@@ -68,6 +70,7 @@ export function StepNetwork({
   values,
   maxAgents,
   maxIterations,
+  maxNetworks = null,
   errors,
   onUpdate,
 }: StepNetworkProps) {
@@ -84,6 +87,9 @@ export function StepNetwork({
 
   const agentsOver = maxAgents !== null && gen.numberOfAgents > maxAgents;
   const iterOver = maxIterations !== null && gen.iterationLimit > maxIterations;
+  const networksOver = maxNetworks !== null && gen.numberOfNetworks > maxNetworks;
+  // Barabási–Albert needs density < agents per network (#122).
+  const densityTooHigh = gen.density >= gen.numberOfAgents;
   const maxEdges = computeMaxEdges(gen.density, gen.numberOfAgents);
 
   return (
@@ -123,9 +129,20 @@ export function StepNetwork({
           id="numberOfNetworks"
           type="number"
           min={1}
+          aria-invalid={networksOver || undefined}
+          className={cn(networksOver && "border-destructive")}
           value={gen.numberOfNetworks}
           onChange={(e) =>
             onUpdate({ numberOfNetworks: Number(e.target.value) } as Partial<SimFormValues>)
+          }
+        />
+        <QuotaFieldHint
+          over={networksOver}
+          limit={maxNetworks}
+          hintKey="simulationConfig.networksPlanHint"
+          onAdjust={() =>
+            maxNetworks !== null &&
+            onUpdate({ numberOfNetworks: maxNetworks } as Partial<SimFormValues>)
           }
         />
       </div>
@@ -166,6 +183,8 @@ export function StepNetwork({
           type="number"
           min={2}
           step={1}
+          aria-invalid={densityTooHigh || undefined}
+          className={cn(densityTooHigh && "border-destructive")}
           value={gen.density}
           onChange={(e) => onUpdate({ density: Number(e.target.value) } as Partial<SimFormValues>)}
         />
@@ -175,6 +194,14 @@ export function StepNetwork({
             edges: formatNumber(maxEdges, i18n.language),
           })}
         </p>
+        {densityTooHigh && (
+          <p className="text-xs text-destructive">
+            {t("simulationConfig.errorDensityExceedsAgents", {
+              density: formatNumber(gen.density, i18n.language),
+              agents: formatNumber(gen.numberOfAgents, i18n.language),
+            })}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

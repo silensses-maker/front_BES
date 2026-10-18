@@ -147,6 +147,35 @@ describe("listValidationMessages", () => {
     ]);
   });
 
+  it("maps the network quota and density rule with their params (#122)", () => {
+    const messages = listValidationMessages(
+      { networkLimitExceeded: true, densityExceedsAgents: true },
+      { networks: "6", networkLimit: "5", density: "10", agents: "10" },
+    );
+
+    expect(messages).toEqual([
+      { key: "simulationConfig.errorNetworkLimit", params: { requested: "6", limit: "5" } },
+      {
+        key: "simulationConfig.errorDensityExceedsAgents",
+        params: { density: "10", agents: "10" },
+      },
+    ]);
+  });
+
+  it("orders the network quota right after the agent and iteration quotas", () => {
+    const keys = listValidationMessages({
+      networkLimitExceeded: true,
+      iterationLimitExceeded: true,
+      agentLimitExceeded: true,
+    }).map((m) => m.key);
+
+    expect(keys).toEqual([
+      "simulationConfig.errorAgentLimit",
+      "simulationConfig.errorIterationLimit",
+      "simulationConfig.errorNetworkLimit",
+    ]);
+  });
+
   it("covers the custom-path flags", () => {
     const keys = listValidationMessages({
       customNetworkNameEmpty: true,
@@ -160,6 +189,36 @@ describe("listValidationMessages", () => {
       "simulationConfig.errorCustomNoAgents",
       "simulationConfig.errorCustomNoEdges",
       "simulationConfig.errorCustomEdgeDuplicate",
+    ]);
+  });
+
+  it("maps the name length flags with the 32-character limit (#122)", () => {
+    const messages = listValidationMessages({
+      customNetworkNameEmpty: true,
+      customNetworkNameTooLong: true,
+      customAgentInvalid: true,
+      customAgentNameTooLong: true,
+    });
+
+    expect(messages).toEqual([
+      { key: "simulationConfig.errorCustomNetworkNameEmpty" },
+      { key: "simulationConfig.errorCustomNetworkNameTooLong", params: { max: 32 } },
+      { key: "simulationConfig.errorCustomAgentInvalid" },
+      { key: "simulationConfig.errorCustomAgentNameTooLong", params: { max: 32 } },
+    ]);
+  });
+
+  it("maps a repeated agent name right after the agent name length error (#122)", () => {
+    const messages = listValidationMessages({
+      customEdgeInvalid: true,
+      customAgentNameDuplicate: true,
+      customAgentNameTooLong: true,
+    });
+
+    expect(messages).toEqual([
+      { key: "simulationConfig.errorCustomAgentNameTooLong", params: { max: 32 } },
+      { key: "simulationConfig.errorCustomAgentNameDuplicate" },
+      { key: "simulationConfig.errorCustomEdgeInvalid" },
     ]);
   });
 });

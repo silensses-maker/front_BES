@@ -444,7 +444,7 @@ const es = {
     numberOfAgentsHint:
       "Total de agentes en cada red. El tiempo de cómputo y la memoria crecen aproximadamente lineal. Cada agente tiene su propia opinión y estado.",
     densityHint:
-      "Grado promedio por agente (número de vecinos). Mayor densidad = más interacciones por ronda = difusión más rápida pero más cómputo. Mínimo 2.",
+      "Grado promedio por agente (número de vecinos). Mayor densidad = más interacciones por ronda = difusión más rápida pero más cómputo. Mínimo 2 y menor que el total de agentes.",
     iterationLimitHint:
       "Máximo de rondas. La simulación se detiene al alcanzar este límite O al converger (umbral de parada), lo que pase primero.",
     stopThresholdHint:
@@ -474,6 +474,10 @@ const es = {
     errorStopThreshold: "El umbral de parada debe estar entre 0 y 1 (exclusivo).",
     errorIterationLimit: "El límite de iteraciones supera el máximo de tu plan ({{limit}}).",
     errorAgentLimit: "El total de agentes ({{requested}}) supera el máximo de tu plan ({{limit}}).",
+    errorNetworkLimit:
+      "El número de redes ({{requested}}) supera el máximo de tu plan ({{limit}}).",
+    errorDensityExceedsAgents:
+      "La densidad ({{density}}) debe ser menor que el total de agentes ({{agents}}).",
     errorBiasMismatch:
       "El total de aristas con sesgo ({{bias}}) debe ser igual al total de aristas de la red ({{maxEdges}}).",
     errorCountsInvalid: "Todas las cantidades y límites deben ser al menos 1.",
@@ -503,6 +507,7 @@ const es = {
     adjustToMax: "Ajustar al máximo",
     agentsPlanHint: "Tu plan permite hasta {{limit}} agentes.",
     iterationsPlanHint: "Tu plan permite hasta {{limit}} iteraciones.",
+    networksPlanHint: "Tu plan permite hasta {{limit}} redes.",
     densityEdgesHint: "Con esta densidad la red tendrá {{edges}} aristas.",
     customNetworkNameHint: "Identifica esta red en el historial y en la ejecución en vivo.",
     optionInUse: "{{label}} · en uso",
@@ -538,13 +543,19 @@ const es = {
     liveQuotaUnlimited: "{{used}} / ilimitado",
     liveMeterAgents: "Agentes",
     liveMeterIterations: "Iteraciones",
+    liveMeterNetworks: "Redes",
     errorCustomNetworkNameEmpty: "El nombre de la red no puede estar vacío.",
+    errorCustomNetworkNameTooLong: "El nombre de la red debe tener {{max}} caracteres o menos.",
+    errorCustomAgentNameTooLong:
+      "Los nombres de los agentes deben tener {{max}} caracteres o menos.",
+    errorCustomAgentNameDuplicate:
+      "Los nombres de los agentes deben ser únicos (se distinguen mayúsculas y minúsculas).",
     errorCustomNoAgents: "Se requiere al menos un agente.",
     errorCustomNoEdges: "Se requiere al menos una arista.",
     errorCustomAgentInvalid:
-      "Uno o más agentes tienen valores inválidos. Revisa los rangos de creencia, radio y desplazamiento de tolerancia.",
+      "Uno o más agentes tienen valores inválidos. Cada agente necesita un nombre; revisa los rangos de creencia, radio y desplazamiento de tolerancia.",
     errorCustomEdgeInvalid:
-      "Una o más aristas tienen valores inválidos. Revisa el rango de influencia.",
+      "Una o más aristas están incompletas o tienen valores inválidos. Elige un origen y un destino para cada arista y revisa el rango de influencia.",
     errorCustomEdgeUnknownAgent:
       "Una o más aristas hacen referencia a un nombre de agente que no existe.",
     errorCustomEdgeDuplicate:
@@ -553,6 +564,10 @@ const es = {
     importJson: "Importar JSON",
     importError: "El archivo importado tiene errores de validación. Revisa los campos marcados.",
     errorImportInvalid: "Archivo inválido. El formato JSON o el tipo de simulación no se reconoce.",
+    errorImportNameTooLong:
+      "No se cargó el archivo: el nombre de la red y el de cada agente deben tener {{max}} caracteres o menos.",
+    errorImportDuplicateAgentName:
+      'No se cargó el archivo: el nombre de agente "{{name}}" está repetido. Los nombres de los agentes deben ser únicos.',
     // Load-from-file path
     networkTypeLoad: "Cargar archivo",
     stepLoad: "Carga",

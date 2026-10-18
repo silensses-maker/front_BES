@@ -26,7 +26,14 @@ vi.mock("@/entities/simulation", async () => {
   >("@/entities/simulation/model/last-run.store");
   return { useSimulationStore: vi.fn(), useLastRunStore };
 });
-vi.mock("@/entities/user", () => ({ useAuthStore: vi.fn() }));
+// Real (pure) role-table fallback, imported by file path so the entity index does not pull
+// the Firebase-backed user API into the test environment.
+vi.mock("@/entities/user", async () => {
+  const { resolveMaxNetworks } = await vi.importActual<
+    typeof import("@/entities/user/lib/permissions")
+  >("@/entities/user/lib/permissions");
+  return { useAuthStore: vi.fn(), resolveMaxNetworks };
+});
 vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
     startGenerated: vi.fn(),

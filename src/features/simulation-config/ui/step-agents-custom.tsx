@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
 import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
+import { formatNumber } from "../lib/live-summary";
+import { findDuplicateAgentNames, MAX_CUSTOM_NAME_LENGTH } from "../lib/validation";
 import type {
   CustomSimFormValues,
   SimConfigValidationErrors,
@@ -85,18 +87,27 @@ function FixedStrategyHint({ strategy }: { strategy: SilenceStrategy }) {
 
 interface StepAgentsCustomProps {
   values: SimFormValues;
+  /** Role agent quota — custom networks are checked against it like generated ones (#122). */
+  maxAgents?: number | null;
   errors: SimConfigValidationErrors;
   onUpdate: (patch: Partial<SimFormValues>) => void;
 }
 
-export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomProps) {
-  const { t } = useTranslation();
+export function StepAgentsCustom({
+  values,
+  maxAgents = null,
+  errors,
+  onUpdate,
+}: StepAgentsCustomProps) {
+  const { t, i18n } = useTranslation();
   const { agents, edges } = values as CustomSimFormValues;
 
   const agentKeys = useRef<string[]>([]);
   const edgeKeys = useRef<string[]>([]);
   syncKeys(agentKeys, agents.length);
   syncKeys(edgeKeys, edges.length);
+  // Every input sharing a name is marked — the backend keys agents by name (#122).
+  const duplicateNames = findDuplicateAgentNames(agents);
 
   // ── Agent helpers ────────────────────────────────────────────────────────────
 
@@ -106,7 +117,11 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
     // Propagate name change to all edges atomically
     if (patch.name !== undefined) {
       const prevName = agents[index]?.name;
-      if (prevName !== undefined && prevName !== patch.name) {
+      // While another agent still carries the old (duplicated) name, the edges stay with it.
+      const prevNameShared = agents.some((a, j) => j !== index && a.name === prevName);
+      // An empty old name is not a reference: unfinished edges also have "" as source/target
+      // and must not be captured by the first agent that gets named.
+      if (prevName && prevName !== patch.name && !prevNameShared) {
         const updatedEdges = edges.map((e) => ({
           ...e,
           source: e.source === prevName ? patch.name! : e.source,
@@ -225,9 +240,27 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
                     <Input
                       type="text"
                       placeholder={t("simulationConfig.customAgentNamePlaceholder")}
+                      maxLength={MAX_CUSTOM_NAME_LENGTH}
+                      aria-invalid={
+                        agent.name.length > MAX_CUSTOM_NAME_LENGTH ||
+                        duplicateNames.has(agent.name) ||
+                        undefined
+                      }
                       value={agent.name}
                       onChange={(e) => updateAgent(i, { name: e.target.value })}
                     />
+                    {agent.name.length > MAX_CUSTOM_NAME_LENGTH && (
+                      <p className="text-xs text-destructive">
+                        {t("simulationConfig.errorCustomAgentNameTooLong", {
+                          max: MAX_CUSTOM_NAME_LENGTH,
+                        })}
+                      </p>
+                    )}
+                    {duplicateNames.has(agent.name) && (
+                      <p className="text-xs text-destructive">
+                        {t("simulationConfig.errorCustomAgentNameDuplicate")}
+                      </p>
+                    )}
                   </div>
 
                   {/* Strategy / Effect row */}
@@ -346,6 +379,14 @@ export function StepAgentsCustom({ values, errors, onUpdate }: StepAgentsCustomP
           </Button>
           {errors.customNoAgents && (
             <p className="text-sm text-destructive">{t("simulationConfig.errorCustomNoAgents")}</p>
+          )}
+          {errors.agentLimitExceeded && maxAgents !== null && (
+            <p className="text-sm text-destructive">
+              {t("simulationConfig.errorAgentLimit", {
+                requested: formatNumber(agents.length, i18n.language),
+                limit: formatNumber(maxAgents, i18n.language),
+              })}
+            </p>
           )}
         </div>
 
