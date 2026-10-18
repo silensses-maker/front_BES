@@ -16,8 +16,9 @@ const HEADER_BYTES = 36;
  * documented in shared/lib/simulation-frame.ts (all little-endian):
  *   0-7 networkId msb · 8-15 networkId lsb · 16-23 runId
  *   24-27 agentCount · 28-31 round · 32-35 startsAt
- * followed by agentCount * 8 bytes of interleaved (public, private) float32
- * belief data and agentCount * 1 byte of speaking flags.
+ * followed by agentCount * 4 bytes of public float32 beliefs, agentCount * 4
+ * bytes of private float32 beliefs (two blocks, not interleaved) and
+ * agentCount * 1 byte of speaking flags.
  */
 function makeSliceBuffer(opts: {
   round: number;
@@ -40,8 +41,8 @@ function makeSliceBuffer(opts: {
   view.setInt32(32, startsAt, true);
 
   for (let i = 0; i < agentCount; i++) {
-    view.setFloat32(HEADER_BYTES + i * 8, 0.5, true);
-    view.setFloat32(HEADER_BYTES + i * 8 + 4, 0.5, true);
+    view.setFloat32(HEADER_BYTES + i * 4, 0.5, true);
+    view.setFloat32(HEADER_BYTES + agentCount * 4 + i * 4, 0.5, true);
   }
   for (let i = 0; i < agentCount; i++) {
     view.setUint8(HEADER_BYTES + agentCount * 8 + i, 1);

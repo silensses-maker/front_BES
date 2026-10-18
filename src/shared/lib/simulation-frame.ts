@@ -1,5 +1,6 @@
 /**
- * Binary frame format — per openapi.yaml §L913-948, all values little-endian.
+ * Binary frame format — per openapi.yaml (`/ws`, "Frame binary"), all values
+ * little-endian. Total size: 36 + 9 × numberOfAgents bytes.
  *
  * Header (36 bytes):
  *   0-7   int64  networkId.mostSigBits  (Java UUID long)
@@ -9,11 +10,16 @@
  *   28-31 int32  round
  *   32-35 int32  startsAt (global index of first agent in this partition)
  *
- * Belief data (numberOfAgents × 8 bytes):
- *   [publicBelief (float32), privateBelief (float32)] × n  — interleaved
+ * Belief data (numberOfAgents × 8 bytes) — two consecutive blocks, NOT interleaved:
+ *   36 .. 36+4n-1     [publicBelief (float32)] × n   — agent i at 36 + 4i
+ *   36+4n .. 36+8n-1  [privateBelief (float32)] × n  — agent i at 36 + 4n + 4i
  *
  * Speaking data (numberOfAgents × 1 byte):
- *   [isSpeaking (uint8)] × n
+ *   36+8n .. 36+9n-1  [isSpeaking (uint8)] × n       — agent i at 36 + 8n + i
+ *
+ * Source of truth: AgentProcessor.sendRoundToWebSocketServer (backend) puts the
+ * public block (beliefBuffer) and then the private block (belief) through one
+ * float view. Persisted /frames slices are byte copies of that same buffer.
  *
  * Partitioning: a single round may emit multiple frames with different startsAt
  * values. Each frame covers [startsAt, startsAt + agentCount). The client must
@@ -66,14 +72,16 @@ export function parseSimulationFrame(buffer: ArrayBuffer): SimulationFramePartit
 
   const publicBelief = new Float32Array(agentCount);
   const privateBelief = new Float32Array(agentCount);
+  const privateBase = HEADER_BYTES + agentCount * 4;
+  const speakingBase = HEADER_BYTES + agentCount * 8;
 
   for (let i = 0; i < agentCount; i++) {
-    publicBelief[i] = view.getFloat32(HEADER_BYTES + i * 8, true);
-    privateBelief[i] = view.getFloat32(HEADER_BYTES + i * 8 + 4, true);
+    publicBelief[i] = view.getFloat32(HEADER_BYTES + i * 4, true);
+    privateBelief[i] = view.getFloat32(privateBase + i * 4, true);
   }
 
   // .slice() detaches from the original ArrayBuffer so it can be transferred in Phase 2
-  const speaking = new Uint8Array(buffer, HEADER_BYTES + agentCount * 8, agentCount).slice();
+  const speaking = new Uint8Array(buffer, speakingBase, agentCount).slice();
 
   return { runId, networkId, round, startsAt, agentCount, publicBelief, privateBelief, speaking };
 }
