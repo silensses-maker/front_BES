@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
+import type { CustomSimFormValues, GeneratedSimFormValues } from "../types/simulation-config.types";
 import type { CustomSimSchemaInput, GeneratedSimSchemaInput } from "./validation";
-import { computeMaxEdges, customSimSchema, generatedSimSchema } from "./validation";
+import {
+  computeMaxEdges,
+  customSimSchema,
+  findDuplicateAgentNames,
+  generatedSimSchema,
+  MAX_CUSTOM_NAME_LENGTH,
+  validateCustomForm,
+  validateGeneratedForm,
+} from "./validation";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -329,6 +338,35 @@ describe("generatedSimSchema", () => {
         );
         expect(mismatchIssue?.path).toEqual(["biasTypes"]);
       }
+    });
+
+    it("rejects a density equal to numberOfAgents with densityExceedsAgents on the density path (#122)", () => {
+      // computeMaxEdges(5, 5) = 20 — the bias rows match, only the density rule fails.
+      const result = generatedSimSchema.safeParse(
+        makeGeneratedInput({ numberOfAgents: 5, density: 5 }),
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find((i) => i.message === "densityExceedsAgents");
+        expect(issue?.path).toEqual(["density"]);
+      }
+    });
+
+    it("rejects a density greater than numberOfAgents (#122)", () => {
+      const result = generatedSimSchema.safeParse(
+        makeGeneratedInput({ numberOfAgents: 3, density: 4 }),
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map((i) => i.message)).toContain("densityExceedsAgents");
+      }
+    });
+
+    it("accepts the largest valid density (numberOfAgents - 1)", () => {
+      const result = generatedSimSchema.safeParse(
+        makeGeneratedInput({ numberOfAgents: 5, density: 4 }),
+      );
+      expect(result.success).toBe(true);
     });
 
     it("can report both refinement errors simultaneously", () => {
@@ -726,5 +764,270 @@ describe("customSimSchema", () => {
         expect(messages).toContain("duplicateEdge");
       }
     });
+  });
+});
+
+// ─── Role quotas in the form validators (#122) ───────────────────────────────
+
+function makeGeneratedValues(
+  overrides: Partial<GeneratedSimFormValues> = {},
+): GeneratedSimFormValues {
+  return {
+    ...(makeGeneratedInput() as GeneratedSimFormValues),
+    ...overrides,
+  };
+}
+
+function makeCustomValues(agentCount: number, iterationLimit = 100): CustomSimFormValues {
+  const agents = Array.from({ length: agentCount }, (_, i) => ({
+    ...baseCustomAgent,
+    name: `A${i}`,
+  }));
+  return {
+    ...(makeCustomInput() as CustomSimFormValues),
+    iterationLimit,
+    agents,
+    edges: [{ ...baseCustomEdge, source: "A0", target: "A1" }],
+  };
+}
+
+describe("validateGeneratedForm", () => {
+  it("flags networkLimitExceeded when numberOfNetworks is above maxNetworks", () => {
+    const errors = validateGeneratedForm(makeGeneratedValues({ numberOfNetworks: 6 }), 100, 100, 5);
+    expect(errors.networkLimitExceeded).toBe(true);
+  });
+
+  it("accepts numberOfNetworks equal to maxNetworks", () => {
+    const errors = validateGeneratedForm(makeGeneratedValues({ numberOfNetworks: 5 }), 100, 100, 5);
+    expect(errors).toEqual({});
+  });
+
+  it("does not check the network quota when maxNetworks is not provided", () => {
+    const errors = validateGeneratedForm(makeGeneratedValues({ numberOfNetworks: 500 }), 100, 100);
+    expect(errors.networkLimitExceeded).toBeUndefined();
+  });
+
+  it("treats an Infinity maxNetworks (Administrator) as unlimited", () => {
+    const errors = validateGeneratedForm(
+      makeGeneratedValues({ numberOfNetworks: 10_000 }),
+      Infinity,
+      Infinity,
+      Infinity,
+    );
+    expect(errors).toEqual({});
+  });
+
+  it("maps the density rule to densityExceedsAgents instead of countsInvalid", () => {
+    const values = makeGeneratedInput({ numberOfAgents: 5, density: 5 }) as GeneratedSimFormValues;
+    const errors = validateGeneratedForm(values, undefined, undefined);
+    expect(errors.densityExceedsAgents).toBe(true);
+    expect(errors.countsInvalid).toBeUndefined();
+  });
+});
+
+describe("validateCustomForm", () => {
+  it("flags agentLimitExceeded when the defined agents exceed maxAgents", () => {
+    const errors = validateCustomForm(makeCustomValues(11), 10, 10);
+    expect(errors.agentLimitExceeded).toBe(true);
+  });
+
+  it("accepts an agent count equal to maxAgents", () => {
+    const errors = validateCustomForm(makeCustomValues(10, 10), 10, 10);
+    expect(errors).toEqual({});
+  });
+
+  it("flags iterationLimitExceeded when iterationLimit exceeds maxIterations", () => {
+    const errors = validateCustomForm(makeCustomValues(2, 11), 10, 10);
+    expect(errors.iterationLimitExceeded).toBe(true);
+    expect(errors.agentLimitExceeded).toBeUndefined();
+  });
+
+  it("skips the quotas when no limits are provided (unknown user)", () => {
+    const errors = validateCustomForm(makeCustomValues(5000, 99_999));
+    expect(errors).toEqual({});
+  });
+
+  describe("issue mapping by full path (#122)", () => {
+    const validate = (overrides: Partial<CustomSimSchemaInput>) =>
+      validateCustomForm(makeCustomInput(overrides) as CustomSimFormValues);
+    const withThirdAgent = (patch: Partial<CustomSimSchemaInput["agents"][number]>) =>
+      validate({
+        agents: [
+          { ...baseCustomAgent, name: "Alice" },
+          { ...baseCustomAgent, name: "Bob" },
+          { ...baseCustomAgent, name: "Carol", ...patch },
+        ],
+      });
+    const withEdge = (patch: Partial<CustomSimSchemaInput["edges"][number]>) =>
+      validate({ edges: [{ ...baseCustomEdge, ...patch }] });
+
+    it("maps an empty agents list to customNoAgents", () => {
+      expect(validate({ agents: [], edges: [] })).toEqual({
+        customNoAgents: true,
+        customNoEdges: true,
+      });
+    });
+
+    it("maps an empty edges list to customNoEdges", () => {
+      expect(validate({ edges: [] })).toEqual({ customNoEdges: true });
+    });
+
+    it("maps an empty agent name to customAgentInvalid, not customNoAgents", () => {
+      expect(withThirdAgent({ name: "" })).toEqual({ customAgentInvalid: true });
+    });
+
+    it.each([
+      ["belief", { belief: 1.5 }],
+      ["toleranceRadius", { toleranceRadius: -0.1 }],
+      ["toleranceOffset", { toleranceOffset: 2 }],
+    ])("maps an out-of-range %s to customAgentInvalid", (_field, patch) => {
+      expect(withThirdAgent(patch)).toEqual({ customAgentInvalid: true });
+    });
+
+    it("maps an out-of-range influence to customEdgeInvalid, not customNoEdges", () => {
+      expect(withEdge({ influence: 1.5 })).toEqual({ customEdgeInvalid: true });
+    });
+
+    it("maps an unfinished edge (no source / target picked) to customEdgeInvalid", () => {
+      const errors = withEdge({ source: "", target: "" });
+      expect(errors.customEdgeInvalid).toBe(true);
+      expect(errors.customNoEdges).toBeUndefined();
+    });
+  });
+});
+
+describe("custom name length limit (#122)", () => {
+  // The backend columns are varchar(32): longer names used to make the save roll back silently.
+  const atLimit = "N".repeat(MAX_CUSTOM_NAME_LENGTH);
+  const overLimit = "N".repeat(MAX_CUSTOM_NAME_LENGTH + 1);
+
+  function withAgentName(name: string): CustomSimSchemaInput {
+    return makeCustomInput({
+      agents: [
+        { ...baseCustomAgent, name },
+        { ...baseCustomAgent, name: "Bob" },
+      ],
+      edges: [{ ...baseCustomEdge, source: name, target: "Bob" }],
+    });
+  }
+
+  it("is 32 characters, the size of the backend columns", () => {
+    expect(MAX_CUSTOM_NAME_LENGTH).toBe(32);
+  });
+
+  it("accepts a network name and an agent name of exactly 32 characters", () => {
+    expect(customSimSchema.safeParse(makeCustomInput({ networkName: atLimit })).success).toBe(true);
+    expect(customSimSchema.safeParse(withAgentName(atLimit)).success).toBe(true);
+  });
+
+  it("rejects a 33-character network name with nameTooLong on the networkName path", () => {
+    const result = customSimSchema.safeParse(makeCustomInput({ networkName: overLimit }));
+    expect(result.success).toBe(false);
+    const issue = result.error?.issues.find((i) => i.message === "nameTooLong");
+    expect(issue?.path).toEqual(["networkName"]);
+  });
+
+  it("rejects a 33-character agent name with nameTooLong on the agent's name path", () => {
+    const result = customSimSchema.safeParse(withAgentName(overLimit));
+    expect(result.success).toBe(false);
+    const issue = result.error?.issues.find((i) => i.message === "nameTooLong");
+    expect(issue?.path).toEqual(["agents", 0, "name"]);
+  });
+
+  it("maps a long network name to customNetworkNameTooLong only", () => {
+    const errors = validateCustomForm(
+      makeCustomInput({ networkName: overLimit }) as CustomSimFormValues,
+    );
+    expect(errors).toEqual({ customNetworkNameTooLong: true });
+  });
+
+  it("maps a long agent name to customAgentNameTooLong, not the generic customAgentInvalid", () => {
+    const errors = validateCustomForm(withAgentName(overLimit) as CustomSimFormValues);
+    expect(errors).toEqual({ customAgentNameTooLong: true });
+  });
+
+  it("keeps the empty-name error separate from the length error", () => {
+    const errors = validateCustomForm(makeCustomInput({ networkName: "" }) as CustomSimFormValues);
+    expect(errors.customNetworkNameEmpty).toBe(true);
+    expect(errors.customNetworkNameTooLong).toBeUndefined();
+  });
+});
+
+describe("custom agent name uniqueness (#122)", () => {
+  // custom_agents is keyed by (run_id, name): a repeated name made the save fail with 500.
+  function withAgentNames(first: string, second: string, ...rest: string[]): CustomSimSchemaInput {
+    return makeCustomInput({
+      agents: [first, second, ...rest].map((name) => ({ ...baseCustomAgent, name })),
+      edges: [{ ...baseCustomEdge, source: first, target: second }],
+    });
+  }
+
+  describe("findDuplicateAgentNames", () => {
+    it("returns every name used by more than one agent", () => {
+      const names = findDuplicateAgentNames([
+        { name: "A" },
+        { name: "B" },
+        { name: "A" },
+        { name: "C" },
+        { name: "B" },
+        { name: "A" },
+      ]);
+      expect([...names]).toEqual(["A", "B"]);
+    });
+
+    it("is case-sensitive, like the backend primary key", () => {
+      expect(findDuplicateAgentNames([{ name: "Alice" }, { name: "alice" }]).size).toBe(0);
+    });
+
+    it("does not treat names that differ only in whitespace as duplicates", () => {
+      expect(findDuplicateAgentNames([{ name: "Alice" }, { name: "Alice " }]).size).toBe(0);
+    });
+
+    it("ignores empty names (the required-name rule reports them)", () => {
+      expect(findDuplicateAgentNames([{ name: "" }, { name: "" }]).size).toBe(0);
+    });
+  });
+
+  it("rejects a repeated agent name with duplicateAgentName on the repeat's name path", () => {
+    const result = customSimSchema.safeParse(withAgentNames("Alice", "Bob", "Alice"));
+    expect(result.success).toBe(false);
+    const issues = result.error?.issues.filter((i) => i.message === "duplicateAgentName") ?? [];
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.path).toEqual(["agents", 2, "name"]);
+  });
+
+  it("reports the repeats in order, so the first one is the name the backend's 400 names", () => {
+    const result = customSimSchema.safeParse(withAgentNames("A", "B", "B", "A"));
+    const issues = result.error?.issues.filter((i) => i.message === "duplicateAgentName") ?? [];
+    expect(issues.map((i) => i.path)).toEqual([
+      ["agents", 2, "name"],
+      ["agents", 3, "name"],
+    ]);
+    const first = issues[0];
+    expect(first?.code === "custom" ? first.params : undefined).toEqual({ name: "B" });
+  });
+
+  it("accepts agent names that differ only by case", () => {
+    expect(customSimSchema.safeParse(withAgentNames("Alice", "alice")).success).toBe(true);
+  });
+
+  it("maps a repeated name to customAgentNameDuplicate only", () => {
+    const errors = validateCustomForm(withAgentNames("Alice", "Bob", "Bob") as CustomSimFormValues);
+    expect(errors).toEqual({ customAgentNameDuplicate: true });
+  });
+
+  it("leaves two empty names to the required-name rule, without the duplicate flag", () => {
+    const errors = validateCustomForm(
+      makeCustomInput({
+        agents: [
+          { ...baseCustomAgent, name: "Alice" },
+          { ...baseCustomAgent, name: "Bob" },
+          { ...baseCustomAgent, name: "" },
+          { ...baseCustomAgent, name: "" },
+        ],
+      }) as CustomSimFormValues,
+    );
+    expect(errors).not.toEqual({});
+    expect(errors.customAgentNameDuplicate).toBeUndefined();
   });
 });

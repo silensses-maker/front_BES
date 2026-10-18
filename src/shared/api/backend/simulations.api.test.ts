@@ -137,6 +137,15 @@ describe("simulationsApi", () => {
       );
     });
 
+    it("exposes the optional effectiveDensity returned for generated runs (#122)", async () => {
+      const created: SimCreated = { ...mockSimCreated, effectiveDensity: 2 };
+      vi.mocked(backendClient.post).mockResolvedValue({ data: created });
+
+      const result = await simulationsApi.startGenerated(mockGeneratedRunRequest);
+
+      expect(result.effectiveDensity).toBe(2);
+    });
+
     it("propagates error if request fails", async () => {
       const error = new Error("network error");
       vi.mocked(backendClient.post).mockRejectedValue(error);
@@ -155,6 +164,14 @@ describe("simulationsApi", () => {
 
       expect(result).toEqual(mockSimCreated);
       expect(backendClient.post).toHaveBeenCalledWith("/simulations/custom", mockCustomRunRequest);
+    });
+
+    it("leaves effectiveDensity undefined for custom runs (the backend omits it)", async () => {
+      vi.mocked(backendClient.post).mockResolvedValue({ data: mockSimCreated });
+
+      const result = await simulationsApi.startCustom(mockCustomRunRequest);
+
+      expect(result.effectiveDensity).toBeUndefined();
     });
 
     it("propagates error if request fails", async () => {
@@ -178,6 +195,31 @@ describe("simulationsApi", () => {
       expect(backendClient.post).toHaveBeenCalledWith("/simulations/custom", payload, {
         headers: { "Content-Type": "application/octet-stream" },
       });
+    });
+
+    it("sends persistFrames / frameRetention as query params — the binary payload has no such fields (#122)", async () => {
+      const payload = new ArrayBuffer(8);
+      vi.mocked(backendClient.post).mockResolvedValue({ data: mockSimCreated });
+
+      await simulationsApi.startCustomBinary(payload, {
+        persistFrames: true,
+        frameRetention: "ephemeral",
+      });
+
+      expect(backendClient.post).toHaveBeenCalledWith("/simulations/custom", payload, {
+        headers: { "Content-Type": "application/octet-stream" },
+        params: { persistFrames: true, frameRetention: "ephemeral" },
+      });
+    });
+
+    it("sends no query params when no frame options are given", async () => {
+      const payload = new ArrayBuffer(8);
+      vi.mocked(backendClient.post).mockResolvedValue({ data: mockSimCreated });
+
+      await simulationsApi.startCustomBinary(payload);
+
+      const config = vi.mocked(backendClient.post).mock.calls[0]?.[2];
+      expect(config?.params).toBeUndefined();
     });
 
     it("propagates error if request fails", async () => {

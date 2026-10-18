@@ -28,9 +28,18 @@ export const simulationsApi = {
     return data;
   },
 
-  async startCustomBinary(payload: ArrayBuffer): Promise<SimCreated> {
+  /**
+   * The binary payload has no `persistFrames` / `frameRetention` fields, so they travel as
+   * query parameters (`?persistFrames=true&frameRetention=ephemeral`) with the same meaning
+   * as the JSON body fields.
+   */
+  async startCustomBinary(
+    payload: ArrayBuffer,
+    frameOptions?: Pick<CustomRunRequest, "persistFrames" | "frameRetention">,
+  ): Promise<SimCreated> {
     const { data } = await backendClient.post<SimCreated>("/simulations/custom", payload, {
       headers: { "Content-Type": "application/octet-stream" },
+      params: frameOptions,
     });
     return data;
   },

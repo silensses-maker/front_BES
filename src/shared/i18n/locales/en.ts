@@ -438,7 +438,7 @@ const en = {
     numberOfAgentsHint:
       "Total agents in each network. Compute time and memory grow roughly linearly. Each agent has its own opinion and state.",
     densityHint:
-      "Average degree per agent (number of neighbors). Higher density = more interactions per round = faster opinion spread but more compute. Must be at least 2.",
+      "Average degree per agent (number of neighbors). Higher density = more interactions per round = faster opinion spread but more compute. Must be at least 2 and lower than the total agents.",
     iterationLimitHint:
       "Maximum simulation rounds. The run stops when this limit is hit OR when the network converges (stop threshold), whichever comes first.",
     stopThresholdHint:
@@ -468,6 +468,10 @@ const en = {
     errorStopThreshold: "Stop threshold must be between 0 and 1 (exclusive).",
     errorIterationLimit: "The iteration limit exceeds your plan's maximum ({{limit}}).",
     errorAgentLimit: "Total agents ({{requested}}) exceed your plan's maximum ({{limit}}).",
+    errorNetworkLimit:
+      "Number of networks ({{requested}}) exceeds your plan's maximum ({{limit}}).",
+    errorDensityExceedsAgents:
+      "Density ({{density}}) must be lower than the total agents ({{agents}}).",
     errorBiasMismatch:
       "Total biased edges ({{bias}}) must equal the network's total edges ({{maxEdges}}).",
     errorCountsInvalid: "All counts and limits must be at least 1.",
@@ -495,6 +499,7 @@ const en = {
     adjustToMax: "Adjust to maximum",
     agentsPlanHint: "Your plan allows up to {{limit}} agents.",
     iterationsPlanHint: "Your plan allows up to {{limit}} iterations.",
+    networksPlanHint: "Your plan allows up to {{limit}} networks.",
     densityEdgesHint: "With this density the network will have {{edges}} edges.",
     customNetworkNameHint: "Identifies this network in the history and the live run.",
     optionInUse: "{{label}} · in use",
@@ -530,12 +535,17 @@ const en = {
     liveQuotaUnlimited: "{{used}} / unlimited",
     liveMeterAgents: "Agents",
     liveMeterIterations: "Iterations",
+    liveMeterNetworks: "Networks",
     errorCustomNetworkNameEmpty: "Network name cannot be empty.",
+    errorCustomNetworkNameTooLong: "Network name must be {{max}} characters or fewer.",
+    errorCustomAgentNameTooLong: "Agent names must be {{max}} characters or fewer.",
+    errorCustomAgentNameDuplicate: "Agent names must be unique (case-sensitive).",
     errorCustomNoAgents: "At least one agent is required.",
     errorCustomNoEdges: "At least one edge is required.",
     errorCustomAgentInvalid:
-      "One or more agents have invalid values. Check belief, tolerance radius, and tolerance offset ranges.",
-    errorCustomEdgeInvalid: "One or more edges have invalid values. Check influence range.",
+      "One or more agents have invalid values. Every agent needs a name; check the belief, tolerance radius, and tolerance offset ranges.",
+    errorCustomEdgeInvalid:
+      "One or more edges are incomplete or have invalid values. Pick a source and a target for every edge and check the influence range.",
     errorCustomEdgeUnknownAgent: "One or more edges reference an agent name that does not exist.",
     errorCustomEdgeDuplicate:
       "Duplicate edge detected. Each directed pair (source → target) must be unique.",
@@ -543,6 +553,10 @@ const en = {
     importJson: "Import JSON",
     importError: "The imported file has validation errors. Check the highlighted fields.",
     errorImportInvalid: "Invalid file. The JSON format or simulation type is not recognized.",
+    errorImportNameTooLong:
+      "The file was not loaded: the network name and every agent name must be {{max}} characters or fewer.",
+    errorImportDuplicateAgentName:
+      'The file was not loaded: the agent name "{{name}}" is repeated. Agent names must be unique.',
     // Load-from-file path
     networkTypeLoad: "Load file",
     stepLoad: "Load",

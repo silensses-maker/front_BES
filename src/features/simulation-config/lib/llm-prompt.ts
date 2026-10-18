@@ -25,7 +25,7 @@ SHAPE 1 — "generated": a random network built from agent-type and bias-type di
   "networkType": "generated",
   "numberOfAgents": <integer >= 1>,
   "numberOfNetworks": <integer >= 1>,          // independent network instances to run with this same config; usually 1
-  "density": <integer >= 2>,                    // average number of neighbors per agent
+  "density": <integer >= 2 and < numberOfAgents>, // average number of neighbors per agent
   "iterationLimit": <integer >= 1>,             // max rounds; the run also stops early on convergence
   "stopThreshold": <number, 0 < x < 1>,         // convergence criterion (avg belief change between rounds); typical 0.01-0.001
   "seed": <integer or null>,                    // null = random seed each run; integer = reproducible
@@ -53,6 +53,7 @@ Threshold and confidence values are fixed by the simulator and cannot be configu
 
 Hard invariants for "generated" (the app rejects the file otherwise):
 - sum of agentTypes[].count MUST equal numberOfAgents exactly.
+- density MUST be lower than numberOfAgents.
 - sum of biasTypes[].count MUST equal the network's total edge count (maxEdges), computed as:
     maxEdges = 0                                              if numberOfAgents < density
     maxEdges = density*(density-1) + (numberOfAgents-density)*2*density   otherwise
@@ -91,6 +92,7 @@ SHAPE 2 — "custom": an explicit list of agents and directed edges
 
 Hard invariants for "custom":
 - Every edge's source and target must be a name that exists in agents[].
+- No two agents may share the same name (exact, case-sensitive match) — edges refer to agents by name.
 - No two edges may share the same (source, target) pair (the graph is directed, so A→B and B→A are both allowed and distinct).
 - agents[] and edges[] must each have at least one entry.
 - networkName and every agents[].name MUST be 32 characters or fewer — the backend column is varchar(32) and the run fails to save if this is exceeded.

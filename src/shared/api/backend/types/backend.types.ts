@@ -29,6 +29,11 @@ export interface UsageLimits {
   maxAgents: number | null;
   maxIterations: number | null;
   densityFactor: number;
+  /**
+   * Max `numberOfNetworks` of a generated run; `null` = unlimited (#122). Absent when the
+   * backend predates the field — callers then fall back to the role table.
+   */
+  maxNetworks?: number | null;
 }
 
 /** Shape returned by POST /api/users/sync and GET /api/users/info/{uid} */
@@ -111,6 +116,11 @@ export interface SimCreated {
   runId: string;
   status: "running";
   networkCount: number;
+  /**
+   * Generated runs only: Barabási–Albert `m` the backend actually used —
+   * `floor(density × densityFactor)` clamped to `[1, agentsPerNetwork − 1]` (#122).
+   */
+  effectiveDensity?: number;
   channelId: string;
   wsTicket: string;
   wsUrl: string;

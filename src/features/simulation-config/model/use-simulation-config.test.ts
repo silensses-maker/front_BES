@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
+import type { UserRole } from "@/entities/user";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import type { SimCreated } from "@/shared/api/backend/types/backend.types";
@@ -53,9 +54,14 @@ vi.mock("@/entities/simulation", async () => {
   return { useSimulationStore: vi.fn(), useLastRunStore };
 });
 
-vi.mock("@/entities/user", () => ({
-  useAuthStore: vi.fn(),
-}));
+// Real (pure) role-table fallback, imported by file path so the entity index does not pull
+// the Firebase-backed user API into the test environment.
+vi.mock("@/entities/user", async () => {
+  const { resolveMaxNetworks } = await vi.importActual<
+    typeof import("@/entities/user/lib/permissions")
+  >("@/entities/user/lib/permissions");
+  return { useAuthStore: vi.fn(), resolveMaxNetworks };
+});
 
 vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
@@ -183,8 +189,16 @@ const validCustomValues: CustomSimFormValues = {
   edges: [{ source: "A", target: "B", influence: 0.5, bias: 0 }],
 };
 
-function setupMocks(opts: { maxAgents?: number | null; maxIterations?: number | null } = {}) {
-  const { maxAgents = null, maxIterations = null } = opts;
+function setupMocks(
+  opts: {
+    maxAgents?: number | null;
+    maxIterations?: number | null;
+    /** Omitted → the session predates #122 and the role table applies. */
+    maxNetworks?: number;
+    roles?: UserRole[];
+  } = {},
+) {
+  const { maxAgents = null, maxIterations = null, maxNetworks, roles } = opts;
 
   vi.mocked(useNavigate).mockReturnValue(mockNavigate);
   vi.mocked(useSimulationWsManager).mockReturnValue(mockWsManager);
@@ -201,7 +215,13 @@ function setupMocks(opts: { maxAgents?: number | null; maxIterations?: number | 
     selector({
       user: {
         uid: "uid-1",
-        usageLimits: { maxAgents, maxIterations, densityFactor: 1 },
+        ...(roles === undefined ? {} : { roles }),
+        usageLimits: {
+          maxAgents,
+          maxIterations,
+          densityFactor: 1,
+          ...(maxNetworks === undefined ? {} : { maxNetworks }),
+        },
       },
     } as never),
   );
@@ -677,7 +697,7 @@ describe("useSimulationConfig", () => {
         expect(result.current.errors.customNoEdges).toBe(true);
       });
 
-      it("sets customNoAgents when an agent has an empty name (zod path 'agents' catches nested failures)", () => {
+      it("sets customAgentInvalid, not customNoAgents, when an agent has an empty name", () => {
         const { result } = renderHook(() => useSimulationConfig());
 
         act(() => {
@@ -707,9 +727,9 @@ describe("useSimulationConfig", () => {
         });
 
         expect(valid).toBe(false);
-        // Zod reports path[0] === 'agents' for nested agent field failures,
-        // so validateCustomForm maps this to customNoAgents.
-        expect(result.current.errors.customNoAgents).toBe(true);
+        // The issue path is ["agents", 0, "name"]: a field inside an agent, not an empty list.
+        expect(result.current.errors.customAgentInvalid).toBe(true);
+        expect(result.current.errors.customNoAgents).toBeUndefined();
       });
 
       it("sets customEdgeUnknownAgent when edge references an unknown agent", () => {
@@ -1819,5 +1839,602 @@ describe("useSimulationConfig", () => {
 
       expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
     });
+  });
+});
+
+// ─── Role quotas (#122) ──────────────────────────────────────────────────────
+
+function makeCustomAgents(count: number): CustomSimFormValues["agents"] {
+  return Array.from({ length: count }, (_, i) => ({
+    name: `Agent${i}`,
+    belief: 0.5,
+    toleranceRadius: 0.3,
+    toleranceOffset: 0,
+    silenceStrategy: 0 as const,
+    silenceEffect: 0 as const,
+  }));
+}
+
+/** validCustomValues with `count` agents (the single edge still references two of them). */
+function customWithAgents(count: number): CustomSimFormValues {
+  return {
+    ...validCustomValues,
+    agents: makeCustomAgents(count),
+    edges: [{ source: "Agent0", target: "Agent1", influence: 0.5, bias: 0 }],
+  };
+}
+
+describe("useSimulationConfig — role quotas (#122)", () => {
+  const dummyFile = new File(["{}"], "config.json", { type: "application/json" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSimulationConfigStore.getState().reset();
+    setupMocks();
+  });
+
+  describe("custom wizard — agent quota (maxAgents)", () => {
+    it("blocks the agents step when the defined agents exceed maxAgents", () => {
+      setupMocks({ maxAgents: 2 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+        result.current.goToStep("agents");
+      });
+      act(() => {
+        result.current.updateValues(customWithAgents(3));
+      });
+
+      let valid = true;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(false);
+      expect(result.current.errors.agentLimitExceeded).toBe(true);
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.nextInvalidToast");
+    });
+
+    it("accepts a custom network with exactly maxAgents agents", () => {
+      setupMocks({ maxAgents: 2 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+        result.current.goToStep("agents");
+      });
+      act(() => {
+        result.current.updateValues(customWithAgents(2));
+      });
+
+      let valid = false;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(true);
+      expect(result.current.errors).toEqual({});
+    });
+
+    it("does not launch (JSON or binary) when the agent count exceeds maxAgents", async () => {
+      setupMocks({ maxAgents: 2 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+      });
+      act(() => {
+        result.current.updateValues(customWithAgents(3));
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+      expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+      expect(result.current.errors.agentLimitExceeded).toBe(true);
+      expect(toast.error).toHaveBeenCalledWith("simulationConfig.launchInvalidToast");
+    });
+
+    it("re-checks the iteration quota at launch (the review step can be reached directly)", async () => {
+      setupMocks({ maxIterations: 50 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+      });
+      act(() => {
+        result.current.updateValues({ ...validCustomValues, iterationLimit: 51 });
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+      expect(result.current.errors.iterationLimitExceeded).toBe(true);
+    });
+
+    it("launches when the custom network is within the quotas", async () => {
+      setupMocks({ maxAgents: 2, maxIterations: 100 });
+      vi.mocked(estimateJsonSize).mockReturnValue(100);
+      vi.mocked(simulationsApi.startCustom).mockResolvedValue(mockSimCreated);
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.setNetworkType("custom");
+      });
+      act(() => {
+        result.current.updateValues(customWithAgents(2));
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(simulationsApi.startCustom).toHaveBeenCalledOnce();
+    });
+
+    it("surfaces agentLimitExceeded after importing a custom network above maxAgents", async () => {
+      setupMocks({ maxAgents: 1 });
+      vi.mocked(readJsonFile).mockResolvedValue(validCustomValues);
+      vi.mocked(parseEnvelope).mockReturnValue({
+        createdAt: "2024-01-01T00:00:00.000Z",
+        appVersion: "1.0.0",
+        payload: validCustomValues as unknown as Record<string, unknown>,
+      });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      await act(async () => {
+        await result.current.handleImportFile(dummyFile);
+      });
+
+      // validCustomValues defines 2 agents, limit is 1
+      expect(result.current.errors.agentLimitExceeded).toBe(true);
+    });
+  });
+
+  describe("generated wizard — network quota (maxNetworks)", () => {
+    it("blocks the network step when numberOfNetworks exceeds the session maxNetworks", () => {
+      setupMocks({ maxNetworks: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ ...validGeneratedValues, numberOfNetworks: 6 });
+      });
+
+      let valid = true;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(false);
+      expect(result.current.errors.networkLimitExceeded).toBe(true);
+    });
+
+    it("accepts numberOfNetworks equal to maxNetworks", () => {
+      setupMocks({ maxNetworks: 5 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ ...validGeneratedValues, numberOfNetworks: 5 });
+      });
+
+      let valid = false;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(true);
+      expect(result.current.maxNetworks).toBe(5);
+    });
+
+    it("does not call startGenerated when numberOfNetworks exceeds maxNetworks", async () => {
+      setupMocks({ maxNetworks: 1 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ ...validGeneratedValues, numberOfNetworks: 2 });
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(simulationsApi.startGenerated).not.toHaveBeenCalled();
+      expect(result.current.errors.networkLimitExceeded).toBe(true);
+    });
+
+    it("treats an unlimited (Infinity) maxNetworks as no cap", () => {
+      setupMocks({ maxNetworks: Infinity, roles: ["Administrator"] });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ ...validGeneratedValues, numberOfNetworks: 1000 });
+      });
+
+      let valid = false;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(true);
+    });
+
+    it.each([
+      ["Guest", 1],
+      ["BaseUser", 5],
+      ["Researcher", 20],
+    ] as const)("falls back to the %s role table when the session lacks maxNetworks", (role, cap) => {
+      setupMocks({ roles: [role] });
+      const { result } = renderHook(() => useSimulationConfig());
+      expect(result.current.maxNetworks).toBe(cap);
+
+      act(() => {
+        result.current.updateValues({ ...validGeneratedValues, numberOfNetworks: cap });
+      });
+      let valid = false;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+      expect(valid).toBe(true);
+
+      act(() => {
+        result.current.updateValues({ numberOfNetworks: cap + 1 });
+      });
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+      expect(valid).toBe(false);
+      expect(result.current.errors.networkLimitExceeded).toBe(true);
+    });
+
+    it("surfaces networkLimitExceeded after importing generated values above maxNetworks", async () => {
+      setupMocks({ maxNetworks: 1 });
+      const imported = { ...validGeneratedValues, numberOfNetworks: 3 };
+      vi.mocked(readJsonFile).mockResolvedValue(imported);
+      vi.mocked(parseEnvelope).mockReturnValue({
+        createdAt: "2024-01-01T00:00:00.000Z",
+        appVersion: "1.0.0",
+        payload: imported as unknown as Record<string, unknown>,
+      });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      await act(async () => {
+        await result.current.handleImportFile(dummyFile);
+      });
+
+      expect(result.current.errors.networkLimitExceeded).toBe(true);
+    });
+  });
+
+  describe("generated wizard — density below the agents per network", () => {
+    it("sets densityExceedsAgents when density equals numberOfAgents", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        // computeMaxEdges(10, 10) = 90 — bias rows match, only the density rule fails
+        result.current.updateValues({
+          ...validGeneratedValues,
+          density: 10,
+          biasTypes: [{ id: "b0", count: 90, cognitiveBias: 0 }],
+        });
+      });
+
+      let valid = true;
+      act(() => {
+        valid = result.current.validateAndAdvance();
+      });
+
+      expect(valid).toBe(false);
+      expect(result.current.errors.densityExceedsAgents).toBe(true);
+      expect(result.current.errors.countsInvalid).toBeUndefined();
+    });
+  });
+});
+
+describe("useSimulationConfig — custom name length limit (#122)", () => {
+  const dummyFile = new File(["{}"], "config.json", { type: "application/json" });
+  const longName = "N".repeat(33);
+  const limitName = "N".repeat(32);
+
+  /** validCustomValues with agent "A" renamed (edges follow, so only the name rule can fail). */
+  function withAgentName(name: string): CustomSimFormValues {
+    return {
+      ...validCustomValues,
+      agents: validCustomValues.agents.map((a, i) => (i === 0 ? { ...a, name } : a)),
+      edges: [{ source: name, target: "B", influence: 0.5, bias: 0 }],
+    };
+  }
+
+  function mockImport(payload: unknown) {
+    vi.mocked(readJsonFile).mockResolvedValue(payload);
+    vi.mocked(parseEnvelope).mockReturnValue({
+      createdAt: "2024-01-01T00:00:00.000Z",
+      appVersion: "1.0.0",
+      payload: payload as Record<string, unknown>,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSimulationConfigStore.getState().reset();
+    setupMocks();
+  });
+
+  it("blocks the custom network step when the network name exceeds 32 characters", () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues({ ...validCustomValues, networkName: longName });
+    });
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAndAdvance();
+    });
+
+    expect(valid).toBe(false);
+    expect(result.current.errors.customNetworkNameTooLong).toBe(true);
+    expect(result.current.errors.customNetworkNameEmpty).toBeUndefined();
+  });
+
+  it("accepts a network name of exactly 32 characters on the network step", () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues({ ...validCustomValues, networkName: limitName });
+    });
+
+    let valid = false;
+    act(() => {
+      valid = result.current.validateAndAdvance();
+    });
+
+    expect(valid).toBe(true);
+    expect(result.current.errors).toEqual({});
+  });
+
+  it("blocks the agents step when an agent name exceeds 32 characters", () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+      result.current.goToStep("agents");
+    });
+    act(() => {
+      result.current.updateValues(withAgentName(longName));
+    });
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAndAdvance();
+    });
+
+    expect(valid).toBe(false);
+    expect(result.current.errors).toEqual({ customAgentNameTooLong: true });
+  });
+
+  it("does not launch (JSON or binary) a custom run with a name over 32 characters", async () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues(withAgentName(longName));
+    });
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+    expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.launchInvalidToast");
+    expect(result.current.errors.customAgentNameTooLong).toBe(true);
+  });
+
+  it("rejects an imported custom file whose agent names exceed 32 characters", async () => {
+    mockImport(withAgentName(longName));
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.errors).toEqual({ importInvalid: true });
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.errorImportNameTooLong");
+    // The file is not loaded: the wizard keeps its previous (default) draft.
+    expect(result.current.networkType).toBe("generated");
+    expect(useSimulationConfigStore.getState().customValues.agents).toEqual([]);
+  });
+
+  it("rejects an imported custom file whose network name exceeds 32 characters", async () => {
+    mockImport({ ...validCustomValues, networkName: longName });
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.errors.importInvalid).toBe(true);
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.errorImportNameTooLong");
+    expect(toast.error).not.toHaveBeenCalledWith("simulationConfig.importError");
+  });
+
+  it("imports a custom file whose names are exactly 32 characters", async () => {
+    mockImport({ ...withAgentName(limitName), networkName: limitName });
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.networkType).toBe("custom");
+    expect(result.current.errors).toEqual({});
+    expect((result.current.values as CustomSimFormValues).networkName).toBe(limitName);
+  });
+});
+
+describe("useSimulationConfig — custom agent name uniqueness (#122)", () => {
+  const dummyFile = new File(["{}"], "config.json", { type: "application/json" });
+
+  /** validCustomValues ("A", "B", edge A→B) plus a third agent that repeats "A". */
+  const duplicatedValues: CustomSimFormValues = {
+    ...validCustomValues,
+    agents: [...validCustomValues.agents, { ...validCustomValues.agents[0]!, belief: 0.9 }],
+  };
+
+  function mockImport(payload: unknown) {
+    vi.mocked(readJsonFile).mockResolvedValue(payload);
+    vi.mocked(parseEnvelope).mockReturnValue({
+      createdAt: "2024-01-01T00:00:00.000Z",
+      appVersion: "1.0.0",
+      payload: payload as Record<string, unknown>,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSimulationConfigStore.getState().reset();
+    setupMocks();
+  });
+
+  it("blocks the agents step when two agents share a name", () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+      result.current.goToStep("agents");
+    });
+    act(() => {
+      result.current.updateValues(duplicatedValues);
+    });
+
+    let valid = true;
+    act(() => {
+      valid = result.current.validateAndAdvance();
+    });
+
+    expect(valid).toBe(false);
+    expect(result.current.errors).toEqual({ customAgentNameDuplicate: true });
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.nextInvalidToast");
+  });
+
+  it("does not launch (JSON or binary) a custom run with a repeated agent name", async () => {
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues(duplicatedValues);
+    });
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(simulationsApi.startCustom).not.toHaveBeenCalled();
+    expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.launchInvalidToast");
+    expect(result.current.errors.customAgentNameDuplicate).toBe(true);
+  });
+
+  it("rejects an imported custom file with a repeated agent name, naming it in the toast", async () => {
+    vi.mocked(useTranslation).mockReturnValue({
+      t: (key: string, params?: Record<string, unknown>) =>
+        params ? `${key} ${JSON.stringify(params)}` : key,
+    } as unknown as ReturnType<typeof useTranslation>);
+    mockImport(duplicatedValues);
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.errors).toEqual({ importInvalid: true });
+    expect(toast.error).toHaveBeenCalledWith(
+      'simulationConfig.errorImportDuplicateAgentName {"name":"A"}',
+    );
+    expect(toast.error).toHaveBeenCalledOnce();
+    // The file is not loaded: the wizard keeps its previous (default) draft.
+    expect(result.current.networkType).toBe("generated");
+    expect(useSimulationConfigStore.getState().customValues.agents).toEqual([]);
+  });
+
+  it("keeps the name-length toast when a file also has names over 32 characters", async () => {
+    const longName = "N".repeat(33);
+    mockImport({ ...duplicatedValues, networkName: longName });
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.errors.importInvalid).toBe(true);
+    expect(toast.error).toHaveBeenCalledWith("simulationConfig.errorImportNameTooLong");
+    expect(toast.error).not.toHaveBeenCalledWith("simulationConfig.errorImportDuplicateAgentName");
+  });
+
+  it("imports a custom file whose agent names differ only by case", async () => {
+    const caseOnly: CustomSimFormValues = {
+      ...validCustomValues,
+      agents: [...validCustomValues.agents, { ...validCustomValues.agents[0]!, name: "a" }],
+    };
+    mockImport(caseOnly);
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.networkType).toBe("custom");
+    expect(result.current.errors).toEqual({});
+  });
+});
+
+describe("useSimulationConfig — custom run frame options (#122)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSimulationConfigStore.getState().reset();
+    setupMocks();
+  });
+
+  async function launchCustom(jsonSize: number) {
+    vi.mocked(estimateJsonSize).mockReturnValue(jsonSize);
+    vi.mocked(encodeCustomSimulation).mockReturnValue(new ArrayBuffer(8));
+    vi.mocked(simulationsApi.startCustom).mockResolvedValue(mockSimCreated);
+    vi.mocked(simulationsApi.startCustomBinary).mockResolvedValue(mockSimCreated);
+    const { result } = renderHook(() => useSimulationConfig());
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues(validCustomValues);
+    });
+    await act(async () => {
+      await result.current.submit();
+    });
+  }
+
+  it("sends persistFrames / frameRetention to the binary variant (query params)", async () => {
+    await launchCustom(BINARY_THRESHOLD_BYTES + 1);
+
+    expect(simulationsApi.startCustomBinary).toHaveBeenCalledWith(expect.any(ArrayBuffer), {
+      persistFrames: true,
+      frameRetention: "ephemeral",
+    });
+  });
+
+  it("sends the same values in the JSON body", async () => {
+    await launchCustom(BINARY_THRESHOLD_BYTES - 1);
+
+    expect(simulationsApi.startCustom).toHaveBeenCalledWith(
+      expect.objectContaining({ persistFrames: true, frameRetention: "ephemeral" }),
+    );
   });
 });

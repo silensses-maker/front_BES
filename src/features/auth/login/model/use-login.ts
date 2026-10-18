@@ -22,6 +22,9 @@ export function useLogin() {
       // resolves, so the auth interceptor on backendClient will find a valid
       // currentUser when it calls getIdToken() for the Authorization header.
       const data = await usersApi.sync();
+      // `maxNetworks` absent (backend without #122) is left out so consumers fall back to the
+      // role table; `null` means unlimited, like the other limits.
+      const { maxNetworks } = data.usageLimits;
       setUser({
         uid: data.uid,
         email: data.email,
@@ -32,6 +35,7 @@ export function useLogin() {
           maxAgents: data.usageLimits.maxAgents ?? Infinity,
           maxIterations: data.usageLimits.maxIterations ?? Infinity,
           densityFactor: data.usageLimits.densityFactor,
+          ...(maxNetworks === undefined ? {} : { maxNetworks: maxNetworks ?? Infinity }),
         },
         deactivated: data.deactivated,
       });

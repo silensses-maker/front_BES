@@ -38,6 +38,7 @@ export function SimulationConfigWizard() {
     loadedFromFile,
     maxAgents,
     maxIterations,
+    maxNetworks,
     userRole,
     updateValues,
     setNetworkType,
@@ -175,13 +176,19 @@ export function SimulationConfigWizard() {
                 values={values}
                 maxAgents={maxAgents}
                 maxIterations={maxIterations}
+                maxNetworks={maxNetworks}
                 errors={errors}
                 onUpdate={updateValues}
               />
             ))}
           {step === "agents" &&
             (networkType === "custom" ? (
-              <StepAgentsCustom values={values} errors={errors} onUpdate={updateValues} />
+              <StepAgentsCustom
+                values={values}
+                maxAgents={maxAgents}
+                errors={errors}
+                onUpdate={updateValues}
+              />
             ) : (
               <StepAgents values={values} maxAgents={maxAgents} onUpdate={updateValues} />
             ))}
@@ -192,6 +199,7 @@ export function SimulationConfigWizard() {
               usageLimitError={usageLimitError}
               maxAgents={maxAgents}
               maxIterations={maxIterations}
+              maxNetworks={maxNetworks}
               loadedFromFile={loadedFromFile}
               onExport={exportConfig}
               onImport={handleImportFile}

@@ -1,4 +1,4 @@
-import { useAuthStore } from "@/entities/user";
+import { resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -100,6 +100,7 @@ export function SimulationLiveSummary() {
 
   const maxAgents = user?.usageLimits?.maxAgents ?? null;
   const maxIterations = user?.usageLimits?.maxIterations ?? null;
+  const maxNetworks = user ? resolveMaxNetworks(user) : null;
   const role = user?.roles?.[0] ?? "—";
 
   const isCustom = networkType === "custom";
@@ -109,15 +110,28 @@ export function SimulationLiveSummary() {
   // Deliberate improvement over the mockup: meters read the ACTIVE slot
   const usedAgents = isCustom ? custom.agents.length : gen.numberOfAgents;
   const usedIterations = isCustom ? custom.iterationLimit : gen.iterationLimit;
+  // Custom networks are always a single network.
+  const usedNetworks = isCustom ? 1 : gen.numberOfNetworks;
 
   // Live validation — always visible (the panel's stated purpose)
   const errors = isCustom
-    ? validateCustomForm(custom)
-    : validateGeneratedForm(gen, maxAgents ?? undefined, maxIterations ?? undefined);
+    ? validateCustomForm(custom, maxAgents ?? undefined, maxIterations ?? undefined)
+    : validateGeneratedForm(
+        gen,
+        maxAgents ?? undefined,
+        maxIterations ?? undefined,
+        maxNetworks ?? undefined,
+      );
   const messages = listValidationMessages(errors, {
-    requested: fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)),
+    requested: fmt(
+      isCustom ? custom.agents.length : gen.agentTypes.reduce((sum, r) => sum + r.count, 0),
+    ),
     limit: maxAgents !== null ? fmt(maxAgents) : "∞",
     iterationLimit: maxIterations !== null ? fmt(maxIterations) : "∞",
+    networks: fmt(gen.numberOfNetworks),
+    networkLimit: maxNetworks !== null ? fmt(maxNetworks) : "∞",
+    density: fmt(gen.density),
+    agents: fmt(gen.numberOfAgents),
     actual: fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)),
     expected: fmt(gen.numberOfAgents),
     bias: fmt(gen.biasTypes.reduce((sum, r) => sum + r.count, 0)),
@@ -202,6 +216,11 @@ export function SimulationLiveSummary() {
               label={t("simulationConfig.liveMeterIterations")}
               used={usedIterations}
               limit={maxIterations}
+            />
+            <QuotaMeter
+              label={t("simulationConfig.liveMeterNetworks")}
+              used={usedNetworks}
+              limit={maxNetworks}
             />
           </CardContent>
         </Card>

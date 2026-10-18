@@ -39,6 +39,7 @@ interface StepReviewProps {
   usageLimitError: { limit: number; requested: number } | null;
   maxAgents?: number | null;
   maxIterations?: number | null;
+  maxNetworks?: number | null;
   /** True when the draft was imported from a file — Review shows "Cargada desde archivo". */
   loadedFromFile?: boolean;
   onExport: () => void;
@@ -51,6 +52,7 @@ export function StepReview({
   usageLimitError,
   maxAgents = null,
   maxIterations = null,
+  maxNetworks = null,
   loadedFromFile = false,
   onExport,
   onImport,
@@ -65,9 +67,16 @@ export function StepReview({
   const fmt = (n: number) => formatNumber(n, i18n.language);
 
   const validationMessages = listValidationMessages(errors, {
-    requested: gen ? fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)) : "",
+    // Custom networks: the agent quota counts the defined agents (#122).
+    requested: gen
+      ? fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0))
+      : fmt(custom?.agents.length ?? 0),
     limit: maxAgents !== null ? fmt(maxAgents) : "∞",
     iterationLimit: maxIterations !== null ? fmt(maxIterations) : "∞",
+    networks: gen ? fmt(gen.numberOfNetworks) : "",
+    networkLimit: maxNetworks !== null ? fmt(maxNetworks) : "∞",
+    density: gen ? fmt(gen.density) : "",
+    agents: gen ? fmt(gen.numberOfAgents) : "",
     actual: gen ? fmt(gen.agentTypes.reduce((sum, r) => sum + r.count, 0)) : "",
     expected: gen ? fmt(gen.numberOfAgents) : "",
     bias: gen ? fmt(gen.biasTypes.reduce((sum, r) => sum + r.count, 0)) : "",

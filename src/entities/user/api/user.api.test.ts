@@ -71,10 +71,11 @@ type MockQuerySnapshot = {
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const mockUsageLimits: UsageLimits = {
+const mockUsageLimits: Required<UsageLimits> = {
   maxAgents: 1000,
   maxIterations: 1000,
   densityFactor: 0.75,
+  maxNetworks: 20,
 };
 
 const mockUser: User = {

@@ -59,9 +59,18 @@ export interface SimConfigValidationErrors {
   stopThresholdOutOfRange?: boolean;
   iterationLimitExceeded?: boolean;
   agentLimitExceeded?: boolean;
+  /** numberOfNetworks above the role's maxNetworks (#122). */
+  networkLimitExceeded?: boolean;
+  /** Barabási–Albert density must be lower than the agents per network (#122). */
+  densityExceedsAgents?: boolean;
   countsInvalid?: boolean;
   // Custom path
   customNetworkNameEmpty?: boolean;
+  /** Network / agent name above MAX_CUSTOM_NAME_LENGTH — the backend columns are varchar(32). */
+  customNetworkNameTooLong?: boolean;
+  customAgentNameTooLong?: boolean;
+  /** Two agents share a name — the backend keys `custom_agents` by (run_id, name) (#122). */
+  customAgentNameDuplicate?: boolean;
   customNoAgents?: boolean;
   customNoEdges?: boolean;
   customAgentInvalid?: boolean;
