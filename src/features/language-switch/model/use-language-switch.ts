@@ -9,7 +9,7 @@ export function useLanguageSwitch() {
   const currentLang: Lang = i18n.language.startsWith("es") ? "es" : "en";
 
   const changeLanguage = (lang: Lang) => {
-    i18n.changeLanguage(lang);
+    void i18n.changeLanguage(lang);
   };
 
   return { currentLang, changeLanguage, supportedLangs: SUPPORTED_LANGS };

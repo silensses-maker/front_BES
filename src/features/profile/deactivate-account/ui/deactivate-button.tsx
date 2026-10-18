@@ -8,7 +8,7 @@ export function DeactivateButton() {
 
   const handleClick = () => {
     const confirmed = window.confirm(t("profile.deactivateConfirm"));
-    if (confirmed) deactivate();
+    if (confirmed) void deactivate();
   };
 
   return (

@@ -141,7 +141,7 @@ export class SimulationWsManager {
     this.ws.binaryType = "arraybuffer";
 
     this.ws.onopen = () => {
-      this.sendAuth();
+      void this.sendAuth();
     };
 
     this.ws.onmessage = (event: MessageEvent) => {

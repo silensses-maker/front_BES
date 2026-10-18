@@ -26,12 +26,12 @@ export function WikiPage() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: i18n.language is an intentional trigger, not a value used inside the effect
   useEffect(() => {
-    window.MathJax?.typesetPromise?.();
+    void window.MathJax?.typesetPromise?.();
   }, [i18n.language]);
 
   const handleTabChange = (_value: string) => {
     setTimeout(() => {
-      window.MathJax?.typesetPromise?.();
+      void window.MathJax?.typesetPromise?.();
     }, 0);
   };
 

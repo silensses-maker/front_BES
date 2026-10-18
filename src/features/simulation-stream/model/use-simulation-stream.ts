@@ -61,7 +61,7 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
       }
     };
 
-    connect();
+    void connect();
 
     // Proactive topology fetch: the persistent WS replays topology_ready on
     // subscribe, but a REST prefetch races it and ensures the worker is

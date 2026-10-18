@@ -263,7 +263,7 @@ export function useSimulationConfig() {
       });
       setRunId(result.runId);
       setStatus("running");
-      navigate(`/board/simulation/${result.runId}`);
+      void navigate(`/board/simulation/${result.runId}`);
       storeReset();
       toast.success(t("simulationConfig.launchSuccessToast"));
     } catch (error) {

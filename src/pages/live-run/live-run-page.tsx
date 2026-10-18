@@ -119,7 +119,7 @@ export function LiveRunPage() {
 
         if (networks.length === 1) {
           // Single network — redirect immediately (replace so back button skips this)
-          navigate(`/board/simulation/${runId}/${networks[0]}`, { replace: true });
+          void navigate(`/board/simulation/${runId}/${networks[0]}`, { replace: true });
           return;
         }
         if (networks.length > 1) {
@@ -150,7 +150,7 @@ export function LiveRunPage() {
       }
     };
 
-    discover();
+    void discover();
 
     return () => {
       cancelled = true;
