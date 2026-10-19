@@ -22,6 +22,9 @@ export default defineConfig({
       ],
       exclude: [
         "**/*.d.ts",
+        // Coverage measures the logic layer (.ts) only, like SonarCloud (ui/** excluded).
+        // Component tests load .tsx files, which would otherwise be counted too.
+        "**/*.tsx",
         "**/*.test.ts",
         "**/*.spec.ts",
         "**/index.ts",
