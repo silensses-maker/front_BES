@@ -78,3 +78,23 @@ describe("LLM_NETWORK_PROMPT field documentation", () => {
     }
   });
 });
+
+// ─── saveMode is accepted but ignored (#133) ─────────────────────────────────
+
+describe("LLM_NETWORK_PROMPT saveMode", () => {
+  it("marks saveMode as currently ignored in both shapes", () => {
+    const saveModeLines = LLM_NETWORK_PROMPT.split("\n").filter((line) =>
+      line.includes('"saveMode": <0 | 1 | 2>'),
+    );
+    expect(saveModeLines).toHaveLength(2);
+    for (const line of saveModeLines) {
+      expect(line).toContain("currently IGNORED");
+    }
+  });
+
+  it("worked examples still carry a valid saveMode", () => {
+    for (const label of ["generated", "custom"]) {
+      expect(extractWorkedExample(label)).toHaveProperty("saveMode", 1);
+    }
+  });
+});

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CONSENSUS_PURSUIT_TEMPLATE } from "../lib/templates";
+import { CONSENSUS_PURSUIT_TEMPLATE, RUN_SAVE_MODE } from "../lib/templates";
 import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
@@ -15,7 +15,7 @@ export const DEFAULT_CUSTOM_FORM: CustomSimFormValues = {
   networkName: "",
   iterationLimit: 1000,
   stopThreshold: 0.001,
-  saveMode: 1,
+  saveMode: RUN_SAVE_MODE,
   agents: [],
   edges: [],
 };

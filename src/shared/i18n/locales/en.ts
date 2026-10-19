@@ -358,10 +358,6 @@ const en = {
     stopThreshold: "Stop threshold",
     seed: "Seed",
     seedRandom: "Random",
-    saveMode: "Save mode",
-    saveModeFull: "Full",
-    saveModeStandard: "Standard",
-    saveModeLight: "Light",
     customNetworkHint: "Custom network configuration is managed in the Agents step.",
     customAgentsNotSupported:
       "Agent row editing is not available for custom networks in this step.",
@@ -433,8 +429,6 @@ const en = {
     submit: "Launch simulation",
     submitting: "Launching…",
     // ── Field-level tooltips (generated path) ───────────────────────────────
-    saveModeHint:
-      "How much simulation data is persisted. DEBUG: in-memory only (fastest, run is lost on refresh). STANDARD: round metrics in DB. FULL: per-round agent state, enables replay.",
     numberOfNetworksHint:
       "How many independent network instances to run with the same configuration. Each one generates its own topology and dynamics; useful to average out random variation.",
     numberOfAgentsHint:
@@ -495,9 +489,6 @@ const en = {
     discardDialogDismiss: "Keep",
     discardSuccessToast: "Draft discarded. Wizard reset.",
     templateAppliedToast: "Template applied: {{name}}.",
-    saveModeFullDesc: "Saves every round of every agent. Maximum detail, more storage.",
-    saveModeStandardDesc: "Saves aggregated evolution and key states. Recommended.",
-    saveModeLightDesc: "Reduced saving (STANDARD_LIGHT) for large networks.",
     errorAgentLimitInline: "Exceeds your plan's maximum ({{limit}}).",
     adjustToMax: "Adjust to maximum",
     agentsPlanHint: "Your plan allows up to {{limit}} agents.",
@@ -519,6 +510,9 @@ const en = {
     reviewInfluence: "influence {{value}}",
     reviewErrorsTitle: "Fix before launching",
     reviewValid: "✓ Configuration valid. Ready to launch.",
+    // #133: replaces the save-mode selector (every run is saved the same way for now).
+    storageNote:
+      "In this version, the run configuration is stored, and its replay data is kept for about 60–90 minutes after the run ends.",
     exportSuccessToast: "Configuration exported as simulacion.json.",
     nextInvalidToast: "Fix the highlighted errors before continuing.",
     launchInvalidToast: "The configuration has errors. Review them before launching.",
@@ -610,7 +604,7 @@ const en = {
     runIterations: "Iteration limit",
     runCreated: "Created",
     fullIdTooltip: "Full run identifier",
-    retentionNote: "Frames of finished runs are kept ~60 min on the server.",
+    retentionNote: "Frames of finished runs are kept about 60–90 min on the server.",
     openLiveRun: "Open run",
     runNameFallback: "Unnamed run",
     runDetailTitle: "Experiment details",

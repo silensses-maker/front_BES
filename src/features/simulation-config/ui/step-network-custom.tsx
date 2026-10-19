@@ -2,7 +2,6 @@ import { useTranslation } from "@/shared/i18n";
 import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { MAX_CUSTOM_NAME_LENGTH } from "../lib/validation";
 import type {
   CustomSimFormValues,
@@ -18,9 +17,11 @@ interface StepNetworkCustomProps {
 }
 
 /**
- * Custom-network header step. Per mockup asymmetry: the save-mode select has
- * no description line, the iteration field has no quick-fix, and the stop
- * threshold has no inline error (validation still blocks Next via toast).
+ * Custom-network header step. Per mockup asymmetry: the iteration field has no
+ * quick-fix and the stop threshold has no inline error (validation still blocks
+ * Next via toast). Deliberate deviation from the mockup (#133): no save-mode
+ * select — the backend saves every run in DEBUG mode in this phase, and the
+ * review step says what is stored instead.
  */
 export function StepNetworkCustom({
   values,
@@ -59,28 +60,6 @@ export function StepNetworkCustom({
             {t("simulationConfig.errorCustomNetworkNameTooLong", { max: MAX_CUSTOM_NAME_LENGTH })}
           </p>
         )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="customSaveMode" className="flex items-center gap-1.5">
-          {t("simulationConfig.saveMode")}
-          <InfoTooltip>{t("simulationConfig.saveModeHint")}</InfoTooltip>
-        </Label>
-        <Select
-          value={String(custom.saveMode)}
-          onValueChange={(v) =>
-            onUpdate({ saveMode: Number(v) as 0 | 1 | 2 } as Partial<SimFormValues>)
-          }
-        >
-          <SelectTrigger id="customSaveMode" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">{t("simulationConfig.saveModeFull")}</SelectItem>
-            <SelectItem value="1">{t("simulationConfig.saveModeStandard")}</SelectItem>
-            <SelectItem value="2">{t("simulationConfig.saveModeLight")}</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="space-y-2">

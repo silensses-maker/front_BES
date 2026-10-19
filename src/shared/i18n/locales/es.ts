@@ -362,10 +362,6 @@ const es = {
     stopThreshold: "Umbral de parada",
     seed: "Semilla",
     seedRandom: "Aleatoria",
-    saveMode: "Modo de guardado",
-    saveModeFull: "Completo",
-    saveModeStandard: "Estándar",
-    saveModeLight: "Ligero",
     customNetworkHint:
       "La configuración de la red personalizada se gestiona en el paso de Agentes.",
     customAgentsNotSupported:
@@ -439,8 +435,6 @@ const es = {
     submit: "Lanzar simulación",
     submitting: "Lanzando…",
     // ── Tooltips por campo (path generated) ────────────────────────────────
-    saveModeHint:
-      "Cuánto se persiste de la simulación. DEBUG: solo en memoria (más rápido, se pierde al refrescar). ESTÁNDAR: métricas por ronda en BD. COMPLETO: estado por agente cada ronda, permite replay.",
     numberOfNetworksHint:
       "Cuántas instancias de red independientes ejecutar con la misma configuración. Cada una genera su propia topología y dinámica; útil para promediar variación aleatoria.",
     numberOfAgentsHint:
@@ -502,10 +496,6 @@ const es = {
     discardDialogDismiss: "Conservar",
     discardSuccessToast: "Borrador descartado. Asistente restablecido.",
     templateAppliedToast: "Plantilla aplicada: {{name}}.",
-    saveModeFullDesc:
-      "Guarda todas las rondas de todos los agentes. Máximo detalle, más almacenamiento.",
-    saveModeStandardDesc: "Guarda la evolución agregada y los estados clave. Recomendado.",
-    saveModeLightDesc: "Guardado reducido (STANDARD_LIGHT) para redes grandes.",
     errorAgentLimitInline: "Supera el máximo de tu plan ({{limit}}).",
     adjustToMax: "Ajustar al máximo",
     agentsPlanHint: "Tu plan permite hasta {{limit}} agentes.",
@@ -527,6 +517,9 @@ const es = {
     reviewInfluence: "influencia {{value}}",
     reviewErrorsTitle: "Corrige antes de lanzar",
     reviewValid: "✓ Configuración válida. Lista para lanzar.",
+    // #133: reemplaza el selector de modo de guardado (toda ejecución se guarda igual).
+    storageNote:
+      "En esta versión se guarda la configuración de la ejecución, y sus datos de repetición se conservan unos 60–90 minutos después de que termine.",
     exportSuccessToast: "Configuración exportada como simulacion.json.",
     nextInvalidToast: "Corrige los errores marcados antes de continuar.",
     launchInvalidToast: "La configuración tiene errores. Revísalos antes de lanzar.",
@@ -623,7 +616,7 @@ const es = {
     runIterations: "Límite de iteraciones",
     runCreated: "Creado",
     fullIdTooltip: "Identificador completo de la ejecución",
-    retentionNote: "Los frames de ejecuciones terminadas se conservan ~60 min en el servidor.",
+    retentionNote: "Los frames de ejecuciones terminadas se conservan unos 60–90 min en el servidor.",
     openLiveRun: "Abrir ejecución",
     runNameFallback: "Ejecución sin nombre",
     runDetailTitle: "Detalles del experimento",

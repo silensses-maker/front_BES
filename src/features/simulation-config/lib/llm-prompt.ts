@@ -29,7 +29,7 @@ SHAPE 1 — "generated": a random network built from agent-type and bias-type di
   "iterationLimit": <integer >= 1>,             // max rounds; the run also stops early on convergence
   "stopThreshold": <number, 0 < x < 1>,         // convergence criterion (avg belief change between rounds); typical 0.01-0.001
   "seed": <integer or null>,                    // null = random seed each run; integer = reproducible
-  "saveMode": <0 | 1 | 2>,                      // 0=FULL (every agent every round, heaviest), 1=STANDARD (aggregated + key states, default/recommended), 2=STANDARD_LIGHT (reduced, for large networks)
+  "saveMode": <0 | 1 | 2>,                      // currently IGNORED: every run is stored the same way in this version (any of 0/1/2 is accepted); keep the field and use 1
   "agentTypes": [
     {
       "id": "<unique string>",
@@ -67,7 +67,7 @@ SHAPE 2 — "custom": an explicit list of agents and directed edges
   "networkName": "<non-empty string, MAX 32 CHARACTERS>",
   "iterationLimit": <integer >= 1>,
   "stopThreshold": <number, 0 < x < 1>,
-  "saveMode": <0 | 1 | 2>,                      // same meaning as above
+  "saveMode": <0 | 1 | 2>,                      // currently IGNORED, same as above; use 1
   "agents": [
     {
       "name": "<unique non-empty string, MAX 32 CHARACTERS>", // referenced by edges below
