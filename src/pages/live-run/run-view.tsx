@@ -152,7 +152,7 @@ export function RunView({ runId, networkId }: RunViewProps) {
         if (cancelled || results === null) return;
         const store = useSimulationStore.getState();
         if (store.consensus === null) store.setConsensus(results.consensus);
-        if (store.finalRound === null) store.setFinalRound(results.finalRound);
+        if (store.finalRound == null) store.setFinalRound(results.finalRound);
         if (needAgents) setResultAgents(results.agents);
       })
       .catch((err: unknown) => logger.error("RunView.getResults", err));

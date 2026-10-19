@@ -45,6 +45,20 @@ const mockAuth = auth as unknown as MutableAuth;
 const lastWs = (): MockWebSocket =>
   MockWebSocket.instances[MockWebSocket.instances.length - 1] as MockWebSocket;
 
+/** Snowflake-like run ids: binaries carry the runId in their header, so it must be numeric. */
+const RUN_A = "342521980018098176";
+const RUN_B = "342521980018098177";
+
+/**
+ * Server binary for `runId`: runId as int64 LE at header bytes 16-23 (frame
+ * and topology headers alike). The manager routes on that field only.
+ */
+function binaryFor(runId: string, byteLength = 36 + 9): ArrayBuffer {
+  const buffer = new ArrayBuffer(byteLength);
+  new DataView(buffer).setBigUint64(16, BigInt(runId), true);
+  return buffer;
+}
+
 /** Flushes pending microtasks (e.g. the async sendAuth handshake). */
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -229,24 +243,60 @@ describe("SimulationWsManager", () => {
       expect(onEvent).toHaveBeenCalledWith(event);
     });
 
-    it("forwards binary frames as per-subscriber copies", async () => {
+    it("delivers a binary frame to the subscription of the run in its header", async () => {
       const { manager, ws } = await connectAndAuth();
       const onBinary = vi.fn();
-      manager.subscribe("run-1", vi.fn(), onBinary);
+      manager.subscribe(RUN_A, vi.fn(), onBinary);
 
-      const buffer = new ArrayBuffer(8);
+      const buffer = binaryFor(RUN_A);
       ws.onmessage?.({ data: buffer } as MessageEvent);
 
       expect(onBinary).toHaveBeenCalledOnce();
-      const received = onBinary.mock.calls[0]![0] as ArrayBuffer;
-      expect(received.byteLength).toBe(8);
-      expect(received).not.toBe(buffer); // copy, not the same reference
+      // Single recipient: handed over as is (it may transfer it to its worker).
+      expect(onBinary).toHaveBeenCalledWith(buffer);
+    });
+
+    it("routes each binary only to its own run when several runs are subscribed", async () => {
+      const { manager, ws } = await connectAndAuth();
+      const onBinaryA = vi.fn();
+      const onBinaryB = vi.fn();
+      manager.subscribe(RUN_A, vi.fn(), onBinaryA);
+      manager.subscribe(RUN_B, vi.fn(), onBinaryB);
+
+      const frameA = binaryFor(RUN_A);
+      const frameB = binaryFor(RUN_B);
+      ws.onmessage?.({ data: frameA } as MessageEvent);
+      ws.onmessage?.({ data: frameB } as MessageEvent);
+
+      expect(onBinaryA.mock.calls).toEqual([[frameA]]);
+      expect(onBinaryB.mock.calls).toEqual([[frameB]]);
+    });
+
+    it("drops a binary of a run with no subscription or prepared buffer here", async () => {
+      const { manager, ws } = await connectAndAuth();
+      const onBinary = vi.fn();
+      manager.subscribe(RUN_A, vi.fn(), onBinary);
+
+      ws.onmessage?.({ data: binaryFor(RUN_B) } as MessageEvent);
+
+      expect(onBinary).not.toHaveBeenCalled();
+    });
+
+    it("drops a binary too short to carry a runId", async () => {
+      const { manager, ws } = await connectAndAuth();
+      const onBinary = vi.fn();
+      manager.subscribe(RUN_A, vi.fn(), onBinary);
+
+      ws.onmessage?.({ data: new ArrayBuffer(23) } as MessageEvent);
+
+      expect(onBinary).not.toHaveBeenCalled();
     });
 
     it("drops a binary frame when there are no subscriptions or buffered runs", async () => {
       const { ws } = await connectAndAuth();
 
       expect(() => ws.onmessage?.({ data: new ArrayBuffer(4) } as MessageEvent)).not.toThrow();
+      expect(() => ws.onmessage?.({ data: binaryFor(RUN_A) } as MessageEvent)).not.toThrow();
     });
 
     it("sends unsubscribe and stops routing after unsubscribe()", async () => {
@@ -277,20 +327,36 @@ describe("SimulationWsManager", () => {
     it("eagerly sends subscribe and buffers events until a consumer subscribes", async () => {
       const { manager, ws } = await connectAndAuth();
 
-      manager.prepareRun("run-1");
-      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "subscribe", runId: "run-1" }));
+      manager.prepareRun(RUN_A);
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "subscribe", runId: RUN_A }));
 
       // Event + binary arrive before any UI consumer
-      const event = { event: "topology_ready", runId: "run-1", networkId: "net-1" };
+      const event = { event: "topology_ready", runId: RUN_A, networkId: "net-1" };
+      const frame = binaryFor(RUN_A);
       ws.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
-      ws.onmessage?.({ data: new ArrayBuffer(4) } as MessageEvent);
+      ws.onmessage?.({ data: frame } as MessageEvent);
 
       const onEvent = vi.fn();
       const onBinary = vi.fn();
-      manager.subscribe("run-1", onEvent, onBinary);
+      manager.subscribe(RUN_A, onEvent, onBinary);
 
       expect(onEvent).toHaveBeenCalledWith(event);
-      expect(onBinary).toHaveBeenCalledOnce();
+      expect(onBinary.mock.calls).toEqual([[frame]]);
+    });
+
+    it("buffers a prepared run's frames even while another run is subscribed", async () => {
+      const { manager, ws } = await connectAndAuth();
+      const onBinaryA = vi.fn();
+      manager.subscribe(RUN_A, vi.fn(), onBinaryA);
+      manager.prepareRun(RUN_B);
+
+      const frameB = binaryFor(RUN_B);
+      ws.onmessage?.({ data: frameB } as MessageEvent);
+      expect(onBinaryA).not.toHaveBeenCalled();
+
+      const onBinaryB = vi.fn();
+      manager.subscribe(RUN_B, vi.fn(), onBinaryB);
+      expect(onBinaryB.mock.calls).toEqual([[frameB]]);
     });
 
     it("drops a stale prepared run (unsubscribe) when a new one is prepared", async () => {

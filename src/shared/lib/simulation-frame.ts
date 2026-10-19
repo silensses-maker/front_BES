@@ -41,6 +41,8 @@ export interface SimulationFramePartition {
 }
 
 const HEADER_BYTES = 36;
+/** Byte offset of the int64 runId — the same in frame and topology binary headers. */
+const RUN_ID_OFFSET = 16;
 
 function int64ToHex16(n: bigint): string {
   return BigInt.asUintN(64, n).toString(16).padStart(16, "0");
@@ -52,6 +54,10 @@ function reconstructUuid(msb: bigint, lsb: bigint): string {
   return `${m.slice(0, 8)}-${m.slice(8, 12)}-${m.slice(12, 16)}-${l.slice(0, 4)}-${l.slice(4)}`;
 }
 
+function readRunIdAt(view: DataView): string {
+  return BigInt.asUintN(64, view.getBigInt64(RUN_ID_OFFSET, true)).toString();
+}
+
 /**
  * Reads ONLY the network UUID from a frame header — cheap relevance check so
  * multi-network runs can drop other networks' frames before the worker.
@@ -61,11 +67,23 @@ export function readFrameNetworkId(buffer: ArrayBuffer): string {
   return reconstructUuid(view.getBigInt64(0, true), view.getBigInt64(8, true));
 }
 
+/**
+ * Reads ONLY the runId from a server binary's header (bytes 16-23, int64 LE)
+ * as the unsigned decimal string `parseSimulationFrame` returns — cheap
+ * routing check so a binary only reaches the subscription of its own run. The
+ * topology binary (`APP_WS_SEND_TOPOLOGY=true`) carries it at the same offset.
+ * Null when the buffer is too short to hold it.
+ */
+export function readFrameRunId(buffer: ArrayBuffer): string | null {
+  if (buffer.byteLength < RUN_ID_OFFSET + 8) return null;
+  return readRunIdAt(new DataView(buffer));
+}
+
 export function parseSimulationFrame(buffer: ArrayBuffer): SimulationFramePartition {
   const view = new DataView(buffer);
 
   const networkId = reconstructUuid(view.getBigInt64(0, true), view.getBigInt64(8, true));
-  const runId = BigInt.asUintN(64, view.getBigInt64(16, true)).toString();
+  const runId = readRunIdAt(view);
   const agentCount = view.getInt32(24, true);
   const round = view.getInt32(28, true);
   const startsAt = view.getInt32(32, true);
