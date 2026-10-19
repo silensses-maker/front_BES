@@ -86,6 +86,11 @@ export interface AgentSpec {
   silenceEffect: SilenceEffect;
 }
 
+/**
+ * Directed edge of a custom network: `source` influences `target` (the target agent updates its
+ * belief from the source's opinion); `influence` is the weight `target` gives to `source`'s
+ * opinion and `bias` the cognitive bias `target` applies to it.
+ */
 export interface EdgeSpec {
   source: string;
   target: string;
@@ -176,6 +181,10 @@ export interface TopologyAgent {
   silenceEffect: SilenceEffect;
 }
 
+/**
+ * Same semantics as {@link EdgeSpec}, by agent index, for custom and generated networks:
+ * `source` influences `target`.
+ */
 export interface TopologyEdge {
   source: number;
   target: number;
