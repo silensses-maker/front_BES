@@ -616,7 +616,8 @@ const es = {
     runIterations: "Límite de iteraciones",
     runCreated: "Creado",
     fullIdTooltip: "Identificador completo de la ejecución",
-    retentionNote: "Los frames de ejecuciones terminadas se conservan unos 60–90 min en el servidor.",
+    retentionNote:
+      "Los frames de ejecuciones terminadas se conservan unos 60–90 min en el servidor.",
     openLiveRun: "Abrir ejecución",
     runNameFallback: "Ejecución sin nombre",
     runDetailTitle: "Detalles del experimento",
