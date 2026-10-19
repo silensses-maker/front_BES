@@ -2,7 +2,7 @@ import { motion, type Variants } from "motion/react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/entities/user";
 import { PARTNERS } from "@/shared/config/partners";
-import { useTranslation } from "@/shared/i18n";
+import { Trans, useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 const container: Variants = {
@@ -70,43 +70,37 @@ export function HomePage() {
 
       {/* Introduction */}
       <section className="flex flex-col gap-4 max-w-prose">
-        <h2 className="font-display text-2xl font-normal text-foreground">Introduction</h2>
+        <h2 className="font-display text-2xl font-normal text-foreground">
+          {t("home.introTitle")}
+        </h2>
+        <p className="text-muted-foreground leading-relaxed">{t("home.introP1")}</p>
         <p className="text-muted-foreground leading-relaxed">
-          Opinion dynamics studies how individual beliefs evolve through social interaction.
-          SiLEnSeSS lets researchers configure agent networks, choose an update rule, and observe
-          how opinion distributions shift over time — all without writing code.
-        </p>
-        <p className="text-muted-foreground leading-relaxed">
-          The platform currently implements two foundational models: the <strong>DeGroot</strong>{" "}
-          averaging model and the <strong>Spiral of Silence</strong> suppression model. Both run on
-          configurable network topologies and expose per-iteration data for analysis.
+          <Trans t={t} i18nKey="home.introP2" components={{ bold: <strong /> }} />
         </p>
       </section>
 
       {/* Examples */}
       <section className="flex flex-col gap-6 max-w-prose">
-        <h2 className="font-display text-2xl font-normal text-foreground">Examples</h2>
-        <p className="text-muted-foreground leading-relaxed">
-          The following scenarios illustrate the kinds of questions SiLEnSeSS can help answer.
-        </p>
+        <h2 className="font-display text-2xl font-normal text-foreground">
+          {t("home.examplesTitle")}
+        </h2>
+        <p className="text-muted-foreground leading-relaxed">{t("home.examplesIntro")}</p>
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h3 className="font-sans font-semibold text-foreground">Consensus under DeGroot</h3>
+            <h3 className="font-sans font-semibold text-foreground">
+              {t("home.exampleConsensusTitle")}
+            </h3>
             <p className="text-muted-foreground leading-relaxed">
-              A 500-agent Barabási-Albert network with uniform influence weights converges to a
-              shared opinion within ~300 iterations. Hub nodes dominate early; peripheral agents
-              follow after sufficient exposure.
+              {t("home.exampleConsensusBody")}
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
-            <h3 className="font-sans font-semibold text-foreground">Silencing cascade</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              In a polarized Erdős-Rényi network calibrated with 2022 Colombian election data, the
-              minority cluster begins suppressing its opinion at iteration 80, producing a cascade
-              that amplifies the majority position far beyond its initial share.
-            </p>
+            <h3 className="font-sans font-semibold text-foreground">
+              {t("home.exampleSilenceTitle")}
+            </h3>
+            <p className="text-muted-foreground leading-relaxed">{t("home.exampleSilenceBody")}</p>
           </div>
         </div>
       </section>

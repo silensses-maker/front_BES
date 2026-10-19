@@ -1,6 +1,10 @@
+export { AboutPage } from "./about/about-page";
 export { BoardPage } from "./board/board-page";
+export { ContactPage } from "./contact/contact-page";
+export { FaqPage } from "./faq/faq-page";
 export { HomePage } from "./home/home-page";
 export { LiveRunPage } from "./live-run";
+export { NotFoundPage } from "./not-found/not-found-page";
 export { ProfilePage } from "./profile/profile-page";
 export { ResultsPage } from "./results/results-page";
 export { WikiPage } from "./wiki/wiki-page";

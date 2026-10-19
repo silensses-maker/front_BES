@@ -42,3 +42,8 @@ export const PARTNERS = [
 ] as const;
 
 export type PartnerId = (typeof PARTNERS)[number]["id"];
+
+/** Official website of a partner, for pages that link to one institution by id. */
+export function partnerHref(id: PartnerId): string {
+  return PARTNERS.find((partner) => partner.id === id)?.href ?? "";
+}
