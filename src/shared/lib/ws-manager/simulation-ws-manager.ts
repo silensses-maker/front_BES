@@ -1,5 +1,6 @@
 import { auth } from "@/shared/api/firebase";
 import { logger } from "@/shared/lib/logger";
+import { readFrameRunId } from "@/shared/lib/simulation-frame";
 import type { WsControlEvent } from "./ws-events";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -149,20 +150,25 @@ export class SimulationWsManager {
         this.handleTextMessage(JSON.parse(event.data) as ServerControlMessage);
         return;
       }
-      // Route to active subscribers; otherwise buffer for any prepared (but
-      // not yet subscribed) run so frames that arrive between launch and UI
-      // mount aren't lost.
+      // Route each binary to the ONE run it belongs to: every server binary
+      // (round frames, and the topology binary when enabled) carries its
+      // runId at header bytes 16-23. Deliver it to that run's subscription,
+      // or buffer it for that run when prepared (launched, UI not mounted
+      // yet) so it isn't lost. Binaries of runs with no consumer here — and
+      // anything too short to carry a runId — are dropped. Before #119 every
+      // binary went to every subscription (and never to a prepared run's
+      // buffer while any subscription existed), so one run's frames leaked
+      // into another's view. A single recipient needs no copy: it may
+      // transfer the buffer to its worker.
       const buffer = event.data as ArrayBuffer;
-      if (this.subscriptions.size > 0) {
-        for (const sub of this.subscriptions.values()) {
-          // Each subscriber gets its own copy (transferable semantics)
-          sub.onBinary(buffer.slice(0));
-        }
-      } else if (this.buffers.size > 0) {
-        for (const buf of this.buffers.values()) {
-          buf.binaries.push(buffer.slice(0));
-        }
+      const runId = readFrameRunId(buffer);
+      if (runId === null) return;
+      const sub = this.subscriptions.get(runId);
+      if (sub) {
+        sub.onBinary(buffer);
+        return;
       }
+      this.buffers.get(runId)?.binaries.push(buffer);
     };
 
     this.ws.onerror = () => {

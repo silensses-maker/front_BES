@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseSimulationFrame } from "./simulation-frame";
+import { parseSimulationFrame, readFrameRunId } from "./simulation-frame";
 
 // ─── Fixture builder ─────────────────────────────────────────────────────────
 
@@ -442,5 +442,41 @@ describe("parseSimulationFrame", () => {
         expect(frame.speaking[i]).toBe(0);
       }
     });
+  });
+});
+
+describe("readFrameRunId", () => {
+  const frameWithRunId = (runIdBigInt: bigint): ArrayBuffer =>
+    buildFrameBuffer({
+      networkIdMsb: NETWORK_ID_MSB,
+      networkIdLsb: NETWORK_ID_LSB,
+      runIdBigInt,
+      agentCount: 1,
+      round: 3,
+      startsAt: 0,
+      agents: [{ pub: 0, priv: 0, speaking: 0 }],
+    });
+
+  it("reads the runId at bytes 16-23 as the decimal string parseSimulationFrame returns", () => {
+    const buf = frameWithRunId(RUN_ID_BIGINT);
+    expect(readFrameRunId(buf)).toBe(EXPECTED_RUN_ID);
+    expect(readFrameRunId(buf)).toBe(parseSimulationFrame(buf).runId);
+  });
+
+  it("reads it as unsigned 64-bit, consistently with parseSimulationFrame", () => {
+    const buf = frameWithRunId(-1n);
+    expect(readFrameRunId(buf)).toBe("18446744073709551615");
+    expect(readFrameRunId(buf)).toBe(parseSimulationFrame(buf).runId);
+  });
+
+  it("reads it from any binary long enough to hold it (e.g. a topology header)", () => {
+    const header = new ArrayBuffer(24);
+    new DataView(header).setBigUint64(16, 342521980018098176n, true);
+    expect(readFrameRunId(header)).toBe("342521980018098176");
+  });
+
+  it("returns null when the buffer is too short to carry a runId", () => {
+    expect(readFrameRunId(new ArrayBuffer(23))).toBeNull();
+    expect(readFrameRunId(new ArrayBuffer(0))).toBeNull();
   });
 });

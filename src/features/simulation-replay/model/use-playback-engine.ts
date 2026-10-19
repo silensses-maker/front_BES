@@ -421,7 +421,7 @@ export function usePlaybackEngine(
     const final = state.finalRound ?? state.receivedRound;
     finalRoundRef.current = final;
     setFinalRound(final);
-    if (state.finalRound === null) useSimulationStore.getState().setFinalRound(final);
+    if (state.finalRound == null) useSimulationStore.getState().setFinalRound(final);
     liveScrubBlockedRef.current = false;
     setLiveScrubBlocked(false);
     playheadRef.current = state.currentRound;

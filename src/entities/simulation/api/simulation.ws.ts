@@ -1,10 +1,45 @@
 import { simulationsApi } from "@/shared/api/backend";
-import { readFrameNetworkId } from "@/shared/lib/simulation-frame";
+import { readFrameNetworkId, readFrameRunId } from "@/shared/lib/simulation-frame";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { useLastRunStore } from "../model/last-run.store";
 import { useSimulationStore } from "../model/simulation.store";
 import type { WsControlEvent } from "../types/simulation.types";
+
+const FRAME_HEADER_BYTES = 36;
+
+/**
+ * Round frame check for a WS binary message: 36-byte header + 9 × numberOfAgents
+ * bytes (openapi.yaml `/ws` § "Frame binary") with a plausible header —
+ * numberOfAgents > 0, round ≥ 0, startsAt ≥ 0 — so a truncated or foreign
+ * binary never reaches the worker.
+ *
+ * Since #119 the backend no longer sends the topology binary by default
+ * (`APP_WS_SEND_TOPOLOGY=false`): round frames are the only binary messages.
+ * With that flag on, a topology binary (32 + 4n + 9m bytes) has a frame's size
+ * whenever 9m = 5n + 4 and its header also looks plausible, so it would pass.
+ */
+export function isFrameBinary(buffer: ArrayBuffer): boolean {
+  if (buffer.byteLength < FRAME_HEADER_BYTES) return false;
+  const view = new DataView(buffer);
+  const numberOfAgents = view.getInt32(24, true);
+  if (numberOfAgents <= 0) return false;
+  if (buffer.byteLength !== FRAME_HEADER_BYTES + 9 * numberOfAgents) return false;
+  return view.getInt32(28, true) >= 0 && view.getInt32(32, true) >= 0;
+}
+
+/**
+ * Final round of a `network_converged` event: `finalRound` (canonical since
+ * #119), falling back to `round` (live path of older backends). Null when
+ * neither is a number — never undefined, which `=== null` checks would miss.
+ */
+export function readFinalRound(
+  msg: Extract<WsControlEvent, { event: "network_converged" }>,
+): number | null {
+  if (typeof msg.finalRound === "number") return msg.finalRound;
+  if (typeof msg.round === "number") return msg.round;
+  return null;
+}
 
 export interface SimulationWsClient {
   connect: () => Promise<void>;
@@ -101,12 +136,16 @@ export function createSimulationWsClient(
         if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setStatus("running");
         break;
-      case "network_converged":
+      case "network_converged": {
         if (!isRelevantNetworkEvent(msg.networkId)) break;
         store().setNetworkId(msg.networkId);
-        store().setFinalRound(msg.finalRound);
-        store().setConsensus(msg.consensus);
+        // A missing field leaves the store at null, so the /results fallbacks
+        // (`finalRound == null`, `consensus === null`) still fill it.
+        const finalRound = readFinalRound(msg);
+        if (finalRound !== null) store().setFinalRound(finalRound);
+        if (typeof msg.consensus === "boolean") store().setConsensus(msg.consensus);
         break;
+      }
       case "run_completed":
         store().setStatus("completed");
         mirrorLastRunStatus("completed");
@@ -118,22 +157,19 @@ export function createSimulationWsClient(
     }
   }
 
-  function isFrameBinary(buffer: ArrayBuffer): boolean {
-    // Frame binary: 36-byte header + 9 × numberOfAgents bytes payload.
-    // Topology binary: 32-byte header + variable CSR payload. Both share the
-    // numberOfAgents int32 at offset 24, so we use the total-size identity from
-    // openapi.yaml § "Discriminating binaries" to tell them apart.
-    if (buffer.byteLength < 36) return false;
-    const numberOfAgents = new DataView(buffer).getInt32(24, true);
-    return buffer.byteLength === 36 + 9 * numberOfAgents;
-  }
-
   function handleBinaryFrame(buffer: ArrayBuffer): void {
     if (!isFrameBinary(buffer)) {
-      // WS topology binary (CSR adjacency). Agent properties (name, beliefs,
-      // strategies) still come from REST GET /topology, so we skip the CSR
-      // here. If we ever need WS-driven edges, parse it on the main thread —
-      // never feed it to the worker (the worker assumes 36-byte frame headers).
+      // Not a round frame — e.g. the WS topology binary (CSR adjacency), only
+      // sent when the backend runs with APP_WS_SEND_TOPOLOGY=true. The
+      // topology comes from REST GET /topology; never feed anything else to
+      // the worker (it assumes 36-byte frame headers).
+      return;
+    }
+    // Never feed another run's frame to this run's worker. The manager
+    // already routes binaries by the runId in their header (bytes 16-23);
+    // this guard holds whoever delivers them — it matters most with
+    // `networkId === null`, where the network filter below accepts any frame.
+    if (readFrameRunId(buffer) !== runId) {
       return;
     }
     // Multi-network runs stream EVERY network's frames on the same socket:
