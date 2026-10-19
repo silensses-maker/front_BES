@@ -119,16 +119,6 @@ export function StepReview({
                 <span className="text-muted-foreground">{t("simulationConfig.stopThreshold")}</span>
                 <span>{custom.stopThreshold}</span>
               </div>
-              <div className="flex justify-between px-4 py-2">
-                <span className="text-muted-foreground">{t("simulationConfig.saveMode")}</span>
-                <span>
-                  {custom.saveMode === 0
-                    ? t("simulationConfig.saveModeFull")
-                    : custom.saveMode === 1
-                      ? t("simulationConfig.saveModeStandard")
-                      : t("simulationConfig.saveModeLight")}
-                </span>
-              </div>
             </>
           )}
 
@@ -164,20 +154,15 @@ export function StepReview({
                 <span className="text-muted-foreground">{t("simulationConfig.seed")}</span>
                 <span>{gen.seed === null ? t("simulationConfig.seedRandom") : gen.seed}</span>
               </div>
-              <div className="flex justify-between px-4 py-2">
-                <span className="text-muted-foreground">{t("simulationConfig.saveMode")}</span>
-                <span>
-                  {gen.saveMode === 0
-                    ? t("simulationConfig.saveModeFull")
-                    : gen.saveMode === 1
-                      ? t("simulationConfig.saveModeStandard")
-                      : t("simulationConfig.saveModeLight")}
-                </span>
-              </div>
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Replaces the save-mode row (#133): every run is saved in DEBUG mode in this phase, so
+          the review states what is actually stored. Shown for every flow (generated, custom and
+          loaded from a file — the load flow skips the network step). */}
+      <p className="text-xs text-muted-foreground">{t("simulationConfig.storageNote")}</p>
 
       {/* Agent distribution */}
       {gen !== null && (

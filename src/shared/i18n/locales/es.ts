@@ -23,6 +23,7 @@ const es = {
     usageLimits: "Límites de uso",
     maxAgents: "Máx. agentes",
     maxIterations: "Máx. iteraciones",
+    maxNetworks: "Máx. redes",
     densityFactor: "Factor de densidad",
     editDisplayName: "Editar nombre de usuario",
     displayName: "Nombre de usuario",
@@ -42,6 +43,7 @@ const es = {
     usageLimitsDescription: "Cuotas aplicadas a tu rol actual.",
     agentsUsed: "Agentes",
     iterationsUsed: "Iteraciones",
+    networksUsed: "Redes",
     densityFactorLabel: "Factor de densidad",
   },
   home: {
@@ -360,10 +362,6 @@ const es = {
     stopThreshold: "Umbral de parada",
     seed: "Semilla",
     seedRandom: "Aleatoria",
-    saveMode: "Modo de guardado",
-    saveModeFull: "Completo",
-    saveModeStandard: "Estándar",
-    saveModeLight: "Ligero",
     customNetworkHint:
       "La configuración de la red personalizada se gestiona en el paso de Agentes.",
     customAgentsNotSupported:
@@ -437,8 +435,6 @@ const es = {
     submit: "Lanzar simulación",
     submitting: "Lanzando…",
     // ── Tooltips por campo (path generated) ────────────────────────────────
-    saveModeHint:
-      "Cuánto se persiste de la simulación. DEBUG: solo en memoria (más rápido, se pierde al refrescar). ESTÁNDAR: métricas por ronda en BD. COMPLETO: estado por agente cada ronda, permite replay.",
     numberOfNetworksHint:
       "Cuántas instancias de red independientes ejecutar con la misma configuración. Cada una genera su propia topología y dinámica; útil para promediar variación aleatoria.",
     numberOfAgentsHint:
@@ -486,7 +482,8 @@ const es = {
       "Se superó el límite de tu plan. Reduce la configuración e intenta de nuevo.",
     errorLimitExceededDetail:
       "Límite superado: tu plan permite {{limit}}, pero se solicitaron {{requested}}.",
-    userLimitsHint: "{{role}} · máx. {{maxAgents}} agentes · máx. {{maxIterations}} iteraciones",
+    userLimitsHint:
+      "{{role}} · máx. {{maxAgents}} agentes · máx. {{maxIterations}} iteraciones · máx. {{maxNetworks}} redes",
     limitUnlimited: "ilimitado",
     quotaTooltip: "Cuota aplicada a tu rol actual. La validación del asistente usa estos topes.",
     discardDraft: "Descartar borrador",
@@ -499,10 +496,6 @@ const es = {
     discardDialogDismiss: "Conservar",
     discardSuccessToast: "Borrador descartado. Asistente restablecido.",
     templateAppliedToast: "Plantilla aplicada: {{name}}.",
-    saveModeFullDesc:
-      "Guarda todas las rondas de todos los agentes. Máximo detalle, más almacenamiento.",
-    saveModeStandardDesc: "Guarda la evolución agregada y los estados clave. Recomendado.",
-    saveModeLightDesc: "Guardado reducido (STANDARD_LIGHT) para redes grandes.",
     errorAgentLimitInline: "Supera el máximo de tu plan ({{limit}}).",
     adjustToMax: "Ajustar al máximo",
     agentsPlanHint: "Tu plan permite hasta {{limit}} agentes.",
@@ -524,6 +517,9 @@ const es = {
     reviewInfluence: "influencia {{value}}",
     reviewErrorsTitle: "Corrige antes de lanzar",
     reviewValid: "✓ Configuración válida. Lista para lanzar.",
+    // #133: reemplaza el selector de modo de guardado (toda ejecución se guarda igual).
+    storageNote:
+      "En esta versión se guarda la configuración de la ejecución, y sus datos de repetición se conservan unos 60–90 minutos después de que termine.",
     exportSuccessToast: "Configuración exportada como simulacion.json.",
     nextInvalidToast: "Corrige los errores marcados antes de continuar.",
     launchInvalidToast: "La configuración tiene errores. Revísalos antes de lanzar.",
@@ -609,6 +605,7 @@ const es = {
     cancelDialogConfirm: "Sí, cancelar la simulación",
     cancelDialogDismiss: "Seguir ejecutando",
     cancelSuccess: "Simulación cancelada.",
+    cancelAlreadyFinished: "Esta ejecución ya había terminado; se actualizó su estado.",
     errorCancel: "No se pudo cancelar la simulación. Por favor intenta de nuevo.",
     errorLoad: "No se pudieron cargar los experimentos. Por favor intenta de nuevo.",
     emptyList: "No se encontraron experimentos.",
@@ -619,7 +616,8 @@ const es = {
     runIterations: "Límite de iteraciones",
     runCreated: "Creado",
     fullIdTooltip: "Identificador completo de la ejecución",
-    retentionNote: "Los frames de ejecuciones terminadas se conservan ~60 min en el servidor.",
+    retentionNote:
+      "Los frames de ejecuciones terminadas se conservan unos 60–90 min en el servidor.",
     openLiveRun: "Abrir ejecución",
     runNameFallback: "Ejecución sin nombre",
     runDetailTitle: "Detalles del experimento",
@@ -800,7 +798,7 @@ const es = {
     networkUnselected: "Sin seleccionar",
     runDataGoneTitle: "Los datos de esta ejecución ya no están disponibles",
     runDataGoneBody:
-      "El servidor ya no conserva las redes de esta ejecución — la retención expiró o su modo de guardado no persiste datos. Sus metadatos siguen visibles en Mis experimentos.",
+      "El servidor ya no conserva las redes de esta ejecución — la retención expiró, el servidor se reinició o su modo de guardado no persiste datos. Sus metadatos siguen visibles en Mis experimentos.",
     // ── Sidebar de ejecución ────────────────────────────────
     statusRunning: "En ejecución",
     statusReconnecting: "Reconectando…",
@@ -839,6 +837,7 @@ const es = {
     cancelDialogConfirm: "Sí, cancelar la simulación",
     cancelDialogKeep: "Seguir ejecutando",
     cancelledToast: "Simulación cancelada. Los datos recibidos se conservan.",
+    cancelAlreadyFinished: "Esta ejecución ya había terminado; no había nada que cancelar.",
     backToBoard: "Volver al tablero",
     // ── Viewer limitado / estados de error ──────────────────
     limitedBanner:
@@ -847,13 +846,6 @@ const es = {
     streamErrorBody:
       "No se pudo recuperar el flujo de datos de esta ejecución. Puedes reintentar la conexión.",
     retry: "Reintentar",
-  },
-  user: {
-    errorGet: "Error al cargar los datos del usuario.",
-    errorGetByEmail: "Error al cargar el usuario por correo.",
-    errorCreate: "Error al crear el perfil de usuario.",
-    errorUpdate: "Error al actualizar los datos del usuario.",
-    errorDelete: "Error al eliminar el usuario.",
   },
   liveRun: {
     sidebar: {

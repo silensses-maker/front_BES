@@ -16,6 +16,8 @@ interface QuotaStripProps {
   role: string | null;
   maxAgents: number | null;
   maxIterations: number | null;
+  /** Role cap of a generated run's networks (#122); custom runs are always one network. */
+  maxNetworks: number | null;
   onDiscard: () => void;
 }
 
@@ -23,7 +25,13 @@ interface QuotaStripProps {
  * Top strip of the wizard (mockup): the user's role quota on the left and the
  * "Descartar borrador" action (with confirm dialog) on the right.
  */
-export function QuotaStrip({ role, maxAgents, maxIterations, onDiscard }: QuotaStripProps) {
+export function QuotaStrip({
+  role,
+  maxAgents,
+  maxIterations,
+  maxNetworks,
+  onDiscard,
+}: QuotaStripProps) {
   const { t, i18n } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -39,6 +47,7 @@ export function QuotaStrip({ role, maxAgents, maxIterations, onDiscard }: QuotaS
               role: role ?? "—",
               maxAgents: fmtLimit(maxAgents),
               maxIterations: fmtLimit(maxIterations),
+              maxNetworks: fmtLimit(maxNetworks),
             })}
           </span>
         </TooltipTrigger>

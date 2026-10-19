@@ -97,6 +97,7 @@ export function SimulationConfigWizard() {
           role={userRole}
           maxAgents={maxAgents}
           maxIterations={maxIterations}
+          maxNetworks={maxNetworks}
           onDiscard={resetDraft}
         />
 

@@ -2,7 +2,8 @@ import { act, renderHook } from "@testing-library/react";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useAuthStore, userApi } from "@/entities/user";
+import { useAuthStore } from "@/entities/user";
+import { usersApi } from "@/shared/api/backend";
 import { logger } from "@/shared/lib/logger";
 import { useDeactivate } from "./use-deactivate";
 
@@ -14,8 +15,11 @@ vi.mock("firebase/auth", () => ({
 
 vi.mock("@/entities/user", () => ({
   useAuthStore: vi.fn(),
-  userApi: {
-    update: vi.fn(),
+}));
+
+vi.mock("@/shared/api/backend", () => ({
+  usersApi: {
+    deactivateMe: vi.fn(),
   },
 }));
 
@@ -82,7 +86,7 @@ describe("useDeactivate", () => {
   // ── deactivate — null guard ────────────────────────────────────────────────
 
   describe("deactivate — null guard", () => {
-    it("returns early and does not call userApi.update when user is null", async () => {
+    it("returns early and does not call the backend when user is null", async () => {
       vi.mocked(useAuthStore).mockImplementation((selector) =>
         selector({
           user: null,
@@ -96,7 +100,7 @@ describe("useDeactivate", () => {
       const { result } = renderHook(() => useDeactivate());
       await act(() => result.current.deactivate());
 
-      expect(userApi.update).not.toHaveBeenCalled();
+      expect(usersApi.deactivateMe).not.toHaveBeenCalled();
       expect(signOut).not.toHaveBeenCalled();
     });
   });
@@ -104,12 +108,12 @@ describe("useDeactivate", () => {
   // ── deactivate — happy path ────────────────────────────────────────────────
 
   describe("deactivate — happy path", () => {
-    it("sets loading to true before calling userApi.update", async () => {
+    it("sets loading to true before calling the backend", async () => {
       let loadingDuringUpdate = false;
 
-      vi.mocked(userApi.update).mockImplementation(async () => {
+      vi.mocked(usersApi.deactivateMe).mockImplementation(async () => {
         loadingDuringUpdate = true;
-        return true;
+        return { deactivated: true };
       });
 
       const { result } = renderHook(() => useDeactivate());
@@ -118,41 +122,59 @@ describe("useDeactivate", () => {
       expect(loadingDuringUpdate).toBe(true);
     });
 
-    it("calls userApi.update with uid and deactivated: true", async () => {
-      vi.mocked(userApi.update).mockResolvedValue(true);
+    it("deactivates the account through the backend endpoint", async () => {
+      vi.mocked(usersApi.deactivateMe).mockResolvedValue({ deactivated: true });
 
       const { result } = renderHook(() => useDeactivate());
       await act(() => result.current.deactivate());
 
-      expect(userApi.update).toHaveBeenCalledWith("uid-researcher", { deactivated: true });
+      expect(usersApi.deactivateMe).toHaveBeenCalledOnce();
     });
 
-    it("calls signOut after userApi.update succeeds", async () => {
-      vi.mocked(userApi.update).mockResolvedValue(true);
+    it("calls signOut after the backend confirms the deactivation", async () => {
+      const order: string[] = [];
+      vi.mocked(usersApi.deactivateMe).mockImplementation(async () => {
+        order.push("deactivateMe");
+        return { deactivated: true };
+      });
+      vi.mocked(signOut).mockImplementation(async () => {
+        order.push("signOut");
+      });
 
       const { result } = renderHook(() => useDeactivate());
       await act(() => result.current.deactivate());
 
       expect(signOut).toHaveBeenCalledOnce();
+      expect(order).toEqual(["deactivateMe", "signOut"]);
+      expect(toast.error).not.toHaveBeenCalled();
     });
   });
 
   // ── deactivate — error path ────────────────────────────────────────────────
 
   describe("deactivate — error path", () => {
-    it("logs error and shows toast.error when userApi.update throws", async () => {
-      const error = new Error("update failed");
-      vi.mocked(userApi.update).mockRejectedValue(error);
+    it("logs error and shows toast.error when the backend call fails", async () => {
+      const error = new Error("Request failed with status code 500");
+      vi.mocked(usersApi.deactivateMe).mockRejectedValue(error);
 
       const { result } = renderHook(() => useDeactivate());
       await act(() => result.current.deactivate());
 
       expect(logger.error).toHaveBeenCalledWith("useDeactivate", error);
-      expect(toast.error).toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith("profile.errorDeactivate");
+    });
+
+    it("stays signed in when the backend call fails", async () => {
+      vi.mocked(usersApi.deactivateMe).mockRejectedValue(new Error("Network Error"));
+
+      const { result } = renderHook(() => useDeactivate());
+      await act(() => result.current.deactivate());
+
+      expect(signOut).not.toHaveBeenCalled();
     });
 
     it("sets loading to false on error", async () => {
-      vi.mocked(userApi.update).mockRejectedValue(new Error("update failed"));
+      vi.mocked(usersApi.deactivateMe).mockRejectedValue(new Error("update failed"));
 
       const { result } = renderHook(() => useDeactivate());
       await act(() => result.current.deactivate());

@@ -1,6 +1,12 @@
 import "./auth-interceptor";
 import { backendClient } from "./client";
-import type { RoleActionResponse, UserRole, UserSyncResponse } from "./types/backend.types";
+import type {
+  DeactivateResponse,
+  RoleActionResponse,
+  UserInfoResponse,
+  UserRole,
+  UserSyncResponse,
+} from "./types/backend.types";
 
 export const usersApi = {
   async sync(): Promise<UserSyncResponse> {
@@ -8,8 +14,18 @@ export const usersApi = {
     return data;
   },
 
-  async getInfo(uid: string): Promise<UserSyncResponse> {
-    const { data } = await backendClient.get<UserSyncResponse>(`/api/users/info/${uid}`);
+  /** Owner or admin only. `timeout` (ms) bounds the request; omitted, the client has none. */
+  async getInfo(uid: string, options?: { timeout?: number }): Promise<UserInfoResponse> {
+    const { data } = await backendClient.get<UserInfoResponse>(`/api/users/info/${uid}`, options);
+    return data;
+  },
+
+  /**
+   * Deactivates the caller's own account. From then on the backend answers every REST call of
+   * the account with 401 "Account is deactivated"; only an administrator can reactivate it.
+   */
+  async deactivateMe(): Promise<DeactivateResponse> {
+    const { data } = await backendClient.post<DeactivateResponse>("/api/users/me/deactivate");
     return data;
   },
 

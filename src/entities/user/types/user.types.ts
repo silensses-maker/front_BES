@@ -5,13 +5,18 @@ export interface UsageLimits {
   maxIterations: number;
   densityFactor: number;
   /**
-   * Max `numberOfNetworks` of a generated run (#122). Optional: sessions restored from
-   * Firestore documents (or synced against a backend) created before this field existed
-   * lack it — resolve it with `resolveMaxNetworks`, which falls back to the role table.
+   * Max `numberOfNetworks` of a generated run (#122). Optional: a backend that predates this
+   * field does not send it — resolve it with `resolveMaxNetworks`, which falls back to the role
+   * table.
    */
   maxNetworks?: number;
 }
 
+/**
+ * Session user. Identity (`email`, `name`, `photo`) comes from Firebase Authentication;
+ * authorization (`roles`, `usageLimits`, `deactivated`) from the backend. Without the backend,
+ * `roles` is empty and `usageLimits` undefined (role-table fallbacks apply).
+ */
 export interface User {
   uid: string;
   email: string;

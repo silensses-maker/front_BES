@@ -24,7 +24,8 @@ export function StepLoad({ onLoad, loading }: StepLoadProps) {
         description:
           "SiLEnSeSS simulation configuration file. Drop it in the 'Load file' tab to pre-fill the wizard.",
         networkType: "'generated' = random network  |  'custom' = manually defined network",
-        saveMode: "0=FULL  1=STANDARD  2=STANDARD_LIGHT",
+        saveMode:
+          "currently ignored — every run is stored the same way in this version (run configuration + replay data for about 60–90 minutes after it ends). Keep the field; 0, 1 and 2 are all accepted",
         silenceStrategy:
           "0=DeGroot  1=Majority  2=Threshold (fixed by the simulator: 0.1)  3=Confidence (random initial confidence, threshold fixed at 0.1)",
         silenceEffect: "0=DeGroot  1=Memory  2=Memoryless",

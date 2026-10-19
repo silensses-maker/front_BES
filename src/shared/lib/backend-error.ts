@@ -31,6 +31,7 @@ const BACKEND_ERROR_CODES: ReadonlySet<BackendErrorCode> = new Set([
   "invalid_body",
   "usage_limit_exceeded",
   "rate_limited",
+  "conflict",
 ]);
 
 function isKnownCode(code: string): code is BackendErrorCode {
@@ -46,4 +47,18 @@ export function getBackendErrorCode(error: unknown): BackendErrorCode | null {
 
 export function isErrorCode(error: unknown, code: BackendErrorCode): boolean {
   return getBackendErrorCode(error) === code;
+}
+
+/**
+ * Message of the 401 `unauthorized` the backend (`FirebaseAuthDirective`) returns to every REST
+ * call of a deactivated account — documented in its OpenAPI (`/api/users/me/deactivate`).
+ */
+const ACCOUNT_DEACTIVATED_MESSAGE = "Account is deactivated";
+
+/** True when the backend rejected the request because the account is deactivated. */
+export function isAccountDeactivatedError(error: unknown): boolean {
+  return (
+    isErrorCode(error, "unauthorized") &&
+    (error as AxiosError<BackendError>).response?.data.message === ACCOUNT_DEACTIVATED_MESSAGE
+  );
 }

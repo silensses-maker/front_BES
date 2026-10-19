@@ -14,7 +14,9 @@ vi.mock("firebase/auth", () => ({
   signInWithPopup: vi.fn(),
 }));
 
-vi.mock("@/entities/user", () => ({
+// Real mapper (shared with the session restore), mocked store.
+vi.mock("@/entities/user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/entities/user")>()),
   useAuthStore: vi.fn(),
 }));
 
@@ -44,15 +46,37 @@ const mockProvider = {};
 const mockSetLoading = vi.fn();
 const mockSetUser = vi.fn();
 
-const mockSyncResponse = {
+type MockFirebaseUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+};
+
+/** The Firebase Authentication user returned by the sign-in: the only source of identity. */
+const mockFirebaseUser: MockFirebaseUser = {
   uid: "uid-123",
   email: "user@example.com",
-  name: "Test User",
-  photo: "https://example.com/photo.jpg",
+  displayName: "Edited Name",
+  photoURL: "https://example.com/google.jpg",
+};
+
+/** POST /api/users/sync: the only source of roles and quotas (name/email/photo are a mirror). */
+const mockSyncResponse = {
+  uid: "uid-123",
+  email: "mirror@example.com",
+  name: "Backend Mirror Name",
+  photo: "https://example.com/backend.jpg",
   roles: ["BaseUser" as const],
   usageLimits: { maxAgents: 100, maxIterations: 100, densityFactor: 0.5 },
   deactivated: false,
 };
+
+function mockSignIn(user: Partial<MockFirebaseUser> = {}) {
+  vi.mocked(signInWithPopup).mockResolvedValue({
+    user: { ...mockFirebaseUser, ...user },
+  } as unknown as Awaited<ReturnType<typeof signInWithPopup>>);
+}
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -74,9 +98,7 @@ describe("useLogin", () => {
 
   describe("login", () => {
     it("calls signInWithPopup with auth and provider on login()", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();
@@ -86,9 +108,7 @@ describe("useLogin", () => {
     });
 
     it("calls usersApi.sync after successful signInWithPopup", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();
@@ -97,10 +117,8 @@ describe("useLogin", () => {
       expect(usersApi.sync).toHaveBeenCalledOnce();
     });
 
-    it("calls setUser with mapped backend response on success", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+    it("sets identity from the Firebase user and roles/limits from the sync response", async () => {
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();
@@ -109,30 +127,28 @@ describe("useLogin", () => {
       expect(mockSetUser).toHaveBeenCalledWith({
         uid: "uid-123",
         email: "user@example.com",
-        name: "Test User",
-        photo: "https://example.com/photo.jpg",
+        name: "Edited Name",
+        photo: "https://example.com/google.jpg",
         roles: ["BaseUser"],
         usageLimits: { maxAgents: 100, maxIterations: 100, densityFactor: 0.5 },
         deactivated: false,
       });
     });
 
-    it("maps null photo to empty string", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
-      vi.mocked(usersApi.sync).mockResolvedValue({ ...mockSyncResponse, photo: null });
+    it("maps null Firebase identity fields to empty strings", async () => {
+      mockSignIn({ email: null, displayName: null, photoURL: null });
+      vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();
       await login();
 
-      expect(mockSetUser).toHaveBeenCalledWith(expect.objectContaining({ photo: "" }));
+      expect(mockSetUser).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "", name: "", photo: "" }),
+      );
     });
 
     it("passes maxNetworks through when the backend sends it (#122)", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue({
         ...mockSyncResponse,
         usageLimits: { ...mockSyncResponse.usageLimits, maxNetworks: 5 },
@@ -149,9 +165,7 @@ describe("useLogin", () => {
     });
 
     it("maps a null maxNetworks (Administrator) to Infinity", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue({
         ...mockSyncResponse,
         usageLimits: {
@@ -178,9 +192,7 @@ describe("useLogin", () => {
     });
 
     it("omits maxNetworks when the backend does not send it, so the role table applies", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();
@@ -191,9 +203,7 @@ describe("useLogin", () => {
     });
 
     it("maps null usageLimits fields to Infinity", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue({
         ...mockSyncResponse,
         usageLimits: { maxAgents: null, maxIterations: null, densityFactor: 1.0 },
@@ -218,12 +228,12 @@ describe("useLogin", () => {
 
       expect(logger.error).toHaveBeenCalledWith("useLogin", authError);
       expect(toast.error).toHaveBeenCalled();
+      expect(usersApi.sync).not.toHaveBeenCalled();
+      expect(mockSetUser).not.toHaveBeenCalled();
     });
 
     it("logs error and shows toast when sync fails", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       const syncError = new Error("network-error");
       vi.mocked(usersApi.sync).mockRejectedValue(syncError);
 
@@ -232,12 +242,11 @@ describe("useLogin", () => {
 
       expect(logger.error).toHaveBeenCalledWith("useLogin", syncError);
       expect(toast.error).toHaveBeenCalled();
+      expect(mockSetUser).not.toHaveBeenCalled();
     });
 
     it("calls setLoading(true) then setLoading(false) on success", async () => {
-      vi.mocked(signInWithPopup).mockResolvedValue(
-        undefined as unknown as Awaited<ReturnType<typeof signInWithPopup>>,
-      );
+      mockSignIn();
       vi.mocked(usersApi.sync).mockResolvedValue(mockSyncResponse);
 
       const { login } = useLogin();

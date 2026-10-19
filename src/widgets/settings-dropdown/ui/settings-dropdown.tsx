@@ -1,6 +1,6 @@
 import { LogOut, Monitor, Moon, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useAuthStore } from "@/entities/user";
+import { getHighestRole, useAuthStore } from "@/entities/user";
 import { useLogout } from "@/features/auth/logout";
 import { type Lang, useLanguageSwitch } from "@/features/language-switch";
 import { useTranslation } from "@/shared/i18n";
@@ -69,7 +69,7 @@ export function SettingsDropdown() {
             <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
             {user && user.roles.length > 0 && (
               <span className="mt-1.5 w-fit rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-medium text-primary">
-                {user.roles[0]}
+                {getHighestRole(user.roles)}
               </span>
             )}
           </div>

@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
@@ -13,21 +12,15 @@ vi.mock("firebase/auth", () => ({
   getAuth: vi.fn(),
 }));
 
-vi.mock("firebase/firestore", () => ({
-  getFirestore: vi.fn(),
-}));
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type MockFirebaseApp = { name: string };
 type MockAuth = { currentUser: null };
-type MockFirestore = { type: "firestore" };
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const mockApp: MockFirebaseApp = { name: "[DEFAULT]" };
 const mockAuth: MockAuth = { currentUser: null };
-const mockDb: MockFirestore = { type: "firestore" };
 
 const mockEnv = {
   PUBLIC_FIREBASE_API_KEY: "test-api-key",
@@ -49,7 +42,6 @@ describe("firebase/config", () => {
       mockApp as unknown as ReturnType<typeof initializeApp>,
     );
     vi.mocked(getAuth).mockReturnValue(mockAuth as unknown as ReturnType<typeof getAuth>);
-    vi.mocked(getFirestore).mockReturnValue(mockDb as unknown as ReturnType<typeof getFirestore>);
   });
 
   afterEach(() => {
@@ -75,21 +67,13 @@ describe("firebase/config", () => {
     });
   });
 
-  describe("db", () => {
-    it("is defined and exported", async () => {
+  describe("Firestore", () => {
+    it("is not initialized nor exported (Firebase is only used for Authentication)", async () => {
       for (const [key, value] of Object.entries(mockEnv)) {
         vi.stubEnv(key, value);
       }
-      const { db } = await import("./config");
-      expect(db).toBeDefined();
-    });
-
-    it("is the result of getFirestore call", async () => {
-      for (const [key, value] of Object.entries(mockEnv)) {
-        vi.stubEnv(key, value);
-      }
-      const { db } = await import("./config");
-      expect(db).toBe(mockDb);
+      const config = await import("./config");
+      expect(Object.keys(config)).toEqual(["auth"]);
     });
   });
 
@@ -110,14 +94,13 @@ describe("firebase/config", () => {
       });
     });
 
-    it("chains getAuth and getFirestore on the initialized app", async () => {
+    it("chains getAuth on the initialized app", async () => {
       for (const [key, value] of Object.entries(mockEnv)) {
         vi.stubEnv(key, value);
       }
       await import("./config");
 
       expect(getAuth).toHaveBeenCalledWith(mockApp);
-      expect(getFirestore).toHaveBeenCalledWith(mockApp);
     });
   });
 });

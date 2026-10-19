@@ -35,6 +35,10 @@ export interface GeneratedSimFormValues {
   iterationLimit: number;
   stopThreshold: number;
   seed: number | null;
+  /**
+   * Not editable in the wizard and not sent: requests carry RUN_SAVE_MODE (#133). Kept so JSON
+   * import/export and persisted drafts keep their shape.
+   */
   saveMode: SaveMode;
   agentTypes: AgentTypeRow[];
   biasTypes: BiasRow[];
@@ -45,6 +49,7 @@ export interface CustomSimFormValues {
   networkName: string;
   iterationLimit: number;
   stopThreshold: number;
+  /** See GeneratedSimFormValues.saveMode — kept for import/export, never sent (#133). */
   saveMode: SaveMode;
   agents: AgentSpec[];
   edges: EdgeSpec[];

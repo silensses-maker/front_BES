@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { UserRole } from "../types/user.types";
-import { getRoleLimits, getRolePermissions, ROLE_LIMITS, resolveMaxNetworks } from "./permissions";
+import {
+  getHighestRole,
+  getRoleLimits,
+  getRolePermissions,
+  ROLE_LIMITS,
+  resolveMaxNetworks,
+} from "./permissions";
 
 describe("getRoleLimits", () => {
   it("returns Administrator limits when Administrator is present", () => {
@@ -153,5 +159,20 @@ describe("getRolePermissions", () => {
     const permissions = getRolePermissions(["BaseUser", "Researcher", "Guest"]);
     const unique = [...new Set(permissions)];
     expect(permissions.length).toBe(unique.length);
+  });
+});
+
+describe("getHighestRole", () => {
+  it("ignores the order of roles (promoted users keep Guest first)", () => {
+    expect(getHighestRole(["Guest", "Researcher"])).toBe("Researcher");
+    expect(getHighestRole(["Guest", "BaseUser", "Administrator"])).toBe("Administrator");
+  });
+
+  it("returns the single role when only one is present", () => {
+    expect(getHighestRole(["BaseUser"])).toBe("BaseUser");
+  });
+
+  it("falls back to Guest for an empty list", () => {
+    expect(getHighestRole([])).toBe("Guest");
   });
 });

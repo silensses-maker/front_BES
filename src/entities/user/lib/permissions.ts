@@ -35,10 +35,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
 };
 
+const ROLE_PRIORITY: UserRole[] = ["Administrator", "Researcher", "BaseUser", "Guest"];
+
+/**
+ * Effective role, with the same priority the backend uses for quotas
+ * (`DatabaseManager.getUsageLimits`). `roles` order is not guaranteed and promoted
+ * users keep "Guest", so never display `roles[0]`.
+ */
+export function getHighestRole(roles: UserRole[]): UserRole {
+  return ROLE_PRIORITY.find((role) => roles.includes(role)) ?? "Guest";
+}
+
 export function getRoleLimits(roles: UserRole[]): Required<UsageLimits> {
-  const priority: UserRole[] = ["Administrator", "Researcher", "BaseUser", "Guest"];
-  const highestRole = priority.find((role) => roles.includes(role)) ?? "Guest";
-  return ROLE_LIMITS[highestRole];
+  return ROLE_LIMITS[getHighestRole(roles)];
 }
 
 /**

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
-import { resolveMaxNetworks, useAuthStore } from "@/entities/user";
+import { getHighestRole, resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
@@ -20,6 +20,7 @@ import {
 } from "@/shared/lib/simulation-export";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import { rebalanceCounts } from "../lib/rebalance";
+import { RUN_SAVE_MODE } from "../lib/templates";
 import {
   computeMaxEdges,
   customSimSchema,
@@ -213,7 +214,8 @@ export function useSimulationConfig() {
           iterationLimit: generatedValues.iterationLimit,
           stopThreshold: generatedValues.stopThreshold,
           seed: generatedValues.seed ?? undefined,
-          saveMode: generatedValues.saveMode,
+          // Constant, not the form value: the backend saves every run in DEBUG for now (#133).
+          saveMode: RUN_SAVE_MODE,
           // AgentTypeReq is { silenceStrategy, silenceEffect, count } — the API has
           // no threshold/confidence fields (the simulator fixes them, #120).
           agentTypes: generatedValues.agentTypes.map((row) => ({
@@ -238,7 +240,7 @@ export function useSimulationConfig() {
             networkName: customValues.networkName,
             iterationLimit: customValues.iterationLimit,
             stopThreshold: customValues.stopThreshold,
-            saveMode: customValues.saveMode,
+            saveMode: RUN_SAVE_MODE,
             agents: customValues.agents.map((a) => ({
               name: a.name,
               belief: a.belief,
@@ -260,7 +262,7 @@ export function useSimulationConfig() {
             name: customValues.networkName,
             iterationLimit: customValues.iterationLimit,
             stopThreshold: customValues.stopThreshold,
-            saveMode: customValues.saveMode,
+            saveMode: RUN_SAVE_MODE,
             agents: customValues.agents,
             edges: customValues.edges,
             ...CUSTOM_RUN_FRAME_OPTIONS,
@@ -452,7 +454,7 @@ export function useSimulationConfig() {
     maxAgents: maxAgents ?? null,
     maxIterations: maxIterations ?? null,
     maxNetworks: maxNetworks ?? null,
-    userRole: user?.roles?.[0] ?? null,
+    userRole: user?.roles?.length ? getHighestRole(user.roles) : null,
     updateValues,
     setNetworkType,
     goToStep,

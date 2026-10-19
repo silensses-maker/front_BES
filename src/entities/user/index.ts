@@ -1,5 +1,6 @@
-export { userApi } from "./api/user.api";
+export { toSessionUser } from "./api/user.mapper";
 export {
+  getHighestRole,
   getRoleLimits,
   getRolePermissions,
   ROLE_LIMITS,

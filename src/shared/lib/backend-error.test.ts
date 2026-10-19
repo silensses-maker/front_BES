@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BackendError, BackendErrorCode } from "@/shared/api/backend";
-import { getBackendErrorCode, isBackendError, isErrorCode } from "./backend-error";
+import {
+  getBackendErrorCode,
+  isAccountDeactivatedError,
+  isBackendError,
+  isErrorCode,
+} from "./backend-error";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,6 +102,7 @@ describe("getBackendErrorCode", () => {
       "invalid_body",
       "usage_limit_exceeded",
       "rate_limited",
+      "conflict",
     ];
 
     for (const code of knownCodes) {
@@ -157,5 +163,35 @@ describe("isErrorCode", () => {
       message: "?",
     });
     expect(isErrorCode(error, "not_found")).toBe(false);
+  });
+});
+
+describe("isAccountDeactivatedError", () => {
+  it("returns true for the 401 the backend sends to a deactivated account", () => {
+    const error = makeAxiosError<BackendError>({
+      error: "unauthorized",
+      message: "Account is deactivated",
+    });
+    expect(isAccountDeactivatedError(error)).toBe(true);
+  });
+
+  it("returns false for any other unauthorized error (missing or expired token)", () => {
+    const error = makeAxiosError<BackendError>({
+      error: "unauthorized",
+      message: "Invalid or expired token",
+    });
+    expect(isAccountDeactivatedError(error)).toBe(false);
+  });
+
+  it("returns false when the message matches but the code does not", () => {
+    const error = makeAxiosError<BackendError>({
+      error: "forbidden",
+      message: "Account is deactivated",
+    });
+    expect(isAccountDeactivatedError(error)).toBe(false);
+  });
+
+  it("returns false for a non-backend error", () => {
+    expect(isAccountDeactivatedError(new Error("Account is deactivated"))).toBe(false);
   });
 });

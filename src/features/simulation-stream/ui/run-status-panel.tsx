@@ -9,7 +9,9 @@ import {
 } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { isErrorCode } from "@/shared/lib/backend-error";
 import { formatNumber } from "@/shared/lib/format-number";
+import { logger } from "@/shared/lib/logger";
 import { cn } from "@/shared/lib/utils";
 import { useWsAuthState } from "@/shared/lib/ws-manager";
 import { Button } from "@/shared/ui/button";
@@ -84,6 +86,26 @@ interface RunStatusPanelProps {
 }
 
 /**
+ * After a 409 on cancel, mirrors the run's real terminal status from REST so the viewer stops
+ * offering "Cancel" even if the WS terminal event was missed.
+ */
+function syncFinishedStatus(runId: string): void {
+  simulationsApi
+    .getById(runId)
+    .then((run) => {
+      if (run.status === "running") return;
+      const sim = useSimulationStore.getState();
+      if (sim.runId === runId && sim.status !== run.status) {
+        if (run.status === "error") sim.setError(sim.error ?? "");
+        else sim.setStatus(run.status);
+      }
+      const lastRun = useLastRunStore.getState();
+      if (lastRun.runId === runId) lastRun.setStatus(run.status);
+    })
+    .catch((err: unknown) => logger.error("RunStatusPanel.syncFinishedStatus", err));
+}
+
+/**
  * "Panel de ejecución" (mockup): status card with progress, verdict card,
  * Red card, Composición card, node inspector, and the cancel/back footer.
  * Reads the simulation store directly — it is a status-display primitive
@@ -138,8 +160,14 @@ export function RunStatusPanel({
       if (lastRun.runId === runId) lastRun.setStatus("cancelled");
       toast.warning(t("runView.cancelledToast"));
     } catch (err) {
-      void err;
-      toast.error(t("liveRun.sidebar.errorCancel"));
+      if (isErrorCode(err, "conflict")) {
+        // 409 (#124): the run finished before the cancel landed and keeps its terminal status.
+        setCancelOpen(false);
+        toast.info(t("runView.cancelAlreadyFinished"));
+        syncFinishedStatus(runId);
+      } else {
+        toast.error(t("liveRun.sidebar.errorCancel"));
+      }
     } finally {
       setCancelling(false);
     }

@@ -5,7 +5,6 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { formatNumber } from "../lib/live-summary";
 import { computeMaxEdges } from "../lib/validation";
 import type {
@@ -23,12 +22,6 @@ interface StepNetworkProps {
   errors?: SimConfigValidationErrors;
   onUpdate: (patch: Partial<SimFormValues>) => void;
 }
-
-const SAVE_MODE_DESC_KEYS: Record<number, string> = {
-  0: "simulationConfig.saveModeFullDesc",
-  1: "simulationConfig.saveModeStandardDesc",
-  2: "simulationConfig.saveModeLightDesc",
-};
 
 /**
  * Inline over-quota affordance (mockup): danger error + "Ajustar al máximo"
@@ -94,32 +87,9 @@ export function StepNetwork({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="saveMode" className="flex items-center gap-1.5">
-          {t("simulationConfig.saveMode")}
-          <InfoTooltip>{t("simulationConfig.saveModeHint")}</InfoTooltip>
-        </Label>
-        <Select
-          value={String(gen.saveMode)}
-          onValueChange={(v) =>
-            onUpdate({ saveMode: Number(v) as 0 | 1 | 2 } as Partial<SimFormValues>)
-          }
-        >
-          <SelectTrigger id="saveMode" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">{t("simulationConfig.saveModeFull")}</SelectItem>
-            <SelectItem value="1">{t("simulationConfig.saveModeStandard")}</SelectItem>
-            <SelectItem value="2">{t("simulationConfig.saveModeLight")}</SelectItem>
-          </SelectContent>
-        </Select>
-        {/* Mockup: description of the selected save mode under the select */}
-        <p className="text-xs text-muted-foreground">
-          {t(SAVE_MODE_DESC_KEYS[gen.saveMode] as Parameters<typeof t>[0])}
-        </p>
-      </div>
-
+      {/* Deliberate deviation from the mockup (#133): no save-mode select. The backend saves
+          every run in DEBUG mode in this phase, so the choice had no effect; the review step
+          says what is stored instead. */}
       <div className="space-y-2">
         <Label htmlFor="numberOfNetworks" className="flex items-center gap-1.5">
           {t("simulationConfig.numberOfNetworks")}

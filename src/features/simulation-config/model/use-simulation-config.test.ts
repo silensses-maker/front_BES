@@ -23,6 +23,7 @@ import {
   readJsonFile,
 } from "@/shared/lib/simulation-export";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
+import { RUN_SAVE_MODE } from "../lib/templates";
 import type {
   AgentTypeRow,
   CustomSimFormValues,
@@ -55,12 +56,12 @@ vi.mock("@/entities/simulation", async () => {
 });
 
 // Real (pure) role-table fallback, imported by file path so the entity index does not pull
-// the Firebase-backed user API into the test environment.
+// the Firebase-backed auth store into the test environment.
 vi.mock("@/entities/user", async () => {
-  const { resolveMaxNetworks } = await vi.importActual<
+  const { getHighestRole, resolveMaxNetworks } = await vi.importActual<
     typeof import("@/entities/user/lib/permissions")
   >("@/entities/user/lib/permissions");
-  return { useAuthStore: vi.fn(), resolveMaxNetworks };
+  return { useAuthStore: vi.fn(), getHighestRole, resolveMaxNetworks };
 });
 
 vi.mock("@/shared/api/backend", () => ({
@@ -2436,5 +2437,128 @@ describe("useSimulationConfig — custom run frame options (#122)", () => {
     expect(simulationsApi.startCustom).toHaveBeenCalledWith(
       expect.objectContaining({ persistFrames: true, frameRetention: "ephemeral" }),
     );
+  });
+});
+
+describe("useSimulationConfig — save mode forced by the backend (#133)", () => {
+  const dummyFile = new File(["{}"], "config.json", { type: "application/json" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSimulationConfigStore.getState().reset();
+    setupMocks();
+  });
+
+  function mockImport(payload: GeneratedSimFormValues | CustomSimFormValues) {
+    vi.mocked(readJsonFile).mockResolvedValue(payload);
+    vi.mocked(parseEnvelope).mockReturnValue({
+      createdAt: "2024-01-01T00:00:00.000Z",
+      appVersion: "1.0.0",
+      payload: payload as unknown as Record<string, unknown>,
+    });
+  }
+
+  it("sends the former default (STANDARD = 1) as the constant save mode", () => {
+    expect(RUN_SAVE_MODE).toBe(1);
+  });
+
+  it("sends RUN_SAVE_MODE in the generated body even when the draft carries another save mode", async () => {
+    vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+    const { result } = renderHook(() => useSimulationConfig());
+
+    act(() => {
+      result.current.updateValues({ ...validGeneratedValues, saveMode: 0 });
+    });
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(simulationsApi.startGenerated).toHaveBeenCalledWith(
+      expect.objectContaining({ saveMode: RUN_SAVE_MODE }),
+    );
+  });
+
+  it.each([
+    ["JSON", BINARY_THRESHOLD_BYTES - 1],
+    ["binary", BINARY_THRESHOLD_BYTES + 1],
+  ])("sends RUN_SAVE_MODE for a custom run (%s variant)", async (variant, jsonSize) => {
+    vi.mocked(estimateJsonSize).mockReturnValue(jsonSize);
+    vi.mocked(encodeCustomSimulation).mockReturnValue(new ArrayBuffer(8));
+    vi.mocked(simulationsApi.startCustom).mockResolvedValue(mockSimCreated);
+    vi.mocked(simulationsApi.startCustomBinary).mockResolvedValue(mockSimCreated);
+    const { result } = renderHook(() => useSimulationConfig());
+
+    act(() => {
+      result.current.setNetworkType("custom");
+    });
+    act(() => {
+      result.current.updateValues({ ...validCustomValues, saveMode: 2 });
+    });
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    if (variant === "JSON") {
+      expect(simulationsApi.startCustom).toHaveBeenCalledWith(
+        expect.objectContaining({ saveMode: RUN_SAVE_MODE }),
+      );
+    } else {
+      expect(encodeCustomSimulation).toHaveBeenCalledWith(
+        expect.objectContaining({ saveMode: RUN_SAVE_MODE }),
+      );
+    }
+  });
+
+  it.each([0, 1, 2] as const)("imports a generated file with saveMode %i", async (saveMode) => {
+    mockImport({ ...validGeneratedValues, saveMode });
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.networkType).toBe("generated");
+    expect(result.current.errors).toEqual({});
+    expect(toast.error).not.toHaveBeenCalled();
+    // Kept as-is so "Export JSON" gives the same file back.
+    expect(result.current.values.saveMode).toBe(saveMode);
+  });
+
+  it.each([0, 1, 2] as const)("imports a custom file with saveMode %i", async (saveMode) => {
+    mockImport({ ...validCustomValues, saveMode });
+    const { result } = renderHook(() => useSimulationConfig());
+
+    await act(async () => {
+      await result.current.handleImportFile(dummyFile);
+    });
+
+    expect(result.current.networkType).toBe("custom");
+    expect(result.current.errors).toEqual({});
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(result.current.values.saveMode).toBe(saveMode);
+  });
+
+  it("rehydrates a v1 draft with any saveMode unchanged and still launches with RUN_SAVE_MODE", async () => {
+    vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+    const draft = {
+      ...useSimulationConfigStore.getState(),
+      step: "review",
+      generatedValues: { ...validGeneratedValues, saveMode: 2 },
+    };
+    localStorage.setItem("bes-simulation-config", JSON.stringify({ state: draft, version: 1 }));
+
+    await useSimulationConfigStore.persist.rehydrate();
+    expect(useSimulationConfigStore.getState().step).toBe("review");
+    expect(useSimulationConfigStore.getState().generatedValues.saveMode).toBe(2);
+
+    const { result } = renderHook(() => useSimulationConfig());
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(simulationsApi.startGenerated).toHaveBeenCalledWith(
+      expect.objectContaining({ saveMode: RUN_SAVE_MODE }),
+    );
+    localStorage.removeItem("bes-simulation-config");
   });
 });

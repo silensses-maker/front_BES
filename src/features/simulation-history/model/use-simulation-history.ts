@@ -4,6 +4,7 @@ import { useLastRunStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import type { RunSummary } from "@/shared/api/backend/types/backend.types";
 import { useTranslation } from "@/shared/i18n";
+import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
 
 const PAGE_LIMIT = 20;
@@ -123,6 +124,20 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     setPendingCancelId(null);
   }, []);
 
+  /** Re-reads one run's status in place (and in the last-run chip) after a 409 on cancel. */
+  const refreshRunStatus = useCallback(async (id: string): Promise<void> => {
+    try {
+      const fresh = await simulationsApi.getById(id);
+      setRuns((prev) =>
+        prev.map((run) => (run.id === id ? { ...run, status: fresh.status } : run)),
+      );
+      const lastRun = useLastRunStore.getState();
+      if (lastRun.runId === id) lastRun.setStatus(fresh.status);
+    } catch (error) {
+      logger.error("useSimulationHistory.refreshRunStatus", error);
+    }
+  }, []);
+
   const confirmCancel = useCallback(async () => {
     const id = pendingCancelId;
     if (id === null) return;
@@ -138,9 +153,16 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
       toast.success(t("simulationHistory.cancelSuccess"));
     } catch (error) {
       logger.error("useSimulationHistory.confirmCancel", error);
-      toast.error(t("simulationHistory.errorCancel"));
+      if (isErrorCode(error, "conflict")) {
+        // 409 (#124): the run finished before the cancel landed and keeps its terminal
+        // status — show it instead of a failure.
+        toast.info(t("simulationHistory.cancelAlreadyFinished"));
+        await refreshRunStatus(id);
+      } else {
+        toast.error(t("simulationHistory.errorCancel"));
+      }
     }
-  }, [pendingCancelId, t]);
+  }, [pendingCancelId, refreshRunStatus, t]);
 
   return {
     runs,

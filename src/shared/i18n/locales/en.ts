@@ -23,6 +23,7 @@ const en = {
     usageLimits: "Usage limits",
     maxAgents: "Max agents",
     maxIterations: "Max iterations",
+    maxNetworks: "Max networks",
     densityFactor: "Density factor",
     editDisplayName: "Edit display name",
     displayName: "Display name",
@@ -42,6 +43,7 @@ const en = {
     usageLimitsDescription: "Quotas applied to your current role.",
     agentsUsed: "Agents",
     iterationsUsed: "Iterations",
+    networksUsed: "Networks",
     densityFactorLabel: "Density factor",
   },
   home: {
@@ -356,10 +358,6 @@ const en = {
     stopThreshold: "Stop threshold",
     seed: "Seed",
     seedRandom: "Random",
-    saveMode: "Save mode",
-    saveModeFull: "Full",
-    saveModeStandard: "Standard",
-    saveModeLight: "Light",
     customNetworkHint: "Custom network configuration is managed in the Agents step.",
     customAgentsNotSupported:
       "Agent row editing is not available for custom networks in this step.",
@@ -431,8 +429,6 @@ const en = {
     submit: "Launch simulation",
     submitting: "Launching…",
     // ── Field-level tooltips (generated path) ───────────────────────────────
-    saveModeHint:
-      "How much simulation data is persisted. DEBUG: in-memory only (fastest, run is lost on refresh). STANDARD: round metrics in DB. FULL: per-round agent state, enables replay.",
     numberOfNetworksHint:
       "How many independent network instances to run with the same configuration. Each one generates its own topology and dynamics; useful to average out random variation.",
     numberOfAgentsHint:
@@ -479,7 +475,8 @@ const en = {
     errorLimitExceeded: "Your plan limit was exceeded. Reduce the configuration and try again.",
     errorLimitExceededDetail:
       "Limit exceeded: your plan allows {{limit}}, but {{requested}} were requested.",
-    userLimitsHint: "{{role}} · max {{maxAgents}} agents · max {{maxIterations}} iterations",
+    userLimitsHint:
+      "{{role}} · max {{maxAgents}} agents · max {{maxIterations}} iterations · max {{maxNetworks}} networks",
     limitUnlimited: "unlimited",
     quotaTooltip: "Quota applied to your current role. The wizard's validation uses these caps.",
     discardDraft: "Discard draft",
@@ -492,9 +489,6 @@ const en = {
     discardDialogDismiss: "Keep",
     discardSuccessToast: "Draft discarded. Wizard reset.",
     templateAppliedToast: "Template applied: {{name}}.",
-    saveModeFullDesc: "Saves every round of every agent. Maximum detail, more storage.",
-    saveModeStandardDesc: "Saves aggregated evolution and key states. Recommended.",
-    saveModeLightDesc: "Reduced saving (STANDARD_LIGHT) for large networks.",
     errorAgentLimitInline: "Exceeds your plan's maximum ({{limit}}).",
     adjustToMax: "Adjust to maximum",
     agentsPlanHint: "Your plan allows up to {{limit}} agents.",
@@ -516,6 +510,9 @@ const en = {
     reviewInfluence: "influence {{value}}",
     reviewErrorsTitle: "Fix before launching",
     reviewValid: "✓ Configuration valid. Ready to launch.",
+    // #133: replaces the save-mode selector (every run is saved the same way for now).
+    storageNote:
+      "In this version, the run configuration is stored, and its replay data is kept for about 60–90 minutes after the run ends.",
     exportSuccessToast: "Configuration exported as simulacion.json.",
     nextInvalidToast: "Fix the highlighted errors before continuing.",
     launchInvalidToast: "The configuration has errors. Review them before launching.",
@@ -596,6 +593,7 @@ const en = {
     cancelDialogConfirm: "Yes, cancel the simulation",
     cancelDialogDismiss: "Keep running",
     cancelSuccess: "Simulation cancelled.",
+    cancelAlreadyFinished: "This run had already finished — its status has been updated.",
     errorCancel: "Failed to cancel the simulation. Please try again.",
     errorLoad: "Failed to load experiments. Please try again.",
     emptyList: "No experiments found.",
@@ -606,7 +604,7 @@ const en = {
     runIterations: "Iteration limit",
     runCreated: "Created",
     fullIdTooltip: "Full run identifier",
-    retentionNote: "Frames of finished runs are kept ~60 min on the server.",
+    retentionNote: "Frames of finished runs are kept about 60–90 min on the server.",
     openLiveRun: "Open run",
     runNameFallback: "Unnamed run",
     runDetailTitle: "Experiment details",
@@ -788,7 +786,7 @@ const en = {
     networkUnselected: "Not selected",
     runDataGoneTitle: "This run's data is no longer available",
     runDataGoneBody:
-      "The server no longer retains this run's networks — retention expired or its save mode does not persist data. Its metadata is still listed under My experiments.",
+      "The server no longer retains this run's networks — retention expired, the server restarted, or its save mode does not persist data. Its metadata is still listed under My experiments.",
     // ── Run sidebar ─────────────────────────────────────────
     statusRunning: "Running",
     statusReconnecting: "Reconnecting…",
@@ -826,6 +824,7 @@ const en = {
     cancelDialogConfirm: "Yes, cancel the simulation",
     cancelDialogKeep: "Keep running",
     cancelledToast: "Simulation cancelled. Received data is kept.",
+    cancelAlreadyFinished: "This run had already finished — there was nothing to cancel.",
     backToBoard: "Back to board",
     // ── Limited viewer / error states ───────────────────────
     limitedBanner:
@@ -834,13 +833,6 @@ const en = {
     streamErrorBody:
       "The data stream for this run could not be recovered. You can retry the connection.",
     retry: "Retry",
-  },
-  user: {
-    errorGet: "Error loading user data.",
-    errorGetByEmail: "Error loading user by email.",
-    errorCreate: "Error creating user profile.",
-    errorUpdate: "Error updating user data.",
-    errorDelete: "Error deleting user.",
   },
   liveRun: {
     sidebar: {

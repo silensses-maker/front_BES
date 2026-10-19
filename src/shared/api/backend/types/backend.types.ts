@@ -16,7 +16,9 @@ export type BackendErrorCode =
   | "not_found"
   | "invalid_body"
   | "usage_limit_exceeded"
-  | "rate_limited";
+  | "rate_limited"
+  /** 409 — e.g. `DELETE /simulations/{runId}` on a run that already finished (#124). */
+  | "conflict";
 
 export interface BackendError {
   error: BackendErrorCode | string;
@@ -36,7 +38,7 @@ export interface UsageLimits {
   maxNetworks?: number | null;
 }
 
-/** Shape returned by POST /api/users/sync and GET /api/users/info/{uid} */
+/** Shape returned by POST /api/users/sync */
 export interface UserSyncResponse {
   uid: string;
   email: string;
@@ -44,6 +46,14 @@ export interface UserSyncResponse {
   photo: string | null;
   roles: UserRole[];
   usageLimits: UsageLimits;
+  deactivated: boolean;
+}
+
+/** Shape returned by GET /api/users/info/{uid}: the sync shape without `photo`. */
+export type UserInfoResponse = Omit<UserSyncResponse, "photo">;
+
+/** Shape returned by POST /api/users/me/deactivate */
+export interface DeactivateResponse {
   deactivated: boolean;
 }
 

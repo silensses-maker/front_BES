@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
-import { useEditName } from "../model/use-edit-name";
+import { DISPLAY_NAME_MAX_LENGTH, useEditName } from "../model/use-edit-name";
 
 export function EditNameForm() {
   const { editName, currentName, loading } = useEditName();
@@ -24,6 +24,7 @@ export function EditNameForm() {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          maxLength={DISPLAY_NAME_MAX_LENGTH}
           className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder={t("profile.namePlaceholder")}
           disabled={loading}
