@@ -5,6 +5,7 @@ const en = {
     loading: "Loading…",
     unlimited: "Unlimited",
     cancel: "Cancel",
+    opensInNewTab: "(opens in a new tab)",
   },
   auth: {
     loginPage: "Login Page",
@@ -52,6 +53,21 @@ const en = {
       "Our opinion evolution simulator, SiLEnSeSS, combines advanced social network models with an intuitive interface, designed so that both the general public and scientists can easily understand and apply the results. We handle the technical complexity so you can focus on the data and its impact.",
     cta: "Register / Log In",
     participation: "With the participation of",
+    introTitle: "Introduction",
+    introP1:
+      "Opinion dynamics studies how individual beliefs evolve through social interaction. SiLEnSeSS lets researchers configure agent networks, choose an update rule, and observe how opinion distributions shift over time — all without writing code.",
+    // <bold> tags are rendered by <Trans> in home-page.tsx
+    introP2:
+      "The platform combines the <bold>DeGroot</bold> averaging model with the <bold>Spiral of Silence</bold> theory: agents update their beliefs from their neighbors' opinions and may stay silent when they do not perceive enough support. Simulations run on generated or custom networks and expose per-round data for analysis.",
+    examplesTitle: "Examples",
+    examplesIntro:
+      "The following scenarios illustrate the kinds of questions SiLEnSeSS can help answer.",
+    exampleConsensusTitle: "Consensus under DeGroot",
+    exampleConsensusBody:
+      "Run a network in which every agent follows the classic DeGroot rule and check whether, and after how many rounds, beliefs converge to a shared opinion. Each run reports whether consensus was reached and the final spread of beliefs.",
+    exampleSilenceTitle: "Silencing cascade",
+    exampleSilenceBody:
+      "Mix agents that use the Majority, Threshold or Confidence silence strategies and compare public and private beliefs: see whether agents fall silent, how participation changes over the rounds and whether the publicly expressed opinion drifts away from what agents privately believe.",
   },
   nav: {
     language: "Language",
@@ -302,6 +318,120 @@ const en = {
     about: "About",
     rights: "All rights reserved.",
   },
+  about: {
+    pageTitle: "About SiLEnSeSS",
+    pageIntro:
+      "SiLEnSeSS stands for “Simulation Laboratory of the Evolution of Opinion in Social Networks under the influence of the Spiral of Silence”. It is a simulation platform for opinion dynamics research, developed by the PROMUEVA group at Universidad del Valle.",
+    pageIntroUsage:
+      "The platform lets you configure networks of agents, launch simulations and explore how beliefs evolve and when agents choose to speak or stay silent, without writing code.",
+    modelTitle: "The model",
+    modelBody:
+      "The simulator combines the DeGroot model, in which each agent updates its belief as a weighted average of its neighbors' opinions, with the Spiral of Silence theory, in which an agent may stop expressing its opinion when it does not perceive enough support around it. The platform therefore follows both what agents believe and whether they say it.",
+    modelLink: "Read the full explanation in the wiki",
+    originTitle: "Origin",
+    originBody:
+      "SiLEnSeSS is built on the opinion-dynamics simulator developed by David Gaona in his master's thesis, “Towards a Model of Opinion Evolution Considering the Spiral of Silence” (Universidad del Valle, 2025), which extends the DeGroot model with the Spiral of Silence theory. The platform was developed at Universidad del Valle in the context of the PROMUEVA research project and makes that simulator available through a web interface.",
+    promuevaTitle: "The PROMUEVA project",
+    promuevaIntro:
+      "PROMUEVA is the research project “Modelos computacionales de redes sociales aplicados a la polarización del Valle del Cauca” (English translation: “Computational models of social networks applied to polarization in Valle del Cauca”). It is a multidisciplinary project that connects knowledge from computer science and the social sciences.",
+    promuevaObjective:
+      "Its main objective is to develop reliable computational models of social networks for the analysis of polarization, in order to model, measure and predict polarization in social networks.",
+    promuevaLinesTitle: "Lines of work",
+    promuevaLine1:
+      "A computational model of social networks to study polarization, based on epistemic logic and concurrency theory and guided by social-science research on political polarization.",
+    promuevaLine2: "The privacy aspects of that social-network model.",
+    promuevaLine3:
+      "Efficient algorithms to analyze large-scale networks, together with machine-learning algorithms to identify patterns or predict behaviors related to polarization.",
+    promuevaInstitutionsTitle: "Institutions",
+    promuevaInstitution1: "Universidad del Valle",
+    promuevaInstitution2: "Pontificia Universidad Javeriana Cali",
+    promuevaInstitution3:
+      "Université Sorbonne Paris Nord (Laboratoire d'Informatique de Paris Nord, LIPN)",
+    promuevaInstitution4: "LIX – École Polytechnique",
+    promuevaInstitution5: "CNRS",
+    promuevaSiteLink: "PROMUEVA website",
+    promuevaTeamLink: "PROMUEVA team",
+    avispaTitle: "AVISPA research group",
+    avispaBody:
+      "AVISPA (Ambientes Visuales de Programación Aplicativa) is a research group of the Escuela de Ingeniería de Sistemas y Computación at Universidad del Valle, with classification A1.",
+    avispaLinesTitle: "Research lines",
+    avispaLine1: "Computer-assisted composition",
+    avispaLine2: "Visual languages",
+    avispaLine3: "Concurrent constraint programming",
+    avispaLine4: "Concurrent process calculi",
+    avispaLine5: "Computational modeling of systems",
+    avispaLine6: "Distributed and parallel processing",
+    avispaLine7: "Formalisms for concurrent systems",
+    avispaLink: "AVISPA page",
+    referencesTitle: "References",
+    referencesIntro: "The simulator behind SiLEnSeSS is based on the following scientific work:",
+    reference1:
+      "J. Aranda, J. F. Díaz, D. Gaona, F. Valencia. “The Spiral of Silence in Multi-Agent Models for Opinion Formation.” ICTAC 2025.",
+    // <arxiv> tags are rendered by <Trans> in about-page.tsx as the external arXiv link
+    reference2:
+      "J. Aranda, J. F. Díaz, D. Gaona, F. Valencia. “The Sound of Silence in Social Networks.” <arxiv>arXiv:2410.19685</arxiv>, 2024.",
+    reference3:
+      "D. Gaona Medina. “Towards a Model of Opinion Evolution Considering the Spiral of Silence.” Master's thesis, Universidad del Valle, 2025.",
+    partnersTitle: "Participating institutions",
+    partnersIntro: "SiLEnSeSS is developed with the participation of the following institutions:",
+  },
+  contact: {
+    pageTitle: "Contact",
+    pageIntro:
+      "SiLEnSeSS was developed at Universidad del Valle in the context of the PROMUEVA research project. Use the following channels for questions, suggestions or problem reports.",
+    emailTitle: "Questions, suggestions and problem reports",
+    emailBody:
+      "Write to us by email with your questions, suggestions or problem reports. If you are reporting a problem, include what you did, the browser you were using and, if possible, the run ID.",
+    researchTitle: "Research groups",
+    researchBody:
+      "For academic inquiries about the project, refer to the PROMUEVA and AVISPA research groups and to Universidad del Valle through their official websites.",
+    promuevaLink: "PROMUEVA website",
+    avispaLink: "AVISPA page",
+    univalleLink: "Universidad del Valle website",
+  },
+  faq: {
+    pageTitle: "Frequently asked questions",
+    pageIntro: "Short answers to common questions about SiLEnSeSS.",
+    whatIsQuestion: "What is SiLEnSeSS?",
+    whatIsAnswer:
+      "SiLEnSeSS stands for “Simulation Laboratory of the Evolution of Opinion in Social Networks under the influence of the Spiral of Silence”. It is a web platform for opinion dynamics research that combines the DeGroot model with the Spiral of Silence theory and is built on the simulator developed by David Gaona in his master's thesis. It was developed by the PROMUEVA group at Universidad del Valle, within the research project “Modelos computacionales de redes sociales aplicados a la polarización del Valle del Cauca”.",
+    whoCanUseQuestion: "Who can use it?",
+    whoCanUseAnswer:
+      "Anyone can browse the public pages, such as the home page and the wiki. To configure and launch simulations you need to sign in with a Google account; the size of the simulations you can run depends on the role of your account.",
+    quotasQuestion: "What are the limits of each role?",
+    quotasAnswer: "Each role caps the size of the simulations you can launch:",
+    quotasColRole: "Role",
+    quotasColAgents: "Agents",
+    quotasColIterations: "Iterations",
+    quotasColNetworks: "Networks",
+    quotasNote: "Your current quota is shown in your profile and in the new simulation wizard.",
+    retentionQuestion: "How long are my results kept?",
+    retentionAnswer:
+      "In this version, the configuration of each run is stored, and its replay data is kept for about 60–90 minutes after the run ends.",
+    exportQuestion: "Can I save a configuration and reuse it?",
+    exportAnswer:
+      "Yes. In the Review step of the new simulation wizard you can export the configuration as a JSON file and import it again later. You can also start a new simulation from a saved file with the Load file option.",
+    llmQuestion: "Can an AI help me write a configuration?",
+    llmAnswer:
+      "Yes. In the Load file option of the wizard, download the AI prompt, paste it into an AI chat and describe the network you want in plain language. The reply is a JSON configuration that you can load into the wizard.",
+    browserQuestion: "What do I need to use it?",
+    browserAnswer:
+      "A recent web browser with WebGL support, which the network view uses to draw the graph. You do not need to install anything.",
+    modelQuestion: "Where can I read about the model?",
+    modelAnswer:
+      "The wiki explains the DeGroot model, how the Spiral of Silence is incorporated into it and the parameters that define each agent.",
+    modelLink: "Go to the wiki",
+    contactQuestion: "How can I ask a question or report a problem?",
+    // {{email}} comes from shared/config/contact; <mail> tags are rendered by <Trans> in faq-page.tsx as a mailto link
+    contactAnswer:
+      "Send an email to <mail>{{email}}</mail>. If you are reporting a problem, include what you did, the browser you were using and, if possible, the run ID.",
+  },
+  notFound: {
+    code: "Error 404",
+    title: "Page not found",
+    body: "The page you are looking for does not exist or is no longer available.",
+    backHome: "Back to home",
+  },
   simulation: {
     errorStream: "Connection to the simulation failed. Please try again.",
     errorRateLimited: "Too many requests. Please wait before reconnecting.",
@@ -317,8 +447,8 @@ const en = {
     agentCount: "{{count}} agents",
     cancelConfirm: "Cancel this simulation? This action cannot be undone.",
     cancelSuccess: "Simulation cancelled.",
-    panelCosmograph: "Cosmograph renders here (issue #47)",
     canvas: {
+      loadingNetwork: "Loading network…",
       preparingData: "Preparing data…",
       computingLayout: "Computing layout…",
       windowsClusterWarning: "Clustering may be unstable on Windows",

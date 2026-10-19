@@ -5,6 +5,7 @@ const es = {
     loading: "Cargando…",
     unlimited: "Ilimitado",
     cancel: "Cancelar",
+    opensInNewTab: "(se abre en una pestaña nueva)",
   },
   auth: {
     loginPage: "Página de inicio de sesión",
@@ -52,6 +53,21 @@ const es = {
       "Nuestro simulador de evolución de opiniones, SiLEnSeSS, combina modelos avanzados de redes sociales con una interfaz intuitiva, diseñado para que tanto el público general como los científicos puedan comprender y aplicar fácilmente los resultados. Nosotros manejamos la complejidad técnica para que tú te puedas enfocar en los datos y su impacto.",
     cta: "Registrarse / Iniciar sesión",
     participation: "Con la participación de",
+    introTitle: "Introducción",
+    introP1:
+      "La dinámica de opiniones estudia cómo evolucionan las creencias individuales a través de la interacción social. SiLEnSeSS permite a los investigadores configurar redes de agentes, elegir una regla de actualización y observar cómo cambian las distribuciones de opinión con el tiempo, todo sin escribir código.",
+    // Las etiquetas <bold> las renderiza <Trans> en home-page.tsx
+    introP2:
+      "La plataforma combina el modelo de promedios de <bold>DeGroot</bold> con la teoría de la <bold>Espiral del Silencio</bold>: los agentes actualizan sus creencias a partir de las opiniones de sus vecinos y pueden guardar silencio cuando no perciben suficiente apoyo. Las simulaciones se ejecutan sobre redes generadas o personalizadas y ofrecen datos por ronda para su análisis.",
+    examplesTitle: "Ejemplos",
+    examplesIntro:
+      "Los siguientes escenarios ilustran el tipo de preguntas que SiLEnSeSS puede ayudar a responder.",
+    exampleConsensusTitle: "Consenso con DeGroot",
+    exampleConsensusBody:
+      "Ejecuta una red en la que todos los agentes siguen la regla clásica de DeGroot y comprueba si las creencias convergen a una opinión compartida y en cuántas rondas. Cada ejecución indica si se alcanzó el consenso y la dispersión final de las creencias.",
+    exampleSilenceTitle: "Cascada de silencio",
+    exampleSilenceBody:
+      "Combina agentes con las estrategias de silencio Mayoría, Umbral o Confianza y compara las creencias públicas y privadas: observa si los agentes se silencian, cómo cambia la participación a lo largo de las rondas y si la opinión expresada en público se aleja de lo que los agentes creen en privado.",
   },
   nav: {
     language: "Idioma",
@@ -306,6 +322,120 @@ const es = {
     about: "Acerca de",
     rights: "Todos los derechos reservados.",
   },
+  about: {
+    pageTitle: "Acerca de SiLEnSeSS",
+    pageIntro:
+      "SiLEnSeSS son las siglas de “Simulation Laboratory of the Evolution of Opinion in Social Networks under the influence of the Spiral of Silence” (traducción al español: “Laboratorio de Simulación de la Evolución de la Opinión en Redes Sociales bajo la influencia de la Espiral del Silencio”). Es una plataforma de simulación para la investigación en dinámicas de opinión, desarrollada por el grupo PROMUEVA en la Universidad del Valle.",
+    pageIntroUsage:
+      "La plataforma te permite configurar redes de agentes, lanzar simulaciones y explorar cómo evolucionan las creencias y cuándo los agentes deciden expresarse o guardar silencio, sin escribir código.",
+    modelTitle: "El modelo",
+    modelBody:
+      "El simulador combina el modelo de DeGroot, en el que cada agente actualiza su creencia como un promedio ponderado de las opiniones de sus vecinos, con la teoría de la Espiral del Silencio, según la cual un agente puede dejar de expresar su opinión cuando no percibe suficiente apoyo a su alrededor. Así, la plataforma sigue tanto lo que los agentes creen como si lo expresan.",
+    modelLink: "Lee la explicación completa en el Wiki",
+    originTitle: "Origen",
+    originBody:
+      "SiLEnSeSS se basa en el simulador de dinámicas de opinión desarrollado por David Gaona en su tesis de maestría, “Towards a Model of Opinion Evolution Considering the Spiral of Silence” (Universidad del Valle, 2025), que extiende el modelo de DeGroot con la teoría de la Espiral del Silencio. La plataforma se desarrolló en la Universidad del Valle en el marco del proyecto de investigación PROMUEVA y ofrece ese simulador a través de una interfaz web.",
+    promuevaTitle: "El proyecto PROMUEVA",
+    promuevaIntro:
+      "PROMUEVA es el proyecto de investigación “Modelos computacionales de redes sociales aplicados a la polarización del Valle del Cauca”. Es un proyecto multidisciplinario que conecta el conocimiento de la informática y las ciencias sociales.",
+    promuevaObjective:
+      "Su objetivo principal es desarrollar modelos computacionales confiables de redes sociales para el análisis de la polarización, que permitan modelar, medir y predecir la polarización en las redes sociales.",
+    promuevaLinesTitle: "Líneas de trabajo",
+    promuevaLine1:
+      "Un modelo computacional de redes sociales para estudiar la polarización, basado en la lógica epistémica y la teoría de la concurrencia y guiado por la investigación en ciencias sociales sobre la polarización política.",
+    promuevaLine2: "Los aspectos de privacidad de ese modelo de redes sociales.",
+    promuevaLine3:
+      "Algoritmos eficientes para analizar redes a gran escala, junto con algoritmos de aprendizaje automático para identificar patrones o predecir comportamientos relacionados con la polarización.",
+    promuevaInstitutionsTitle: "Instituciones",
+    promuevaInstitution1: "Universidad del Valle",
+    promuevaInstitution2: "Pontificia Universidad Javeriana Cali",
+    promuevaInstitution3:
+      "Université Sorbonne Paris Nord (Laboratoire d'Informatique de Paris Nord, LIPN)",
+    promuevaInstitution4: "LIX – École Polytechnique",
+    promuevaInstitution5: "CNRS",
+    promuevaSiteLink: "Sitio web de PROMUEVA",
+    promuevaTeamLink: "Equipo de PROMUEVA",
+    avispaTitle: "Grupo de investigación AVISPA",
+    avispaBody:
+      "AVISPA (Ambientes Visuales de Programación Aplicativa) es un grupo de investigación de la Escuela de Ingeniería de Sistemas y Computación de la Universidad del Valle, con clasificación A1.",
+    avispaLinesTitle: "Líneas de investigación",
+    avispaLine1: "Composición asistida por computador",
+    avispaLine2: "Lenguajes visuales",
+    avispaLine3: "Programación concurrente por restricciones",
+    avispaLine4: "Cálculo de procesos concurrentes",
+    avispaLine5: "Modelamiento computacional de sistemas",
+    avispaLine6: "Procesamiento distribuido y paralelo",
+    avispaLine7: "Formalismos de sistemas concurrentes",
+    avispaLink: "Página de AVISPA",
+    referencesTitle: "Referencias",
+    referencesIntro: "El simulador de SiLEnSeSS se basa en los siguientes trabajos científicos:",
+    reference1:
+      "J. Aranda, J. F. Díaz, D. Gaona, F. Valencia. “The Spiral of Silence in Multi-Agent Models for Opinion Formation.” ICTAC 2025.",
+    // Las etiquetas <arxiv> las renderiza <Trans> en about-page.tsx como el enlace externo a arXiv
+    reference2:
+      "J. Aranda, J. F. Díaz, D. Gaona, F. Valencia. “The Sound of Silence in Social Networks.” <arxiv>arXiv:2410.19685</arxiv>, 2024.",
+    reference3:
+      "D. Gaona Medina. “Towards a Model of Opinion Evolution Considering the Spiral of Silence.” Tesis de maestría, Universidad del Valle, 2025.",
+    partnersTitle: "Instituciones participantes",
+    partnersIntro: "SiLEnSeSS se desarrolla con la participación de las siguientes instituciones:",
+  },
+  contact: {
+    pageTitle: "Contacto",
+    pageIntro:
+      "SiLEnSeSS se desarrolló en la Universidad del Valle en el marco del proyecto de investigación PROMUEVA. Usa los siguientes canales para preguntas, sugerencias o reportes de problemas.",
+    emailTitle: "Preguntas, sugerencias y reportes de problemas",
+    emailBody:
+      "Escríbenos por correo electrónico con tus preguntas, sugerencias o reportes de problemas. Si reportas un problema, incluye lo que hiciste, el navegador que usabas y, si es posible, el ID de la ejecución.",
+    researchTitle: "Grupos de investigación",
+    researchBody:
+      "Para consultas académicas sobre el proyecto, dirígete a los grupos de investigación PROMUEVA y AVISPA y a la Universidad del Valle a través de sus sitios web oficiales.",
+    promuevaLink: "Sitio web de PROMUEVA",
+    avispaLink: "Página de AVISPA",
+    univalleLink: "Sitio web de la Universidad del Valle",
+  },
+  faq: {
+    pageTitle: "Preguntas frecuentes",
+    pageIntro: "Respuestas breves a las preguntas más comunes sobre SiLEnSeSS.",
+    whatIsQuestion: "¿Qué es SiLEnSeSS?",
+    whatIsAnswer:
+      "SiLEnSeSS son las siglas de “Simulation Laboratory of the Evolution of Opinion in Social Networks under the influence of the Spiral of Silence” (traducción al español: “Laboratorio de Simulación de la Evolución de la Opinión en Redes Sociales bajo la influencia de la Espiral del Silencio”). Es una plataforma web para la investigación en dinámicas de opinión que combina el modelo de DeGroot con la teoría de la Espiral del Silencio y se basa en el simulador desarrollado por David Gaona en su tesis de maestría. Fue desarrollada por el grupo PROMUEVA en la Universidad del Valle, en el marco del proyecto de investigación “Modelos computacionales de redes sociales aplicados a la polarización del Valle del Cauca”.",
+    whoCanUseQuestion: "¿Quién puede usarla?",
+    whoCanUseAnswer:
+      "Cualquier persona puede consultar las páginas públicas, como la página de inicio y el Wiki. Para configurar y lanzar simulaciones debes iniciar sesión con una cuenta de Google; el tamaño de las simulaciones que puedes ejecutar depende del rol de tu cuenta.",
+    quotasQuestion: "¿Qué límites tiene cada rol?",
+    quotasAnswer: "Cada rol limita el tamaño de las simulaciones que puedes lanzar:",
+    quotasColRole: "Rol",
+    quotasColAgents: "Agentes",
+    quotasColIterations: "Iteraciones",
+    quotasColNetworks: "Redes",
+    quotasNote: "Tu cuota actual aparece en tu perfil y en el asistente de nueva simulación.",
+    retentionQuestion: "¿Cuánto tiempo se conservan mis resultados?",
+    retentionAnswer:
+      "En esta versión se guarda la configuración de cada ejecución, y sus datos de repetición se conservan unos 60–90 minutos después de que termine.",
+    exportQuestion: "¿Puedo guardar una configuración y reutilizarla?",
+    exportAnswer:
+      "Sí. En el paso Revisión del asistente de nueva simulación puedes exportar la configuración como archivo JSON e importarla más adelante. También puedes iniciar una nueva simulación desde un archivo guardado con la opción Cargar archivo.",
+    llmQuestion: "¿Puede una IA ayudarme a escribir una configuración?",
+    llmAnswer:
+      "Sí. En la opción Cargar archivo del asistente, descarga el prompt para IA, pégalo en un chat de inteligencia artificial y describe en lenguaje natural la red que quieres. La respuesta es una configuración JSON que puedes cargar en el asistente.",
+    browserQuestion: "¿Qué necesito para usarla?",
+    browserAnswer:
+      "Un navegador web reciente con soporte para WebGL, que la vista de red usa para dibujar el grafo. No necesitas instalar nada.",
+    modelQuestion: "¿Dónde puedo leer sobre el modelo?",
+    modelAnswer:
+      "El Wiki explica el modelo de DeGroot, cómo se le incorpora la Espiral del Silencio y los parámetros que definen a cada agente.",
+    modelLink: "Ir al Wiki",
+    contactQuestion: "¿Cómo puedo hacer una pregunta o reportar un problema?",
+    // {{email}} viene de shared/config/contact; las etiquetas <mail> las renderiza <Trans> en faq-page.tsx como enlace mailto
+    contactAnswer:
+      "Envía un correo electrónico a <mail>{{email}}</mail>. Si reportas un problema, incluye lo que hiciste, el navegador que usabas y, si es posible, el ID de la ejecución.",
+  },
+  notFound: {
+    code: "Error 404",
+    title: "Página no encontrada",
+    body: "La página que buscas no existe o ya no está disponible.",
+    backHome: "Volver al inicio",
+  },
   simulation: {
     errorStream: "La conexión con la simulación falló. Por favor intenta de nuevo.",
     errorRateLimited: "Demasiadas solicitudes. Espera antes de reconectar.",
@@ -321,8 +451,8 @@ const es = {
     agentCount: "{{count}} agentes",
     cancelConfirm: "¿Cancelar esta simulación? Esta acción no se puede deshacer.",
     cancelSuccess: "Simulación cancelada.",
-    panelCosmograph: "Aquí se renderiza Cosmograph (issue #47)",
     canvas: {
+      loadingNetwork: "Cargando red…",
       preparingData: "Preparando datos…",
       computingLayout: "Calculando layout…",
       windowsClusterWarning: "El agrupamiento puede ser inestable en Windows",

@@ -2,7 +2,18 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DashboardLayout } from "@/app/layouts/dashboard";
 import { LandingLayout } from "@/app/layouts/landing";
 import { ProtectedRoute } from "@/features/auth";
-import { BoardPage, HomePage, LiveRunPage, ProfilePage, ResultsPage, WikiPage } from "@/pages";
+import {
+  AboutPage,
+  BoardPage,
+  ContactPage,
+  FaqPage,
+  HomePage,
+  LiveRunPage,
+  NotFoundPage,
+  ProfilePage,
+  ResultsPage,
+  WikiPage,
+} from "@/pages";
 import { LoginPage } from "@/pages/login/login-page";
 
 export function AppRoutes() {
@@ -17,6 +28,11 @@ export function AppRoutes() {
           <Route path="/home" element={<HomePage />} />
           <Route path="/wiki" element={<WikiPage />} />
           <Route path="/results" element={<ResultsPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          {/* Catch-all: unknown URLs get the translated 404 inside the landing shell */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         {/* Protected app routes — wrapped in DashboardLayout */}
@@ -37,8 +53,6 @@ export function AppRoutes() {
           <Route path="/board/simulation/:runId/:networkId" element={<LiveRunPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
-
-        <Route path="*" element={<div>404 - Not Found</div>} />
       </Routes>
     </BrowserRouter>
   );

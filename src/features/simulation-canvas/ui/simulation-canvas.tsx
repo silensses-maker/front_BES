@@ -540,10 +540,19 @@ export function SimulationCanvas({
 
   // Canvas-phase rendering (idle / preparing / layouting / frozen / error)
 
+  // Idle = no topology yet (it is still being fetched for this network).
   if (phase === "idle") {
     return (
       <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
-        <p className="font-sans text-sm text-muted-foreground">{t("simulation.panelCosmograph")}</p>
+        <div role="status" className="flex items-center gap-2">
+          <div
+            aria-hidden="true"
+            className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          />
+          <p className="font-sans text-sm text-muted-foreground">
+            {t("simulation.canvas.loadingNetwork")}
+          </p>
+        </div>
       </div>
     );
   }

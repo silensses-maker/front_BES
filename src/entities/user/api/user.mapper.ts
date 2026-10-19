@@ -15,9 +15,13 @@ export type BackendAuthorization = Pick<UserInfoResponse, "roles" | "usageLimits
 /**
  * Backend quotas → session quotas. `null` means unlimited and becomes Infinity; an absent
  * `maxNetworks` (backend without #122) stays absent so consumers fall back to the role table
- * (`resolveMaxNetworks`).
+ * (`resolveMaxNetworks`). An absent `limits` object (backend older than #122, whose
+ * `/api/users/info` does not send it) yields `undefined`, so the role-table fallbacks apply.
  */
-export function mapBackendUsageLimits(limits: BackendUsageLimits): UsageLimits {
+export function mapBackendUsageLimits(
+  limits: BackendUsageLimits | undefined,
+): UsageLimits | undefined {
+  if (!limits) return undefined;
   const { maxNetworks } = limits;
   return {
     maxAgents: limits.maxAgents ?? Infinity,
@@ -44,9 +48,10 @@ export function toSessionUser(
     roles: authorization?.roles ?? [],
   };
   if (!authorization) return user;
+  const usageLimits = mapBackendUsageLimits(authorization.usageLimits);
   return {
     ...user,
-    usageLimits: mapBackendUsageLimits(authorization.usageLimits),
+    ...(usageLimits ? { usageLimits } : {}),
     deactivated: authorization.deactivated,
   };
 }
