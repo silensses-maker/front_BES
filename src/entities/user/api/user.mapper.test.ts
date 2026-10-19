@@ -62,6 +62,9 @@ describe("mapBackendUsageLimits", () => {
       getRoleLimits(["BaseUser"]).maxNetworks,
     );
   });
+  it("returns undefined when the backend sends no usageLimits (backend older than #122)", () => {
+    expect(mapBackendUsageLimits(undefined)).toBeUndefined();
+  });
 });
 
 describe("toSessionUser", () => {
@@ -128,5 +131,14 @@ describe("toSessionUser", () => {
     // The role-table fallbacks then apply (Guest).
     expect(getRoleLimits(user.roles)).toEqual(getRoleLimits(["Guest"]));
     expect(resolveMaxNetworks(user)).toBe(getRoleLimits(["Guest"]).maxNetworks);
+  });
+
+  it("does not crash when the backend omits usageLimits; the role-table fallbacks apply", () => {
+    const { usageLimits: _omitted, ...withoutLimits } = syncResponse;
+    const user = toSessionUser(identity, withoutLimits as typeof syncResponse);
+    expect(user.roles).toEqual(["BaseUser"]);
+    expect(user.usageLimits).toBeUndefined();
+    expect(getRoleLimits(user.roles)).toEqual(getRoleLimits(["BaseUser"]));
+    expect(resolveMaxNetworks(user)).toBe(getRoleLimits(["BaseUser"]).maxNetworks);
   });
 });

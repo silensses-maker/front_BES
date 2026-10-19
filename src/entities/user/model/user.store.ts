@@ -68,7 +68,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      set({ user: toSessionUser(firebaseUser, authorization), loading: false });
+      try {
+        set({ user: toSessionUser(firebaseUser, authorization), loading: false });
+      } catch (error) {
+        // An unexpected backend payload must never leave the app stuck on `loading`: keep the
+        // Firebase identity and the role-table fallbacks.
+        logger.error("useAuthStore.observeAuthState", error);
+        set({ user: toSessionUser(firebaseUser, null), loading: false });
+      }
     });
   },
 }));
