@@ -55,12 +55,12 @@ vi.mock("@/entities/simulation", async () => {
 });
 
 // Real (pure) role-table fallback, imported by file path so the entity index does not pull
-// the Firebase-backed user API into the test environment.
+// the Firebase-backed auth store into the test environment.
 vi.mock("@/entities/user", async () => {
-  const { resolveMaxNetworks } = await vi.importActual<
+  const { getHighestRole, resolveMaxNetworks } = await vi.importActual<
     typeof import("@/entities/user/lib/permissions")
   >("@/entities/user/lib/permissions");
-  return { useAuthStore: vi.fn(), resolveMaxNetworks };
+  return { useAuthStore: vi.fn(), getHighestRole, resolveMaxNetworks };
 });
 
 vi.mock("@/shared/api/backend", () => ({

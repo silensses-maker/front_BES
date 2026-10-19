@@ -1,4 +1,4 @@
-import { useAuthStore, usePermissions } from "@/entities/user";
+import { resolveMaxNetworks, useAuthStore, usePermissions } from "@/entities/user";
 import { LanguageSwitcher } from "@/features/language-switch";
 import { DeactivateButton, EditNameForm } from "@/features/profile";
 import { useTranslation } from "@/shared/i18n";
@@ -6,6 +6,7 @@ import { useTranslation } from "@/shared/i18n";
 export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const { roles, limits } = usePermissions();
+  const maxNetworks = user ? resolveMaxNetworks(user) : limits.maxNetworks;
   const { t } = useTranslation();
 
   return (
@@ -34,6 +35,8 @@ export function ProfilePage() {
           <span>
             {limits.maxIterations === Infinity ? t("common.unlimited") : limits.maxIterations}
           </span>
+          <span>{t("profile.maxNetworks")}</span>
+          <span>{maxNetworks === Infinity ? t("common.unlimited") : maxNetworks}</span>
           <span>{t("profile.densityFactor")}</span>
           <span>{limits.densityFactor}</span>
         </div>

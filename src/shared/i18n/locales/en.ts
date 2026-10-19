@@ -23,6 +23,7 @@ const en = {
     usageLimits: "Usage limits",
     maxAgents: "Max agents",
     maxIterations: "Max iterations",
+    maxNetworks: "Max networks",
     densityFactor: "Density factor",
     editDisplayName: "Edit display name",
     displayName: "Display name",
@@ -42,6 +43,7 @@ const en = {
     usageLimitsDescription: "Quotas applied to your current role.",
     agentsUsed: "Agents",
     iterationsUsed: "Iterations",
+    networksUsed: "Networks",
     densityFactorLabel: "Density factor",
   },
   home: {
@@ -479,7 +481,8 @@ const en = {
     errorLimitExceeded: "Your plan limit was exceeded. Reduce the configuration and try again.",
     errorLimitExceededDetail:
       "Limit exceeded: your plan allows {{limit}}, but {{requested}} were requested.",
-    userLimitsHint: "{{role}} · max {{maxAgents}} agents · max {{maxIterations}} iterations",
+    userLimitsHint:
+      "{{role}} · max {{maxAgents}} agents · max {{maxIterations}} iterations · max {{maxNetworks}} networks",
     limitUnlimited: "unlimited",
     quotaTooltip: "Quota applied to your current role. The wizard's validation uses these caps.",
     discardDraft: "Discard draft",
@@ -834,13 +837,6 @@ const en = {
     streamErrorBody:
       "The data stream for this run could not be recovered. You can retry the connection.",
     retry: "Retry",
-  },
-  user: {
-    errorGet: "Error loading user data.",
-    errorGetByEmail: "Error loading user by email.",
-    errorCreate: "Error creating user profile.",
-    errorUpdate: "Error updating user data.",
-    errorDelete: "Error deleting user.",
   },
   liveRun: {
     sidebar: {

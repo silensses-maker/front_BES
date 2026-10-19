@@ -75,8 +75,18 @@ describe("usersApi", () => {
 
       const result = await usersApi.getInfo("uid-test-user");
 
-      expect(backendClient.get).toHaveBeenCalledWith("/api/users/info/uid-test-user");
+      expect(backendClient.get).toHaveBeenCalledWith("/api/users/info/uid-test-user", undefined);
       expect(result).toEqual(mockUserSyncResponse);
+    });
+
+    it("passes the timeout option to the request", async () => {
+      vi.mocked(backendClient.get).mockResolvedValue({ data: mockUserSyncResponse });
+
+      await usersApi.getInfo("uid-test-user", { timeout: 5000 });
+
+      expect(backendClient.get).toHaveBeenCalledWith("/api/users/info/uid-test-user", {
+        timeout: 5000,
+      });
     });
 
     it("propagates error if request fails", async () => {
@@ -84,6 +94,24 @@ describe("usersApi", () => {
       vi.mocked(backendClient.get).mockRejectedValue(error);
 
       await expect(usersApi.getInfo("uid-test-user")).rejects.toThrow("Not found");
+    });
+  });
+
+  describe("deactivateMe", () => {
+    it("POSTs to the deactivate endpoint and returns its body", async () => {
+      vi.mocked(backendClient.post).mockResolvedValue({ data: { deactivated: true } });
+
+      const result = await usersApi.deactivateMe();
+
+      expect(backendClient.post).toHaveBeenCalledWith("/api/users/me/deactivate");
+      expect(result).toEqual({ deactivated: true });
+    });
+
+    it("propagates error if request fails", async () => {
+      const error = new Error("Request failed with status code 500");
+      vi.mocked(backendClient.post).mockRejectedValue(error);
+
+      await expect(usersApi.deactivateMe()).rejects.toThrow(error);
     });
   });
 

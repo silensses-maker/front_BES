@@ -1,4 +1,4 @@
-import { resolveMaxNetworks, useAuthStore } from "@/entities/user";
+import { getHighestRole, resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -101,7 +101,7 @@ export function SimulationLiveSummary() {
   const maxAgents = user?.usageLimits?.maxAgents ?? null;
   const maxIterations = user?.usageLimits?.maxIterations ?? null;
   const maxNetworks = user ? resolveMaxNetworks(user) : null;
-  const role = user?.roles?.[0] ?? "—";
+  const role = user?.roles?.length ? getHighestRole(user.roles) : "—";
 
   const isCustom = networkType === "custom";
   const maxEdges = computeMaxEdges(gen.density, gen.numberOfAgents);

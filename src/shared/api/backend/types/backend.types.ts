@@ -36,7 +36,7 @@ export interface UsageLimits {
   maxNetworks?: number | null;
 }
 
-/** Shape returned by POST /api/users/sync and GET /api/users/info/{uid} */
+/** Shape returned by POST /api/users/sync */
 export interface UserSyncResponse {
   uid: string;
   email: string;
@@ -44,6 +44,14 @@ export interface UserSyncResponse {
   photo: string | null;
   roles: UserRole[];
   usageLimits: UsageLimits;
+  deactivated: boolean;
+}
+
+/** Shape returned by GET /api/users/info/{uid}: the sync shape without `photo`. */
+export type UserInfoResponse = Omit<UserSyncResponse, "photo">;
+
+/** Shape returned by POST /api/users/me/deactivate */
+export interface DeactivateResponse {
   deactivated: boolean;
 }
 

@@ -1,1 +1,1 @@
-export { auth, db } from "./config";
+export { auth } from "./config";

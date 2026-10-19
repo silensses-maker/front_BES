@@ -1,6 +1,6 @@
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { toast } from "sonner";
-import { useAuthStore } from "@/entities/user";
+import { toSessionUser, useAuthStore } from "@/entities/user";
 import { usersApi } from "@/shared/api/backend";
 import { auth } from "@/shared/api/firebase";
 import { useTranslation } from "@/shared/i18n";
@@ -17,28 +17,14 @@ export function useLogin() {
   const login = async () => {
     setLoading(true);
     try {
-      await signInWithPopup(auth, provider);
+      // Identity (email, name, photo): the Firebase user.
+      const { user: firebaseUser } = await signInWithPopup(auth, provider);
       // auth.currentUser is set synchronously by Firebase before the promise
       // resolves, so the auth interceptor on backendClient will find a valid
       // currentUser when it calls getIdToken() for the Authorization header.
-      const data = await usersApi.sync();
-      // `maxNetworks` absent (backend without #122) is left out so consumers fall back to the
-      // role table; `null` means unlimited, like the other limits.
-      const { maxNetworks } = data.usageLimits;
-      setUser({
-        uid: data.uid,
-        email: data.email,
-        name: data.name,
-        photo: data.photo ?? "",
-        roles: data.roles,
-        usageLimits: {
-          maxAgents: data.usageLimits.maxAgents ?? Infinity,
-          maxIterations: data.usageLimits.maxIterations ?? Infinity,
-          densityFactor: data.usageLimits.densityFactor,
-          ...(maxNetworks === undefined ? {} : { maxNetworks: maxNetworks ?? Infinity }),
-        },
-        deactivated: data.deactivated,
-      });
+      // Authorization (roles, quotas): the backend, which creates the account on first login.
+      const authorization = await usersApi.sync();
+      setUser(toSessionUser(firebaseUser, authorization));
     } catch (error) {
       logger.error("useLogin", error);
       toast.error(t("auth.errorLogin"));

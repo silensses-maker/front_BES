@@ -1,4 +1,4 @@
-import { getRoleLimits, useAuthStore } from "@/entities/user";
+import { getRoleLimits, resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { DeactivateButton } from "@/features/profile/deactivate-account";
 import { EditNameForm } from "@/features/profile/edit-display-name";
 import { useTranslation } from "@/shared/i18n";
@@ -17,6 +17,8 @@ export function ProfileSheet() {
   const displayName = user?.name || t("dashboard.guestName");
   const initials = displayName.slice(0, 2).toUpperCase();
   const limits = user ? getRoleLimits(user.roles) : null;
+  // Session quota (backend), falling back to the role table when it predates maxNetworks (#122).
+  const maxNetworks = user ? resolveMaxNetworks(user) : Infinity;
 
   const isUnlimited = (value: number) => value === Infinity;
 
@@ -26,6 +28,7 @@ export function ProfileSheet() {
     limits && !isUnlimited(limits.maxIterations)
       ? Math.min(100, (0 / limits.maxIterations) * 100)
       : 100;
+  const networkPercent = !isUnlimited(maxNetworks) ? Math.min(100, (0 / maxNetworks) * 100) : 100;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -111,6 +114,17 @@ export function ProfileSheet() {
                   </span>
                 </div>
                 <Progress value={isUnlimited(limits.maxIterations) ? 100 : iterationPercent} />
+              </div>
+
+              {/* Networks */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">{t("profile.networksUsed")}</span>
+                  <span className="text-sm font-mono font-medium">
+                    {isUnlimited(maxNetworks) ? t("common.unlimited") : maxNetworks}
+                  </span>
+                </div>
+                <Progress value={isUnlimited(maxNetworks) ? 100 : networkPercent} />
               </div>
 
               {/* Density factor */}

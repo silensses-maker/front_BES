@@ -23,6 +23,7 @@ const es = {
     usageLimits: "Límites de uso",
     maxAgents: "Máx. agentes",
     maxIterations: "Máx. iteraciones",
+    maxNetworks: "Máx. redes",
     densityFactor: "Factor de densidad",
     editDisplayName: "Editar nombre de usuario",
     displayName: "Nombre de usuario",
@@ -42,6 +43,7 @@ const es = {
     usageLimitsDescription: "Cuotas aplicadas a tu rol actual.",
     agentsUsed: "Agentes",
     iterationsUsed: "Iteraciones",
+    networksUsed: "Redes",
     densityFactorLabel: "Factor de densidad",
   },
   home: {
@@ -486,7 +488,8 @@ const es = {
       "Se superó el límite de tu plan. Reduce la configuración e intenta de nuevo.",
     errorLimitExceededDetail:
       "Límite superado: tu plan permite {{limit}}, pero se solicitaron {{requested}}.",
-    userLimitsHint: "{{role}} · máx. {{maxAgents}} agentes · máx. {{maxIterations}} iteraciones",
+    userLimitsHint:
+      "{{role}} · máx. {{maxAgents}} agentes · máx. {{maxIterations}} iteraciones · máx. {{maxNetworks}} redes",
     limitUnlimited: "ilimitado",
     quotaTooltip: "Cuota aplicada a tu rol actual. La validación del asistente usa estos topes.",
     discardDraft: "Descartar borrador",
@@ -847,13 +850,6 @@ const es = {
     streamErrorBody:
       "No se pudo recuperar el flujo de datos de esta ejecución. Puedes reintentar la conexión.",
     retry: "Reintentar",
-  },
-  user: {
-    errorGet: "Error al cargar los datos del usuario.",
-    errorGetByEmail: "Error al cargar el usuario por correo.",
-    errorCreate: "Error al crear el perfil de usuario.",
-    errorUpdate: "Error al actualizar los datos del usuario.",
-    errorDelete: "Error al eliminar el usuario.",
   },
   liveRun: {
     sidebar: {
