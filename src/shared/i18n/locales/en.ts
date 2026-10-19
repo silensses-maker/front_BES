@@ -599,6 +599,7 @@ const en = {
     cancelDialogConfirm: "Yes, cancel the simulation",
     cancelDialogDismiss: "Keep running",
     cancelSuccess: "Simulation cancelled.",
+    cancelAlreadyFinished: "This run had already finished — its status has been updated.",
     errorCancel: "Failed to cancel the simulation. Please try again.",
     errorLoad: "Failed to load experiments. Please try again.",
     emptyList: "No experiments found.",
@@ -791,7 +792,7 @@ const en = {
     networkUnselected: "Not selected",
     runDataGoneTitle: "This run's data is no longer available",
     runDataGoneBody:
-      "The server no longer retains this run's networks — retention expired or its save mode does not persist data. Its metadata is still listed under My experiments.",
+      "The server no longer retains this run's networks — retention expired, the server restarted, or its save mode does not persist data. Its metadata is still listed under My experiments.",
     // ── Run sidebar ─────────────────────────────────────────
     statusRunning: "Running",
     statusReconnecting: "Reconnecting…",
@@ -829,6 +830,7 @@ const en = {
     cancelDialogConfirm: "Yes, cancel the simulation",
     cancelDialogKeep: "Keep running",
     cancelledToast: "Simulation cancelled. Received data is kept.",
+    cancelAlreadyFinished: "This run had already finished — there was nothing to cancel.",
     backToBoard: "Back to board",
     // ── Limited viewer / error states ───────────────────────
     limitedBanner:

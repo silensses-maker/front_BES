@@ -612,6 +612,7 @@ const es = {
     cancelDialogConfirm: "Sí, cancelar la simulación",
     cancelDialogDismiss: "Seguir ejecutando",
     cancelSuccess: "Simulación cancelada.",
+    cancelAlreadyFinished: "Esta ejecución ya había terminado; se actualizó su estado.",
     errorCancel: "No se pudo cancelar la simulación. Por favor intenta de nuevo.",
     errorLoad: "No se pudieron cargar los experimentos. Por favor intenta de nuevo.",
     emptyList: "No se encontraron experimentos.",
@@ -803,7 +804,7 @@ const es = {
     networkUnselected: "Sin seleccionar",
     runDataGoneTitle: "Los datos de esta ejecución ya no están disponibles",
     runDataGoneBody:
-      "El servidor ya no conserva las redes de esta ejecución — la retención expiró o su modo de guardado no persiste datos. Sus metadatos siguen visibles en Mis experimentos.",
+      "El servidor ya no conserva las redes de esta ejecución — la retención expiró, el servidor se reinició o su modo de guardado no persiste datos. Sus metadatos siguen visibles en Mis experimentos.",
     // ── Sidebar de ejecución ────────────────────────────────
     statusRunning: "En ejecución",
     statusReconnecting: "Reconectando…",
@@ -842,6 +843,7 @@ const es = {
     cancelDialogConfirm: "Sí, cancelar la simulación",
     cancelDialogKeep: "Seguir ejecutando",
     cancelledToast: "Simulación cancelada. Los datos recibidos se conservan.",
+    cancelAlreadyFinished: "Esta ejecución ya había terminado; no había nada que cancelar.",
     backToBoard: "Volver al tablero",
     // ── Viewer limitado / estados de error ──────────────────
     limitedBanner:

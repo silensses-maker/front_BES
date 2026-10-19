@@ -11,6 +11,7 @@ import { Card } from "@/shared/ui/card";
 import { consensusSummary } from "./network-browser-lib";
 import { NetworkSelectorWaiting } from "./network-selector";
 import { NetworkSelectorPanel } from "./network-selector-panel";
+import { isFinishedRunTopologyGone } from "./run-data-availability";
 import { RunView } from "./run-view";
 import { useFinalSpreads } from "./use-final-spreads";
 import { useNetworkConsensus } from "./use-network-consensus";
@@ -105,16 +106,32 @@ export function LiveRunPage() {
   useEffect(() => {
     if (!runId) return;
 
+    let cancelled = false;
+
     if (networkId) {
       setLoadingState("run-view");
-      return;
+      // Direct link / refresh: a finished run whose topology the backend no longer retains
+      // (e.g. after a backend restart) gets the "gone" state instead of a viewer that never loads.
+      void isFinishedRunTopologyGone(runId, networkId).then((gone) => {
+        if (!cancelled && gone) setLoadingState("gone");
+      });
+      return () => {
+        cancelled = true;
+      };
     }
-
-    let cancelled = false;
 
     const discover = async () => {
       try {
         const { networks } = await simulationsApi.listNetworks(runId);
+        if (cancelled) return;
+
+        // /networks also lists the networks that only have persisted frames left (#124); for a
+        // finished run whose topology is gone that is the "gone" state, not the viewer.
+        const firstNetwork = networks[0];
+        if (firstNetwork !== undefined && (await isFinishedRunTopologyGone(runId, firstNetwork))) {
+          if (!cancelled) setLoadingState("gone");
+          return;
+        }
         if (cancelled) return;
 
         if (networks.length === 1) {

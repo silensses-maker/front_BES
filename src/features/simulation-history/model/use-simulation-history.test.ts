@@ -10,7 +10,7 @@ import { useSimulationHistory } from "./use-simulation-history";
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
 // Real last-run store (imported by file path to avoid the entity index pulling
@@ -26,6 +26,7 @@ vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
     listMine: vi.fn(),
     cancel: vi.fn(),
+    getById: vi.fn(),
   },
 }));
 
@@ -487,6 +488,35 @@ describe("useSimulationHistory", () => {
       expect(result.current.runs[0]?.status).toBe("running");
       expect(logger.error).toHaveBeenCalledWith("useSimulationHistory.confirmCancel", error);
       expect(toast.error).toHaveBeenCalledWith("simulationHistory.errorCancel");
+    });
+
+    it("on 409 conflict shows the run's real terminal status instead of an error", async () => {
+      // DELETE on a run that finished meanwhile: the backend keeps its terminal status (#124)
+      const conflict = {
+        isAxiosError: true,
+        response: { status: 409, data: { error: "conflict", message: "Run already finished" } },
+      };
+      vi.mocked(simulationsApi.listMine).mockResolvedValue({
+        runs: [runningRun],
+        limit: 20,
+        offset: 0,
+      });
+      vi.mocked(simulationsApi.cancel).mockRejectedValue(conflict);
+      vi.mocked(simulationsApi.getById).mockResolvedValue({ ...runningRun, status: "completed" });
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadRuns(result);
+
+      act(() => {
+        result.current.requestCancel("run-run");
+      });
+      await act(async () => {
+        await result.current.confirmCancel();
+      });
+
+      expect(simulationsApi.getById).toHaveBeenCalledWith("run-run");
+      expect(result.current.runs[0]?.status).toBe("completed");
+      expect(toast.info).toHaveBeenCalledWith("simulationHistory.cancelAlreadyFinished");
+      expect(toast.error).not.toHaveBeenCalled();
     });
   });
 

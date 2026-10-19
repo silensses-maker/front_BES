@@ -31,6 +31,7 @@ const BACKEND_ERROR_CODES: ReadonlySet<BackendErrorCode> = new Set([
   "invalid_body",
   "usage_limit_exceeded",
   "rate_limited",
+  "conflict",
 ]);
 
 function isKnownCode(code: string): code is BackendErrorCode {

@@ -102,6 +102,7 @@ describe("getBackendErrorCode", () => {
       "invalid_body",
       "usage_limit_exceeded",
       "rate_limited",
+      "conflict",
     ];
 
     for (const code of knownCodes) {

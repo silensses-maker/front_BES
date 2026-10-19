@@ -16,7 +16,9 @@ export type BackendErrorCode =
   | "not_found"
   | "invalid_body"
   | "usage_limit_exceeded"
-  | "rate_limited";
+  | "rate_limited"
+  /** 409 — e.g. `DELETE /simulations/{runId}` on a run that already finished (#124). */
+  | "conflict";
 
 export interface BackendError {
   error: BackendErrorCode | string;
