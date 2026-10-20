@@ -36,7 +36,7 @@ export type PlaybackSpeed = 1 | 4 | 16 | 64;
 export const PLAYBACK_SPEEDS: PlaybackSpeed[] = [1, 4, 16, 64];
 
 /** Rounds per second at ×1 speed. */
-const BASE_RPS = 10;
+export const BASE_RPS = 10;
 /** Max raw chunks kept in memory (LRU). */
 const MAX_CACHED_CHUNKS = 4;
 

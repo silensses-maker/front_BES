@@ -65,3 +65,18 @@ export const ProfilePage = lazy(() =>
     default: m.ProfilePage,
   })),
 );
+
+// ── Benchmark harness (#126) ──────────────────────────────────────────────────
+
+/**
+ * /bench suite page — only in benchmark builds (`PUBLIC_BENCHMARK=true`). `__BENCHMARK__` is a
+ * build-time literal: in a normal build this is `null` and the dynamic import is dead code, so
+ * no chunk is emitted.
+ */
+export const BenchPage = __BENCHMARK__
+  ? lazy(() =>
+      import(/* webpackChunkName: "page-bench" */ "@/pages/bench").then((m) => ({
+        default: m.BenchPage,
+      })),
+    )
+  : null;

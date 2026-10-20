@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSimulationWsClient, useSimulationStore } from "@/entities/simulation";
+import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
@@ -36,14 +36,13 @@ vi.mock("@/entities/simulation", () => {
   useSimulationStoreMock.getState = mockGetState;
   return {
     createSimulationWsClient: vi.fn(),
+    loadTopology: vi.fn(),
     useSimulationStore: useSimulationStoreMock,
   };
 });
 
 vi.mock("@/shared/api/backend", () => ({
   simulationsApi: {
-    getTopology: vi.fn(),
-    getTopologyFull: vi.fn(),
     getFrames: vi.fn(),
   },
 }));
@@ -119,7 +118,7 @@ describe("useSimulationStream", () => {
       topology: null,
       setTopology: mockSetTopology,
     });
-    vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(null);
+    vi.mocked(loadTopology).mockResolvedValue(null);
     vi.mocked(useTranslation).mockReturnValue({
       t: (key: string) => key,
     } as unknown as ReturnType<typeof useTranslation>);
@@ -244,22 +243,22 @@ describe("useSimulationStream", () => {
     });
   });
 
-  describe("proactive topology fetch (networkId provided)", () => {
+  describe("proactive topology fetch (networkId provided) — shared load (#140)", () => {
     const topo = { runId: "run-123", networkId: "net-1", agents: [], edges: [] };
 
     it("fetches and sets topology when none is in the store yet", async () => {
-      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(topo as never);
+      vi.mocked(loadTopology).mockResolvedValue(topo as never);
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123", "net-1"));
       });
 
-      expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith("run-123", "net-1");
+      expect(loadTopology).toHaveBeenCalledWith("run-123", "net-1");
       expect(mockSetTopology).toHaveBeenCalledWith(topo);
     });
 
     it("does not set topology when the fetch resolves null", async () => {
-      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(null);
+      vi.mocked(loadTopology).mockResolvedValue(null);
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123", "net-1"));
@@ -269,7 +268,7 @@ describe("useSimulationStream", () => {
     });
 
     it("does not overwrite a topology already present in the store", async () => {
-      vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(topo as never);
+      vi.mocked(loadTopology).mockResolvedValue(topo as never);
       mockGetState.mockReturnValue({ topology: { existing: true }, setTopology: mockSetTopology });
 
       await act(async () => {
@@ -280,7 +279,7 @@ describe("useSimulationStream", () => {
     });
 
     it("logs an error when the topology fetch rejects", async () => {
-      vi.mocked(simulationsApi.getTopologyFull).mockRejectedValue(new Error("boom"));
+      vi.mocked(loadTopology).mockRejectedValue(new Error("boom"));
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123", "net-1"));
@@ -292,12 +291,43 @@ describe("useSimulationStream", () => {
       );
     });
 
+    it("does not load a topology while waiting for the first network (networkId null)", async () => {
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123"));
+      });
+
+      expect(loadTopology).not.toHaveBeenCalled();
+    });
+
+    it("does not set a topology the shared load delivers after unmount", async () => {
+      let resolveTopology!: (topology: unknown) => void;
+      const pending = new Promise((resolve) => {
+        resolveTopology = resolve;
+      });
+      vi.mocked(loadTopology).mockReturnValue(pending as never);
+
+      let unmount!: () => void;
+      await act(async () => {
+        ({ unmount } = renderHook(() => useSimulationStream("run-123", "net-1")));
+      });
+      act(() => {
+        unmount();
+      });
+
+      await act(async () => {
+        resolveTopology(topo);
+        await pending;
+      });
+
+      expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
     it("does not log a topology fetch error once the component has unmounted", async () => {
       let rejectTopology!: (err: unknown) => void;
       const pending = new Promise<never>((_, reject) => {
         rejectTopology = reject;
       });
-      vi.mocked(simulationsApi.getTopologyFull).mockReturnValue(pending as never);
+      vi.mocked(loadTopology).mockReturnValue(pending as never);
 
       let unmount!: () => void;
       await act(async () => {

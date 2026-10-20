@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { SimulationWsClient } from "@/entities/simulation";
-import { createSimulationWsClient, useSimulationStore } from "@/entities/simulation";
+import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
@@ -66,10 +66,13 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
     // Proactive topology fetch: the persistent WS replays topology_ready on
     // subscribe, but a REST prefetch races it and ensures the worker is
     // initialised even if the WS replay is delayed (page refresh, reconnect).
+    // Shared load (#140): the WS handler joins this download instead of
+    // starting its own, and the selector's download of the same network is
+    // reused. Cancelling only ignores the result — the download keeps serving
+    // the other callers.
     let topologyCancelled = false;
     if (networkId !== null) {
-      simulationsApi
-        .getTopologyFull(runId, networkId)
+      loadTopology(runId, networkId)
         .then((topo) => {
           if (topologyCancelled || topo === null) return;
           const current = useSimulationStore.getState().topology;

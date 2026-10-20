@@ -4,6 +4,7 @@ import { LandingLayout } from "@/app/layouts/landing";
 import { RouteBoundary } from "@/app/routing";
 import {
   AboutPage,
+  BenchPage,
   BoardPage,
   ContactPage,
   FaqPage,
@@ -17,6 +18,7 @@ import { ProtectedRoute } from "@/features/auth";
 import { HomePage } from "@/pages/home/home-page";
 import { LoginPage } from "@/pages/login/login-page";
 import { NotFoundPage } from "@/pages/not-found/not-found-page";
+import { isBenchmarkHost } from "@/shared/lib/bench-probe";
 
 export function AppRoutes() {
   return (
@@ -24,6 +26,19 @@ export function AppRoutes() {
       <Routes>
         {/* Auth */}
         <Route index element={<LoginPage />} />
+
+        {/* Benchmark suite (#126): benchmark builds on a loopback host only, no login. Normal
+            builds compile this out (unknown URL → the 404 below). */}
+        {__BENCHMARK__ && BenchPage !== null && isBenchmarkHost(window.location.hostname) && (
+          <Route
+            path="/bench"
+            element={
+              <RouteBoundary key="bench">
+                <BenchPage />
+              </RouteBoundary>
+            }
+          />
+        )}
 
         {/* Public landing shell — LandingLayout owns the Suspense/error boundary of its pages */}
         <Route element={<LandingLayout />}>
