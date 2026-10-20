@@ -432,6 +432,15 @@ const en = {
     body: "The page you are looking for does not exist or is no longer available.",
     backHome: "Back to home",
   },
+  routeBoundary: {
+    loading: "Loading page…",
+    chunkErrorTitle: "This page could not be loaded",
+    chunkErrorBody:
+      "The app may have been updated since you opened it, or the connection dropped. Reload to get the latest version.",
+    errorTitle: "Something went wrong",
+    errorBody: "This page could not be displayed. Reloading usually fixes it.",
+    reload: "Reload",
+  },
   simulation: {
     errorStream: "Connection to the simulation failed. Please try again.",
     errorRateLimited: "Too many requests. Please wait before reconnecting.",
