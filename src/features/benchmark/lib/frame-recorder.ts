@@ -1,9 +1,11 @@
 import type { BenchRuntime } from "./runtime";
 
 /**
- * Records one measured window (#126): every requestAnimationFrame delta, long tasks
+ * Records one window (#126): the timestamp of every requestAnimationFrame, long tasks
  * (`PerformanceObserver('longtask')` where supported) and JS heap samples
- * (`performance.memory`, Chromium only).
+ * (`performance.memory`, Chromium only). The raw timestamps let a window be split after the
+ * fact (see `splitRecording`): the layout windows start at the first frame Cosmograph draws
+ * with the data, which is only known once the window has been recorded.
  */
 
 export interface HeapReading {
@@ -28,20 +30,38 @@ export type LongTaskObserverFactory = (
   onEntries: (entries: readonly LongTaskEntryLite[]) => void,
 ) => LongTaskObserverHandle | null;
 
+export interface LongTaskSummary {
+  supported: boolean;
+  count: number;
+  totalMs: number;
+  maxMs: number;
+}
+
+export interface HeapSummary {
+  supported: boolean;
+  samples: number;
+  minBytes: number | null;
+  maxBytes: number | null;
+  endBytes: number | null;
+  totalEndBytes: number | null;
+  limitBytes: number | null;
+}
+
+export interface HeapSample extends HeapReading {
+  at: number;
+}
+
 export interface PhaseRecording {
   startedAt: number;
   endedAt: number;
+  /** Frame-to-frame intervals between consecutive recorded frames. */
   deltas: number[];
-  longTasks: { supported: boolean; count: number; totalMs: number; maxMs: number };
-  heap: {
-    supported: boolean;
-    samples: number;
-    minBytes: number | null;
-    maxBytes: number | null;
-    endBytes: number | null;
-    totalEndBytes: number | null;
-    limitBytes: number | null;
-  };
+  /** rAF timestamps of the recorded frames. */
+  frameTimes: number[];
+  longTasks: LongTaskSummary;
+  longTaskEntries: LongTaskEntryLite[];
+  heap: HeapSummary;
+  heapSamples: HeapSample[];
 }
 
 export interface FrameRecorderDeps {
@@ -58,6 +78,112 @@ export interface FrameRecorder {
   readonly running: boolean;
 }
 
+export function summarizeLongTasks(
+  entries: readonly LongTaskEntryLite[],
+  supported: boolean,
+): LongTaskSummary {
+  let totalMs = 0;
+  let maxMs = 0;
+  for (const e of entries) {
+    totalMs += e.duration;
+    maxMs = Math.max(maxMs, e.duration);
+  }
+  return { supported, count: entries.length, totalMs, maxMs };
+}
+
+export function summarizeHeap(samples: readonly HeapSample[]): HeapSummary {
+  if (samples.length === 0) {
+    return {
+      supported: false,
+      samples: 0,
+      minBytes: null,
+      maxBytes: null,
+      endBytes: null,
+      totalEndBytes: null,
+      limitBytes: null,
+    };
+  }
+  let min = Number.POSITIVE_INFINITY;
+  let max = 0;
+  for (const s of samples) {
+    min = Math.min(min, s.usedBytes);
+    max = Math.max(max, s.usedBytes);
+  }
+  const end = samples[samples.length - 1] as HeapSample;
+  return {
+    supported: true,
+    samples: samples.length,
+    minBytes: min,
+    maxBytes: max,
+    endBytes: end.usedBytes,
+    totalEndBytes: end.totalBytes,
+    limitBytes: end.limitBytes,
+  };
+}
+
+function deltasOf(frameTimes: readonly number[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < frameTimes.length; i++) {
+    out.push((frameTimes[i] ?? 0) - (frameTimes[i - 1] ?? 0));
+  }
+  return out;
+}
+
+/** Builds a recording from raw data (frames, long tasks and heap samples inside [start, end]). */
+export function makeRecording(
+  startedAt: number,
+  endedAt: number,
+  frameTimes: number[],
+  longTaskEntries: LongTaskEntryLite[],
+  longTasksSupported: boolean,
+  heapSamples: HeapSample[],
+): PhaseRecording {
+  return {
+    startedAt,
+    endedAt,
+    frameTimes,
+    deltas: deltasOf(frameTimes),
+    longTaskEntries,
+    longTasks: summarizeLongTasks(longTaskEntries, longTasksSupported),
+    heapSamples,
+    heap: summarizeHeap(heapSamples),
+  };
+}
+
+/**
+ * Splits a recording at `at`: the lead keeps what happened before (frames, long tasks that
+ * started, heap samples), the main window what happened from `at` on. The frame interval that
+ * spans `at` belongs to neither, so a stall before the first frame of the main window never
+ * lands in it.
+ */
+export function splitRecording(
+  rec: PhaseRecording,
+  at: number,
+): { lead: PhaseRecording; main: PhaseRecording } {
+  const cut = Math.min(Math.max(at, rec.startedAt), rec.endedAt);
+  const leadFrames = rec.frameTimes.filter((t) => t < cut);
+  const mainFrames = rec.frameTimes.filter((t) => t >= cut);
+  const supported = rec.longTasks.supported;
+  return {
+    lead: makeRecording(
+      rec.startedAt,
+      cut,
+      leadFrames,
+      rec.longTaskEntries.filter((e) => e.startTime < cut),
+      supported,
+      rec.heapSamples.filter((s) => s.at < cut),
+    ),
+    main: makeRecording(
+      mainFrames[0] ?? cut,
+      rec.endedAt,
+      mainFrames,
+      rec.longTaskEntries.filter((e) => e.startTime >= cut),
+      supported,
+      rec.heapSamples.filter((s) => s.at >= cut),
+    ),
+  };
+}
+
 export function createFrameRecorder(deps: FrameRecorderDeps): FrameRecorder {
   const { runtime, readHeap, observeLongTasks } = deps;
   const heapSampleMs = deps.heapSampleMs ?? 250;
@@ -65,29 +191,23 @@ export function createFrameRecorder(deps: FrameRecorderDeps): FrameRecorder {
   let running = false;
   let handle: number | null = null;
   let startedAt = 0;
-  let previous: number | null = null;
   let lastHeapSample = Number.NEGATIVE_INFINITY;
-  let deltas: number[] = [];
+  let frameTimes: number[] = [];
+  let longTasks: LongTaskEntryLite[] = [];
+  let heapSamples: HeapSample[] = [];
   let observer: LongTaskObserverHandle | null = null;
-  let longTasks = { count: 0, totalMs: 0, maxMs: 0 };
-  let heap = { samples: 0, min: Number.POSITIVE_INFINITY, max: 0, end: null as HeapReading | null };
 
-  const sampleHeap = () => {
+  const sampleHeap = (at: number) => {
     const reading = readHeap();
-    if (reading === null) return;
-    heap.samples++;
-    heap.min = Math.min(heap.min, reading.usedBytes);
-    heap.max = Math.max(heap.max, reading.usedBytes);
-    heap.end = reading;
+    if (reading !== null) heapSamples.push({ ...reading, at });
   };
 
   const onFrame = (timestamp: number) => {
     if (!running) return;
-    if (previous !== null) deltas.push(timestamp - previous);
-    previous = timestamp;
+    frameTimes.push(timestamp);
     if (timestamp - lastHeapSample >= heapSampleMs) {
       lastHeapSample = timestamp;
-      sampleHeap();
+      sampleHeap(timestamp);
     }
     handle = runtime.requestFrame(onFrame);
   };
@@ -99,21 +219,19 @@ export function createFrameRecorder(deps: FrameRecorderDeps): FrameRecorder {
     start() {
       if (running) return;
       running = true;
-      deltas = [];
-      previous = null;
+      frameTimes = [];
+      longTasks = [];
+      heapSamples = [];
       lastHeapSample = Number.NEGATIVE_INFINITY;
-      longTasks = { count: 0, totalMs: 0, maxMs: 0 };
-      heap = { samples: 0, min: Number.POSITIVE_INFINITY, max: 0, end: null };
       startedAt = runtime.now();
       observer = observeLongTasks((entries) => {
         for (const entry of entries) {
-          if (entry.startTime < startedAt) continue;
-          longTasks.count++;
-          longTasks.totalMs += entry.duration;
-          longTasks.maxMs = Math.max(longTasks.maxMs, entry.duration);
+          if (entry.startTime >= startedAt) {
+            longTasks.push({ startTime: entry.startTime, duration: entry.duration });
+          }
         }
       });
-      sampleHeap();
+      sampleHeap(startedAt);
       handle = runtime.requestFrame(onFrame);
     },
     stop() {
@@ -121,26 +239,12 @@ export function createFrameRecorder(deps: FrameRecorderDeps): FrameRecorder {
       running = false;
       if (handle !== null) runtime.cancelFrame(handle);
       handle = null;
-      sampleHeap();
+      sampleHeap(endedAt);
       const supported = observer !== null;
       observer?.flush();
       observer?.disconnect();
       observer = null;
-      return {
-        startedAt,
-        endedAt,
-        deltas,
-        longTasks: { supported, ...longTasks },
-        heap: {
-          supported: heap.samples > 0,
-          samples: heap.samples,
-          minBytes: heap.samples > 0 ? heap.min : null,
-          maxBytes: heap.samples > 0 ? heap.max : null,
-          endBytes: heap.end?.usedBytes ?? null,
-          totalEndBytes: heap.end?.totalBytes ?? null,
-          limitBytes: heap.end?.limitBytes ?? null,
-        },
-      };
+      return makeRecording(startedAt, endedAt, frameTimes, longTasks, supported, heapSamples);
     },
   };
 }

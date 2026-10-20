@@ -5,6 +5,7 @@ import {
   CSV_COLUMNS,
   csvField,
   flattenResult,
+  isWindowComparable,
   resultToCsv,
   toCsv,
 } from "./result-csv";
@@ -44,7 +45,12 @@ describe("flattenResult", () => {
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({
       result_id: "doc-1",
-      schema_version: 1,
+      schema_version: 2,
+      canvas_variant: "baseline",
+      links_in_data: 59_988,
+      links_drawn: 59_988,
+      rendered_entities: 69_988,
+      window_comparable: true,
       build_mode: "production",
       git_commit: "ed59e82abcde",
       gpu_renderer: "NVIDIA GeForce RTX 3060",
@@ -92,6 +98,105 @@ describe("flattenResult", () => {
       ]),
     );
     expect(rows[0]?.long_tasks).toBeNull();
+  });
+});
+
+describe("version 2 fields", () => {
+  it("flattens canvas variants, the layout lead, the repaint breakdown and the upload", () => {
+    const stat = { median: 2, p95: 3, mean: 2.5 };
+    const doc = fakeDocument([
+      fakeScenario(
+        100_000,
+        3,
+        1,
+        [
+          fakePhase("layout", 40, {
+            lead: {
+              label: "upload",
+              durationMs: 1_234.56,
+              startedBy: "first-tick",
+              frames: 12,
+              maxFrameMs: 900,
+              longTasks: { supported: true, count: 2, totalMs: 1_100, maxMs: 900 },
+            },
+          }),
+          fakePhase("idle", 50, {
+            canvasVariant: "links-off",
+            links: { inData: 599_988, drawn: 0 },
+          }),
+          fakePhase("repaint", 10, {
+            variant: "x1",
+            repaint: {
+              speed: 1,
+              targetRoundsPerSecond: 10,
+              roundsRendered: 95,
+              repaintsPerSecond: 9.5,
+              breakdown: {
+                rounds: 95,
+                mergeMs: stat,
+                commitMs: stat,
+                cosmographUpdates: 90,
+                cosmographUpdateMs: { median: 80, p95: 120, mean: 85 },
+                cosmographSyncMs: stat,
+                colorUpdates: 90,
+                frameMs: 100,
+                longTaskMsPerSecond: 812.34,
+              },
+            },
+          }),
+        ],
+        {
+          canvasRenderer: "ANGLE (NVIDIA RTX 3070)",
+          load: {
+            ...fakeScenario(1, 1, 1, []).load,
+            uploadMs: 1_234.5,
+            uploadLongTasks: 2,
+            uploadLongTaskMs: 1_100,
+            uploadMaxFrameMs: 900,
+          },
+        },
+      ),
+    ]);
+    const [layout, idle, repaint] = flattenResult(doc);
+    expect(layout).toMatchObject({
+      lead_label: "upload",
+      lead_started_by: "first-tick",
+      lead_ms: 1_234.6,
+      lead_long_tasks: 2,
+      lead_long_task_ms: 1_100,
+      load_upload_ms: 1_234.5,
+      load_upload_long_tasks: 2,
+      canvas_renderer: "ANGLE (NVIDIA RTX 3070)",
+      window_comparable: true,
+    });
+    expect(idle).toMatchObject({
+      canvas_variant: "links-off",
+      links_in_data: 599_988,
+      links_drawn: 0,
+      rendered_entities: 100_000,
+    });
+    expect(repaint).toMatchObject({
+      rb_rounds: 95,
+      rb_cosmograph_update_ms_median: 80,
+      rb_cosmograph_update_ms_p95: 120,
+      rb_long_task_ms_per_s: 812.3,
+      frame_ms_mean: 100,
+    });
+  });
+
+  it("marks version 1 layout windows as not comparable", () => {
+    const v1 = fakeDocument(
+      [
+        fakeScenario(1_000, 2, 1, [
+          fakePhase("layout", 60),
+          fakePhase("cluster-layout", 60),
+          fakePhase("idle", 60),
+        ]),
+      ],
+      { schemaVersion: 1 },
+    );
+    expect(flattenResult(v1).map((r) => r.window_comparable)).toEqual([false, false, true]);
+    expect(isWindowComparable(2, "layout")).toBe(true);
   });
 });
 

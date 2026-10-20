@@ -22,6 +22,7 @@ export const CSV_COLUMNS = [
   "gpu_vendor",
   "gpu_renderer",
   "gpu_source",
+  "canvas_renderer",
   "software_rendering",
   "cpu_threads",
   "device_memory_gb",
@@ -45,6 +46,11 @@ export const CSV_COLUMNS = [
   "stage",
   "phase",
   "variant",
+  "canvas_variant",
+  "links_in_data",
+  "links_drawn",
+  "rendered_entities",
+  "window_comparable",
   "warmup_ms",
   "measure_ms",
   "actual_ms",
@@ -53,6 +59,7 @@ export const CSV_COLUMNS = [
   "fps_p5",
   "fps_p1",
   "fps_mean",
+  "frame_ms_mean",
   "frame_ms_p50",
   "frame_ms_p95",
   "frame_ms_p99",
@@ -73,6 +80,22 @@ export const CSV_COLUMNS = [
   "repaint_speed",
   "repaint_rounds_rendered",
   "repaints_per_s",
+  "rb_rounds",
+  "rb_merge_ms_median",
+  "rb_commit_ms_median",
+  "rb_cosmograph_updates",
+  "rb_cosmograph_update_ms_median",
+  "rb_cosmograph_update_ms_p95",
+  "rb_cosmograph_sync_ms_median",
+  "rb_color_updates",
+  "rb_long_task_ms_per_s",
+  "lead_label",
+  "lead_started_by",
+  "lead_ms",
+  "lead_frames",
+  "lead_max_frame_ms",
+  "lead_long_tasks",
+  "lead_long_task_ms",
   "load_generate_ms",
   "load_fetch_ms",
   "load_network_ms",
@@ -81,6 +104,10 @@ export const CSV_COLUMNS = [
   "load_prepare_ms",
   "load_mount_ms",
   "load_layout_ms",
+  "load_upload_ms",
+  "load_upload_long_tasks",
+  "load_upload_long_task_ms",
+  "load_upload_max_frame_ms",
   "load_total_ms",
   "topology_fetches",
 ] as const;
@@ -92,6 +119,14 @@ const round = (v: number | null | undefined, digits = 2): number | null =>
   v === null || v === undefined || !Number.isFinite(v) ? null : Number(v.toFixed(digits));
 const mb = (bytes: number | null | undefined) =>
   bytes === null || bytes === undefined ? null : round(bytes / MB, 1);
+
+/**
+ * Version 1 started the layout / cluster-layout windows at the canvas' layout commit, before the
+ * data upload: those windows mix empty frames with the upload stall and are not comparable.
+ */
+export function isWindowComparable(schemaVersion: number, phase: string): boolean {
+  return !(schemaVersion < 2 && (phase === "layout" || phase === "cluster-layout"));
+}
 
 export function browserLabel(doc: Pick<BenchResultDocument, "environment">): string {
   const ua = doc.environment.userAgentData;
@@ -114,6 +149,7 @@ function scenarioColumns(doc: BenchResultDocument, s: ScenarioResult) {
     gpu_vendor: env.gpu.vendor,
     gpu_renderer: env.gpu.renderer,
     gpu_source: env.gpu.source,
+    canvas_renderer: s.canvasRenderer ?? null,
     software_rendering: env.gpu.softwareRendering,
     cpu_threads: env.hardwareConcurrency,
     device_memory_gb: env.deviceMemoryGb,
@@ -144,6 +180,10 @@ function scenarioColumns(doc: BenchResultDocument, s: ScenarioResult) {
     load_prepare_ms: round(s.load.prepareMs, 1),
     load_mount_ms: round(s.load.mountMs, 1),
     load_layout_ms: round(s.load.layoutMs, 1),
+    load_upload_ms: round(s.load.uploadMs ?? null, 1),
+    load_upload_long_tasks: s.load.uploadLongTasks ?? null,
+    load_upload_long_task_ms: round(s.load.uploadLongTaskMs ?? null, 1),
+    load_upload_max_frame_ms: round(s.load.uploadMaxFrameMs ?? null, 1),
     load_total_ms: round(s.load.totalMs, 1),
     topology_fetches: s.load.topologyFetches,
   };
@@ -152,6 +192,11 @@ function scenarioColumns(doc: BenchResultDocument, s: ScenarioResult) {
 const EMPTY_PHASE = {
   phase: null,
   variant: null,
+  canvas_variant: null,
+  links_in_data: null,
+  links_drawn: null,
+  rendered_entities: null,
+  window_comparable: null,
   warmup_ms: null,
   measure_ms: null,
   actual_ms: null,
@@ -160,6 +205,7 @@ const EMPTY_PHASE = {
   fps_p5: null,
   fps_p1: null,
   fps_mean: null,
+  frame_ms_mean: null,
   frame_ms_p50: null,
   frame_ms_p95: null,
   frame_ms_p99: null,
@@ -179,13 +225,37 @@ const EMPTY_PHASE = {
   repaint_speed: null,
   repaint_rounds_rendered: null,
   repaints_per_s: null,
+  rb_rounds: null,
+  rb_merge_ms_median: null,
+  rb_commit_ms_median: null,
+  rb_cosmograph_updates: null,
+  rb_cosmograph_update_ms_median: null,
+  rb_cosmograph_update_ms_p95: null,
+  rb_cosmograph_sync_ms_median: null,
+  rb_color_updates: null,
+  rb_long_task_ms_per_s: null,
+  lead_label: null,
+  lead_started_by: null,
+  lead_ms: null,
+  lead_frames: null,
+  lead_max_frame_ms: null,
+  lead_long_tasks: null,
+  lead_long_task_ms: null,
 };
 
-function phaseColumns(p: PhaseResult) {
+function phaseColumns(doc: BenchResultDocument, s: ScenarioResult, p: PhaseResult) {
   const f = p.frames;
+  const links = p.links ?? { inData: s.edges, drawn: s.edges };
+  const rb = p.repaint?.breakdown ?? null;
+  const lead = p.lead ?? null;
   return {
     phase: p.phase,
     variant: p.variant,
+    canvas_variant: p.canvasVariant ?? "baseline",
+    links_in_data: links.inData,
+    links_drawn: links.drawn,
+    rendered_entities: s.agents + links.drawn,
+    window_comparable: isWindowComparable(doc.schemaVersion, p.phase),
     warmup_ms: p.warmupMs,
     measure_ms: p.measureMs,
     actual_ms: round(p.actualMs, 0),
@@ -194,6 +264,7 @@ function phaseColumns(p: PhaseResult) {
     fps_p5: round(f.fps.p5),
     fps_p1: round(f.fps.p1),
     fps_mean: round(f.fps.mean),
+    frame_ms_mean: round(f.frameTimeMs.mean),
     frame_ms_p50: round(f.frameTimeMs.p50),
     frame_ms_p95: round(f.frameTimeMs.p95),
     frame_ms_p99: round(f.frameTimeMs.p99),
@@ -213,6 +284,22 @@ function phaseColumns(p: PhaseResult) {
     repaint_speed: p.repaint?.speed ?? null,
     repaint_rounds_rendered: p.repaint?.roundsRendered ?? null,
     repaints_per_s: round(p.repaint?.repaintsPerSecond ?? null),
+    rb_rounds: rb?.rounds ?? null,
+    rb_merge_ms_median: round(rb?.mergeMs.median ?? null),
+    rb_commit_ms_median: round(rb?.commitMs.median ?? null),
+    rb_cosmograph_updates: rb?.cosmographUpdates ?? null,
+    rb_cosmograph_update_ms_median: round(rb?.cosmographUpdateMs.median ?? null),
+    rb_cosmograph_update_ms_p95: round(rb?.cosmographUpdateMs.p95 ?? null),
+    rb_cosmograph_sync_ms_median: round(rb?.cosmographSyncMs.median ?? null),
+    rb_color_updates: rb?.colorUpdates ?? null,
+    rb_long_task_ms_per_s: round(rb?.longTaskMsPerSecond ?? null, 1),
+    lead_label: lead?.label ?? null,
+    lead_started_by: lead?.startedBy ?? null,
+    lead_ms: round(lead?.durationMs ?? null, 1),
+    lead_frames: lead?.frames ?? null,
+    lead_max_frame_ms: round(lead?.maxFrameMs ?? null, 1),
+    lead_long_tasks: lead?.longTasks.supported ? lead.longTasks.count : null,
+    lead_long_task_ms: lead?.longTasks.supported ? round(lead.longTasks.totalMs, 1) : null,
   };
 }
 
@@ -221,7 +308,9 @@ export function flattenResult(doc: BenchResultDocument): CsvRow[] {
   for (const scenario of doc.scenarios) {
     const base = scenarioColumns(doc, scenario);
     if (scenario.phases.length === 0) rows.push({ ...base, ...EMPTY_PHASE });
-    for (const phase of scenario.phases) rows.push({ ...base, ...phaseColumns(phase) });
+    for (const phase of scenario.phases) {
+      rows.push({ ...base, ...phaseColumns(doc, scenario, phase) });
+    }
   }
   return rows;
 }

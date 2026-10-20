@@ -16,15 +16,25 @@ afterEach(() => {
 describe("validateResultDocument", () => {
   const valid = fakeDocument([fakeScenario(10_000, 3, 1, [fakePhase("idle", 60)])]);
 
-  it("accepts a well-formed document", () => {
-    const result = validateResultDocument(JSON.parse(JSON.stringify(valid)));
-    expect(result.ok).toBe(true);
+  it("accepts well-formed version 1 and 2 documents", () => {
+    expect(validateResultDocument(JSON.parse(JSON.stringify(valid))).ok).toBe(true);
+    expect(validateResultDocument({ ...valid, schemaVersion: 1 }).ok).toBe(true);
+    expect(BENCH_SCHEMA_VERSION).toBe(2);
   });
 
   it.each([
     ["not an object", [], "not a JSON object"],
     ["wrong marker", { ...valid, harness: "other" }, "not a benchmark result"],
-    ["future schema", { ...valid, schemaVersion: 2 }, "unsupported schemaVersion 2 (expected 1)"],
+    [
+      "future schema",
+      { ...valid, schemaVersion: 3 },
+      "unsupported schemaVersion 3 (supported: 1, 2)",
+    ],
+    [
+      "missing schema",
+      { ...valid, schemaVersion: "2" },
+      "unsupported schemaVersion 2 (supported: 1, 2)",
+    ],
     ["unknown kind", { ...valid, kind: "x" }, "unknown kind"],
     ["no build", { ...valid, build: null }, "missing build or environment"],
     ["no scenarios", { ...valid, scenarios: {} }, "missing scenarios"],

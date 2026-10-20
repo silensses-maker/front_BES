@@ -32,7 +32,37 @@ export type BenchProbeName =
   /** The canvas committed its "frozen" phase: the force layout stopped. */
   | "canvas-frozen"
   /** The canvas reached its "error" phase. */
-  | "canvas-error";
+  | "canvas-error"
+  /** Cosmograph finished uploading the graph data (its `graphRebuilt` event). */
+  | "cosmograph-graph-rebuilt"
+  /** Cosmograph applied new cluster assignments (its `clustersUpdated` event). */
+  | "cosmograph-clusters-updated"
+  /** The force simulation (re)started (Cosmograph `onSimulationStart`). */
+  | "cosmograph-simulation-start"
+  /**
+   * First simulation tick after a (re)start, a data rebuild or a cluster update: the first frame
+   * Cosmograph renders with the new data and the simulation running.
+   */
+  | "cosmograph-first-tick"
+  /** The force simulation stopped (Cosmograph `onSimulationEnd`). */
+  | "cosmograph-simulation-end"
+  // ── High-frequency events (per round / per config update): listeners only, see below ──
+  /** The canvas committed a new viewed frame (detail: round). */
+  | "canvas-frame-commit"
+  /** A Cosmograph `setConfig` call settled (detail: durationMs, syncMs). */
+  | "cosmograph-config-done"
+  /** Cosmograph recomputed and uploaded the point colours (`pointColorUpdated`). */
+  | "cosmograph-colors-updated";
+
+/**
+ * Emitted once per round or per config update: no `performance.mark` and no history (a long
+ * suite would otherwise accumulate tens of thousands of entries), listeners only.
+ */
+export const HIGH_FREQUENCY_PROBES: readonly BenchProbeName[] = [
+  "canvas-frame-commit",
+  "cosmograph-config-done",
+  "cosmograph-colors-updated",
+];
 
 export interface BenchProbeDetail {
   runId?: string;
@@ -43,6 +73,10 @@ export interface BenchProbeDetail {
   durationMs?: number;
   /** Correlates the start and end of one topology fetch. */
   callId?: number;
+  /** Viewed round of a committed frame (canvas-frame-commit). */
+  round?: number;
+  /** Synchronous part of a Cosmograph setConfig call (cosmograph-config-done). */
+  syncMs?: number;
 }
 
 export interface BenchProbeEvent {
@@ -64,6 +98,17 @@ export interface BenchCosmograph {
 
 export type BenchClusterMode = "strategy" | "belief" | "effect";
 
+/**
+ * Canvas variants the harness can switch on a mounted canvas (#126, LOD study #50):
+ * - `baseline`: the product as shipped;
+ * - `links-transparent`: the product's own "hide links" toggle (transparent colour, links still
+ *   drawn);
+ * - `links-off`: `renderLinks: false`;
+ * - `straight-links`: `curvedLinks: false`.
+ * (`one-link-per-pair` changes the data, so the harness remounts the canvas for it instead.)
+ */
+export type BenchCanvasOverlay = "baseline" | "links-transparent" | "links-off" | "straight-links";
+
 /** What the mounted simulation canvas exposes to the harness. */
 export interface BenchCanvasHandle {
   networkId: string | null;
@@ -71,6 +116,12 @@ export interface BenchCanvasHandle {
   getCosmograph: () => BenchCosmograph | undefined;
   /** Same entry point as the "Agrupar" control. */
   setClusterMode: (mode: BenchClusterMode | null) => void;
+  /** Switches the canvas variant through the canvas' own state (see BenchCanvasOverlay). */
+  setOverlay: (overlay: BenchCanvasOverlay) => void;
+  /** The WebGL renderer string of the context Cosmograph actually draws with. */
+  getRenderer: () => string | null;
+  /** Cosmograph setConfig calls still in flight (wait for 0 before unmounting the canvas). */
+  pendingUpdates: () => number;
 }
 
 /** Events kept for late subscribers (the lazily loaded HUD mounts after the fetch started). */
@@ -95,14 +146,16 @@ function probeState(): ProbeState {
 /** Emits a probe event: a `performance.mark` (visible in DevTools) plus the in-page listeners. */
 export function benchProbe(name: BenchProbeName, detail: BenchProbeDetail = {}): BenchProbeEvent {
   const event: BenchProbeEvent = { name, at: performance.now(), detail };
-  try {
-    performance.mark(`bench:${name}`);
-  } catch {
-    // performance.mark is optional instrumentation — never break the product path
-  }
   const s = probeState();
-  s.history.push(event);
-  if (s.history.length > BENCH_PROBE_HISTORY_LIMIT) s.history.shift();
+  if (!HIGH_FREQUENCY_PROBES.includes(name)) {
+    try {
+      performance.mark(`bench:${name}`);
+    } catch {
+      // performance.mark is optional instrumentation — never break the product path
+    }
+    s.history.push(event);
+    if (s.history.length > BENCH_PROBE_HISTORY_LIMIT) s.history.shift();
+  }
   for (const listener of s.listeners) {
     try {
       listener(event);

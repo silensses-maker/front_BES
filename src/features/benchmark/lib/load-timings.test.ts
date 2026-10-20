@@ -50,9 +50,24 @@ describe("deriveLoadTimings", () => {
       prepareMs: 500,
       mountMs: 90,
       layoutMs: 5_000,
+      uploadMs: null,
       totalMs: 6_580,
       topologyFetches: 2,
     });
+  });
+
+  it("measures the upload: layout commit → first tick after the data was rebuilt", () => {
+    const events: BenchProbeEvent[] = [
+      ev("canvas-prepare-start", 0),
+      ev("canvas-layout-start", 100),
+      ev("cosmograph-first-tick", 120),
+      ev("cosmograph-graph-rebuilt", 900),
+      ev("cosmograph-first-tick", 950),
+      ev("canvas-frozen", 5_100),
+    ];
+    const t = deriveLoadTimings(events, RUN, NET);
+    expect(t.uploadMs).toBe(850);
+    expect(t.layoutMs).toBe(5_000);
   });
 
   it("uses the last canvas cycle and leaves unobserved steps null", () => {

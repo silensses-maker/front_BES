@@ -10,6 +10,11 @@ const firebaseConfig = {
   appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
 };
 
+// Bench builds only (#126): a copy without any Firebase env (no .env.production) must still open
+// /bench, which needs no login. getAuth() throws auth/invalid-api-key at startup without a key, so
+// a placeholder lets it initialise; signing in will not work. Compiled out of normal builds.
+if (__BENCHMARK__ && !firebaseConfig.apiKey) firebaseConfig.apiKey = "bench-without-firebase-env";
+
 const app = initializeApp(firebaseConfig);
 
 // Firebase is only the identity bridge: Authentication, no Firestore.

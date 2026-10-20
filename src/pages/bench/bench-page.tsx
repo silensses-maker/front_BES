@@ -220,7 +220,22 @@ export function BenchPage() {
           setProgress(p);
         },
         onScenarioDone: (result) =>
-          setDoc((d) => (d ? { ...d, scenarios: [...d.scenarios, result] } : d)),
+          setDoc((d) => {
+            if (!d) return d;
+            // The GPU the canvas drew with must be the one the environment reports (hybrid
+            // laptops can hand a context to the integrated GPU).
+            const used = result.canvasRenderer;
+            const mismatch =
+              used && used !== d.environment.gpu.renderer
+                ? `The canvas drew with "${used}"; the environment probe reported "${d.environment.gpu.renderer ?? "unknown"}".`
+                : null;
+            return {
+              ...d,
+              scenarios: [...d.scenarios, result],
+              warnings:
+                mismatch && !d.warnings.includes(mismatch) ? [...d.warnings, mismatch] : d.warnings,
+            };
+          }),
         onPrewarm: (result) => setDoc((d) => (d ? { ...d, prewarm: result } : d)),
       });
       const aborted = controller.signal.aborted;
@@ -273,6 +288,8 @@ export function BenchPage() {
           v{build.appVersion} · {build.gitCommit}
           {build.gitDirty ? " (dirty)" : ""} · {build.mode} build ·{" "}
           {envLine ?? "collecting environment…"}
+          {doc?.scenarios.find((r) => r.canvasRenderer)?.canvasRenderer &&
+            ` · canvas GPU: ${doc.scenarios.find((r) => r.canvasRenderer)?.canvasRenderer}`}
         </p>
       </header>
 
@@ -287,7 +304,11 @@ export function BenchPage() {
 
       {!running && (
         <section className="mb-3 rounded-xl border border-border bg-card p-4">
-          <SuiteConfigForm config={config} onChange={setConfig} />
+          <SuiteConfigForm
+            config={config}
+            onChange={setConfig}
+            estimate={(c) => formatDuration(estimateSuiteMs(c, CANVAS_TIMINGS))}
+          />
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
             <Button
               type="button"

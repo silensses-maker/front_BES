@@ -3,6 +3,8 @@ import { cn } from "@/shared/lib/utils";
 import {
   CLUSTER_MODES,
   DEFAULT_SUITE_CONFIG,
+  EXTRA_CANVAS_VARIANTS,
+  LOD_PRESET_CONFIG,
   PHASE_GROUPS,
   type PhaseGroup,
   PLAYBACK_SPEED_OPTIONS,
@@ -71,13 +73,27 @@ function NumberField({
   );
 }
 
+const VARIANT_HINTS: Record<(typeof EXTRA_CANVAS_VARIANTS)[number], string> = {
+  "links-transparent": 'the product\'s "hide links" toggle (transparent, still drawn)',
+  "links-off": "renderLinks: false",
+  "straight-links": "curvedLinks: false",
+  "one-link-per-pair": "one of the two reciprocal edges per pair (reloads the canvas)",
+};
+
 export interface SuiteConfigFormProps {
   config: SuiteConfig;
   onChange: (config: SuiteConfig) => void;
   disabled?: boolean;
+  /** Estimated duration of a configuration, shown on the preset buttons. */
+  estimate?: (config: SuiteConfig) => string;
 }
 
-export function SuiteConfigForm({ config, onChange, disabled = false }: SuiteConfigFormProps) {
+export function SuiteConfigForm({
+  config,
+  onChange,
+  disabled = false,
+  estimate,
+}: SuiteConfigFormProps) {
   const [sizesText, setSizesText] = useState(listText(config.sizes));
   const [densitiesText, setDensitiesText] = useState(listText(config.densities));
 
@@ -250,6 +266,32 @@ export function SuiteConfigForm({ config, onChange, disabled = false }: SuiteCon
             ))}
           </div>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">
+            Canvas variants (LOD study, #50) — measured after the baseline in idle, interaction and
+            repaint (first speed)
+          </span>
+          {EXTRA_CANVAS_VARIANTS.map((variant) => (
+            <label key={variant} className="flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={config.canvasVariants.includes(variant)}
+                onChange={() =>
+                  set({
+                    canvasVariants: EXTRA_CANVAS_VARIANTS.filter((v) =>
+                      toggle(config.canvasVariants, variant).includes(v),
+                    ),
+                  })
+                }
+              />
+              <span>
+                <span className="font-medium">{variant}</span>{" "}
+                <span className="text-muted-foreground">— {VARIANT_HINTS[variant]}</span>
+              </span>
+            </label>
+          ))}
+        </div>
         <label className="flex items-start gap-2 text-xs">
           <input
             type="checkbox"
@@ -270,7 +312,14 @@ export function SuiteConfigForm({ config, onChange, disabled = false }: SuiteCon
             className="rounded-md border border-input px-2.5 py-1 text-xs hover:bg-accent"
             onClick={() => onChange({ ...DEFAULT_SUITE_CONFIG })}
           >
-            Default matrix
+            Default matrix{estimate ? ` (≈ ${estimate(DEFAULT_SUITE_CONFIG)})` : ""}
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-input px-2.5 py-1 text-xs hover:bg-accent"
+            onClick={() => onChange({ ...LOD_PRESET_CONFIG })}
+          >
+            LOD preset{estimate ? ` (≈ ${estimate(LOD_PRESET_CONFIG)})` : ""}
           </button>
           <button
             type="button"

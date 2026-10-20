@@ -6,10 +6,12 @@ import {
   estimateSuiteMs,
   expandMatrix,
   formatDuration,
+  LOD_PRESET_CONFIG,
   parseSuiteQuery,
   type SuiteConfig,
   suiteQuery,
   validateSuiteConfig,
+  variantPhases,
 } from "./suite-config";
 
 const TIMINGS = { layoutMs: 5_000, clusterMs: 4_000, declusterMs: 2_000 };
@@ -166,5 +168,62 @@ describe("suite query", () => {
     expect(parseSuiteQuery(`?${suiteQuery(DEFAULT_SUITE_CONFIG)}`).config).toEqual(
       DEFAULT_SUITE_CONFIG,
     );
+  });
+});
+
+describe("LOD preset and canvas variants", () => {
+  it("is reachable by URL, keeps the large networks and every variant", () => {
+    const { config, preset } = parseSuiteQuery("?preset=lod");
+    expect(preset).toBe("lod");
+    expect(config).toEqual(LOD_PRESET_CONFIG);
+    expect(config.sizes).toEqual([50_000, 100_000, 150_000]);
+    expect(config.phases).toEqual(["idle", "interaction"]);
+    expect(config.canvasVariants).toEqual([
+      "links-transparent",
+      "links-off",
+      "straight-links",
+      "one-link-per-pair",
+    ]);
+    expect(expandMatrix(config)).toHaveLength(27);
+    // overrides apply on top of the preset
+    expect(parseSuiteQuery("?preset=lod&reps=1&variants=links-off,bogus").config).toMatchObject({
+      repetitions: 1,
+      canvasVariants: ["links-off"],
+    });
+    expect(parseSuiteQuery("?preset=nope").preset).toBeNull();
+    expect(parseSuiteQuery(`?${suiteQuery(LOD_PRESET_CONFIG)}`).config).toEqual(LOD_PRESET_CONFIG);
+  });
+
+  it("adds each variant's phases (and a reload for one-link-per-pair) to the estimate", () => {
+    const base = { ...LOD_PRESET_CONFIG, canvasVariants: [] };
+    const spec = { agents: 100_000, density: 3 };
+    const phase = base.warmupMs + base.measureMs;
+    const plain = estimateScenarioMs(spec, base, TIMINGS);
+    expect(
+      estimateScenarioMs(spec, { ...base, canvasVariants: ["links-off"] }, TIMINGS) - plain,
+    ).toBe(500 + 2 * phase);
+    expect(
+      estimateScenarioMs(spec, { ...base, canvasVariants: ["one-link-per-pair"] }, TIMINGS) - plain,
+    ).toBeCloseTo(base.settleMs + 1_500 + 0.01 * (100_000 + 300_000) + 5_000 + 2 * phase);
+    expect(variantPhases({ ...DEFAULT_SUITE_CONFIG, repaintSpeeds: [] })).toEqual([
+      "idle",
+      "interaction",
+    ]);
+    // The LOD preset runs about as long as the default suite
+    const minutes = estimateSuiteMs(LOD_PRESET_CONFIG, TIMINGS) / 60_000;
+    expect(minutes).toBeGreaterThan(50);
+    expect(minutes).toBeLessThan(90);
+  });
+
+  it("needs a phase that variants are measured in", () => {
+    expect(
+      validateSuiteConfig({
+        ...DEFAULT_SUITE_CONFIG,
+        phases: ["layout"],
+        canvasVariants: ["links-off"],
+      }),
+    ).toEqual([
+      "Canvas variants are measured in idle, interaction or repaint: select one of them.",
+    ]);
   });
 });

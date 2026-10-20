@@ -5,6 +5,7 @@ import {
   benchProbe,
   getBenchCanvas,
   getBenchProbeHistory,
+  HIGH_FREQUENCY_PROBES,
   isBenchmarkHost,
   nextBenchCallId,
   registerBenchCanvas,
@@ -35,6 +36,16 @@ describe("benchProbe", () => {
     unsubscribe();
     benchProbe("canvas-error");
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps per-round events out of the history and the performance timeline", () => {
+    const mark = vi.spyOn(performance, "mark");
+    const listener = vi.fn();
+    subscribeBenchProbe(listener);
+    for (const name of HIGH_FREQUENCY_PROBES) benchProbe(name, { round: 1 });
+    expect(listener).toHaveBeenCalledTimes(HIGH_FREQUENCY_PROBES.length);
+    expect(getBenchProbeHistory()).toEqual([]);
+    expect(mark).not.toHaveBeenCalled();
   });
 
   it("defaults the detail to an empty object", () => {
@@ -75,6 +86,9 @@ describe("registerBenchCanvas", () => {
     networkId: "n1",
     getCosmograph: () => undefined,
     setClusterMode: vi.fn(),
+    setOverlay: vi.fn(),
+    getRenderer: () => null,
+    pendingUpdates: () => 0,
   });
 
   it("exposes the current canvas and unregisters only itself", () => {

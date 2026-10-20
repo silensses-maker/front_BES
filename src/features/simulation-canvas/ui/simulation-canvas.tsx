@@ -494,7 +494,15 @@ export function SimulationCanvas({
   // `__BENCHMARK__` is a build-time literal: bench builds call the hook on every render, normal
   // builds compile the call out — the hook order is fixed either way.
   if (__BENCHMARK__) {
-    useBenchCanvasProbe({ phase, topology, cosmographRef, setClusterMode: handleClusterMode });
+    useBenchCanvasProbe({
+      phase,
+      topology,
+      cosmographRef,
+      setClusterMode: handleClusterMode,
+      frame,
+      setLinksHidden,
+      setCanvasOverride,
+    });
   }
 
   // ─── Render helpers ────────────────────────────────────────────────────────

@@ -161,7 +161,7 @@ describe("BenchHud", () => {
 
     expect(screen.getByText("Last recording (10 s)")).toBeInTheDocument();
     const [median] = (
-      screen.getByText("median / p5 / p1").nextElementSibling?.textContent ?? ""
+      screen.getByText("mean / 1% low / median").nextElementSibling?.textContent ?? ""
     ).split(" / ");
     expect(Number(median)).toBeGreaterThan(30);
 
@@ -171,7 +171,7 @@ describe("BenchHud", () => {
     const blobs = create.mock.calls.map((c) => (c as unknown as [Blob])[0]);
     const json = JSON.parse(await blobs[0]!.text());
     expect(json).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "hud-record",
       complete: true,
       scenarios: [

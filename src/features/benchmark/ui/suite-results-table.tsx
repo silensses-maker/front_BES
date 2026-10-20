@@ -1,7 +1,10 @@
 import type { ScenarioResult } from "../lib/result-schema";
 import "./bench.css";
 
-/** Results of the scenarios run so far (#126) — one row per scenario × phase. English only. */
+/**
+ * Results of the scenarios run so far (#126) — one row per scenario × phase × canvas variant.
+ * Mean FPS is the headline (green when > 30). English only.
+ */
 
 const MB = 1024 * 1024;
 const f1 = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v.toFixed(1));
@@ -24,18 +27,22 @@ export function SuiteResultsTable({ scenarios }: { scenarios: readonly ScenarioR
           <tr>
             {[
               "scenario",
-              "edges",
+              "links",
               "load total (ms)",
+              "upload (ms)",
               "phase",
+              "canvas",
               "frames",
-              "median FPS",
+              "mean FPS",
+              "1% low",
               "p5 FPS",
-              "p1 FPS",
+              "median FPS",
               "> 33.3 ms",
               "> 50 ms",
               "long tasks",
               "heap max (MB)",
               "repaints/s",
+              "update/round (ms)",
             ].map((h) => (
               <th key={h} className="px-2 py-1.5 font-medium">
                 {h}
@@ -51,24 +58,33 @@ export function SuiteResultsTable({ scenarios }: { scenarios: readonly ScenarioR
                   <td className="px-2 py-1">{s.id}</td>
                   <td className="px-2 py-1">{s.edges.toLocaleString("en-US")}</td>
                   <td className="px-2 py-1">{ms(s.load.totalMs)}</td>
-                  <td className="px-2 py-1 text-destructive" colSpan={10}>
+                  <td className="px-2 py-1">{ms(s.load.uploadMs)}</td>
+                  <td className="px-2 py-1 text-destructive" colSpan={14}>
                     {s.status}: {s.error}
                   </td>
                 </tr>,
               ];
             }
             return s.phases.map((p, i) => (
-              <tr key={`${s.id}-${p.phase}-${p.variant ?? ""}`} className="border-t border-border">
+              <tr
+                key={`${s.id}-${p.phase}-${p.variant ?? ""}-${p.canvasVariant ?? ""}`}
+                className="border-t border-border"
+              >
                 <td className="px-2 py-1">{i === 0 ? s.id : ""}</td>
-                <td className="px-2 py-1">{i === 0 ? s.edges.toLocaleString("en-US") : ""}</td>
+                <td className="px-2 py-1">{(p.links?.drawn ?? s.edges).toLocaleString("en-US")}</td>
                 <td className="px-2 py-1">{i === 0 ? ms(s.load.totalMs) : ""}</td>
-                <td className="px-2 py-1">{p.variant ? `${p.phase} (${p.variant})` : p.phase}</td>
-                <td className="px-2 py-1">{p.frames.frames}</td>
-                <td className={`px-2 py-1 font-semibold ${fpsClass(p.frames.fps.median)}`}>
-                  {f1(p.frames.fps.median)}
+                <td className="px-2 py-1">
+                  {i === 0 ? ms(s.load.uploadMs) : p.lead ? ms(p.lead.durationMs) : ""}
                 </td>
-                <td className="px-2 py-1">{f1(p.frames.fps.p5)}</td>
+                <td className="px-2 py-1">{p.variant ? `${p.phase} (${p.variant})` : p.phase}</td>
+                <td className="px-2 py-1">{p.canvasVariant ?? "baseline"}</td>
+                <td className="px-2 py-1">{p.frames.frames}</td>
+                <td className={`px-2 py-1 font-semibold ${fpsClass(p.frames.fps.mean)}`}>
+                  {f1(p.frames.fps.mean)}
+                </td>
                 <td className="px-2 py-1">{f1(p.frames.fps.p1)}</td>
+                <td className="px-2 py-1">{f1(p.frames.fps.p5)}</td>
+                <td className="px-2 py-1">{f1(p.frames.fps.median)}</td>
                 <td className="px-2 py-1">
                   {p.frames.slowFrameShare === null
                     ? "–"
@@ -80,6 +96,9 @@ export function SuiteResultsTable({ scenarios }: { scenarios: readonly ScenarioR
                   {p.heap.maxBytes === null ? "n/a" : Math.round(p.heap.maxBytes / MB)}
                 </td>
                 <td className="px-2 py-1">{p.repaint ? f1(p.repaint.repaintsPerSecond) : ""}</td>
+                <td className="px-2 py-1">
+                  {p.repaint?.breakdown ? f1(p.repaint.breakdown.cosmographUpdateMs.median) : ""}
+                </td>
               </tr>
             ));
           })}

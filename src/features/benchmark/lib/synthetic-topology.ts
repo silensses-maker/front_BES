@@ -250,6 +250,23 @@ export function generateSyntheticTopology(options: SyntheticTopologyOptions): To
   };
 }
 
+/**
+ * The `one-link-per-pair` LOD variant (#50): generated networks store every attachment twice
+ * (A→B and B→A, one per CSR row) and Cosmograph draws each as its own curved link — bent to
+ * opposite sides, so a pair is two arcs. This keeps the first edge of every unordered pair.
+ */
+export function keepOneLinkPerPair(topology: TopologyResponse): TopologyResponse {
+  const n = Math.max(topology.agentCount, topology.agents.length, 1);
+  const seen = new Set<number>();
+  const edges = topology.edges.filter((e) => {
+    const key = Math.min(e.source, e.target) * n + Math.max(e.source, e.target);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return { ...topology, edges, edgeCount: edges.length, edgeLimit: edges.length };
+}
+
 /** A decimal run id (int64-safe) for synthetic data — frames carry it in their header. */
 export function syntheticRunId(seed: number): string {
   return (1_260_000_000_000n + BigInt(seed >>> 0)).toString();

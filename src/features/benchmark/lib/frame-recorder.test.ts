@@ -4,8 +4,10 @@ import {
   createFrameRecorder,
   type LongTaskEntryLite,
   longTasksSupported,
+  makeRecording,
   observeBrowserLongTasks,
   readBrowserHeap,
+  splitRecording,
 } from "./frame-recorder";
 
 afterEach(() => {
@@ -121,5 +123,52 @@ describe("browser sources", () => {
     handle?.disconnect();
     expect(seen.map((e) => e.duration)).toEqual([55, 70]);
     expect(disconnect).toHaveBeenCalled();
+  });
+});
+
+describe("splitRecording", () => {
+  const rec = makeRecording(
+    0,
+    100,
+    [5, 10, 15, 60, 70, 80],
+    [
+      { startTime: 20, duration: 40 },
+      { startTime: 75, duration: 55 },
+    ],
+    true,
+    [
+      { at: 0, usedBytes: 10, totalBytes: 20, limitBytes: 30 },
+      { at: 50, usedBytes: 40, totalBytes: 50, limitBytes: 60 },
+      { at: 90, usedBytes: 15, totalBytes: 25, limitBytes: 60 },
+    ],
+  );
+
+  it("keeps the raw data and the summaries", () => {
+    expect(rec.deltas).toEqual([5, 5, 45, 10, 10]);
+    expect(rec.longTasks).toEqual({ supported: true, count: 2, totalMs: 95, maxMs: 55 });
+    expect(rec.heap).toMatchObject({ samples: 3, minBytes: 10, maxBytes: 40, endBytes: 15 });
+  });
+
+  it("drops the interval that spans the cut from both sides", () => {
+    const { lead, main } = splitRecording(rec, 50);
+    expect(lead.frameTimes).toEqual([5, 10, 15]);
+    expect(lead.deltas).toEqual([5, 5]);
+    expect(lead.endedAt).toBe(50);
+    expect(lead.longTasks.count).toBe(1);
+    expect(lead.heap.samples).toBe(1);
+    expect(main.frameTimes).toEqual([60, 70, 80]);
+    expect(main.deltas).toEqual([10, 10]);
+    expect(main.startedAt).toBe(60);
+    expect(main.endedAt).toBe(100);
+    expect(main.longTasks).toMatchObject({ supported: true, count: 1, totalMs: 55 });
+    expect(main.heap).toMatchObject({ samples: 2, maxBytes: 40, endBytes: 15 });
+  });
+
+  it("clamps the cut to the recording", () => {
+    expect(splitRecording(rec, -10).lead.frameTimes).toEqual([]);
+    const late = splitRecording(rec, 500);
+    expect(late.main.frameTimes).toEqual([]);
+    expect(late.main.startedAt).toBe(100);
+    expect(late.main.heap.supported).toBe(false);
   });
 });

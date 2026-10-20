@@ -3,6 +3,7 @@ import { fakeDocument, fakeEnvironment, fakePhase } from "@/test/bench-fixtures"
 import { FakeBenchRuntime } from "@/test/fake-bench-runtime";
 import { currentBuildInfo } from "./build-info";
 import { downloadText } from "./download";
+import type { PhaseRecording } from "./frame-recorder";
 import { buildHudRecordDocument, buildHudSnapshot } from "./hud-document";
 import { applyInteractionStep, buildInteractionScript } from "./interaction-script";
 import { toPhaseResult } from "./phase-result";
@@ -62,12 +63,15 @@ describe("interaction script", () => {
 });
 
 describe("toPhaseResult", () => {
-  const recording = {
+  const recording: PhaseRecording = {
     startedAt: 1_000,
     endedAt: 11_000,
     deltas: Array<number>(600).fill(1000 / 60),
+    frameTimes: [],
     longTasks: { supported: false, count: 0, totalMs: 0, maxMs: 0 },
+    longTaskEntries: [],
     heap: fakePhase("idle", 60).heap,
+    heapSamples: [],
   };
 
   it("summarises the window and the achieved repaint rate", () => {

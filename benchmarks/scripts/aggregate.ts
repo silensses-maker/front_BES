@@ -6,12 +6,15 @@
  *   (or `bun run bench:report -- …`)
  *
  * Reads every `*.json` in the results directory (default `benchmarks/results/`), validates its
- * `schemaVersion` and harness marker, and writes to the output directory (default
+ * `schemaVersion` (1 and 2 are read) and harness marker, and writes to the output directory (default
  * `benchmarks/report/`):
- *   - summary.md   Markdown tables per machine: size × density × phase (median FPS, p5, p1,
- *                  slow-frame share, heap, GPU estimate, pass/fail) and load timings;
+ *   - summary.md   Markdown tables per machine: size × density × phase (mean FPS — the headline
+ *                  and the pass/fail criterion —, 1% low, p5, median, slow-frame share, heap, GPU
+ *                  estimate), frame rate vs links (with a linear fit), canvas variants (LOD),
+ *                  repaint breakdown and load timings;
  *   - summary.csv  the same frame-rate table as CSV;
  *   - load.csv     the load-timings table as CSV;
+ *   - links.csv    mean FPS / frame time against the links drawn (for plots);
  *   - phases.csv   every scenario × phase row of every included file (flattened).
  * The pure logic lives in src/features/benchmark/lib/aggregate.ts (unit-tested).
  */
@@ -22,6 +25,7 @@ import {
   aggregateResults,
   DEFAULT_AGGREGATE_OPTIONS,
   type LoadedResult,
+  linksCsv,
   loadCsv,
   renderMarkdown,
   summaryCsv,
@@ -93,6 +97,7 @@ function main(): number {
   writeFileSync(join(args.out, "summary.md"), renderMarkdown(report, new Date().toISOString()));
   writeFileSync(join(args.out, "summary.csv"), summaryCsv(report));
   writeFileSync(join(args.out, "load.csv"), loadCsv(report));
+  writeFileSync(join(args.out, "links.csv"), linksCsv(report));
   writeFileSync(join(args.out, "phases.csv"), toCsv(CSV_COLUMNS, report.rows));
 
   console.log(
@@ -102,7 +107,7 @@ function main(): number {
   console.log(
     `${report.machines.length} machine(s), ${report.phases.length} phase row(s), ${report.failures.length} failed scenario(s)`,
   );
-  console.log(`wrote ${args.out}/{summary.md,summary.csv,load.csv,phases.csv}`);
+  console.log(`wrote ${args.out}/{summary.md,summary.csv,load.csv,links.csv,phases.csv}`);
   return 0;
 }
 

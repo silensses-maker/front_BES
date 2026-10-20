@@ -10,6 +10,8 @@
  * density is the effective density.
  */
 
+import type { CanvasVariant } from "./result-schema";
+
 export const PHASE_GROUPS = ["layout", "idle", "interaction", "repaint", "cluster"] as const;
 export type PhaseGroup = (typeof PHASE_GROUPS)[number];
 
@@ -49,7 +51,27 @@ export interface SuiteConfig {
    * downloads and compiles DuckDB-WASM, which would inflate the first scenario's load.
    */
   prewarm: boolean;
+  /**
+   * Canvas variants measured after the baseline phases of each scenario (LOD study, #50): the
+   * idle / interaction / repaint (first speed) phases are measured again with each variant. The
+   * baseline (product as shipped) is always measured.
+   */
+  canvasVariants: Exclude<CanvasVariant, "baseline">[];
 }
+
+/** Variants that can be measured besides the baseline. */
+export const EXTRA_CANVAS_VARIANTS: Exclude<CanvasVariant, "baseline">[] = [
+  "links-transparent",
+  "links-off",
+  "straight-links",
+  "one-link-per-pair",
+];
+
+/** Phases a variant is measured in (repaint: the first selected speed only). */
+export const VARIANT_PHASES: readonly PhaseGroup[] = ["idle", "interaction", "repaint"];
+
+/** Pause after switching a canvas variant, before its warm-up (ms). */
+export const VARIANT_SETTLE_MS = 500;
 
 export const DEFAULT_SUITE_CONFIG: SuiteConfig = {
   sizes: [...DEFAULT_SIZES],
@@ -67,7 +89,26 @@ export const DEFAULT_SUITE_CONFIG: SuiteConfig = {
   interactionStepMs: 1_000,
   loadTimeoutMs: 180_000,
   prewarm: true,
+  canvasVariants: [],
 };
+
+/**
+ * LOD preset (#50): the large networks only (50k, 100k, 150k × densities 2, 3, 5 × 3
+ * repetitions), idle and interaction, each measured on the baseline and on every canvas variant.
+ * One load and layout per scenario serve the baseline and the switchable variants; only
+ * one-link-per-pair reloads (its data differs). `/bench?preset=lod`.
+ */
+export const LOD_PRESET_CONFIG: SuiteConfig = {
+  ...DEFAULT_SUITE_CONFIG,
+  sizes: [50_000, 100_000, 150_000],
+  densities: [...DEFAULT_DENSITIES],
+  phases: ["idle", "interaction"],
+  repaintSpeeds: [1],
+  canvasVariants: [...EXTRA_CANVAS_VARIANTS],
+};
+
+export const SUITE_PRESETS = { default: DEFAULT_SUITE_CONFIG, lod: LOD_PRESET_CONFIG } as const;
+export type SuitePreset = keyof typeof SUITE_PRESETS;
 
 /** The unmeasured pre-warm network (see `SuiteConfig.prewarm`). */
 export const PREWARM_SPEC: ScenarioSpec = {
@@ -131,6 +172,13 @@ export function estimateLoadMs(agents: number, density: number): number {
   return 1_500 + 0.01 * (agents + links);
 }
 
+/** Phases measured for each canvas variant of a scenario. */
+export function variantPhases(config: SuiteConfig): PhaseGroup[] {
+  return VARIANT_PHASES.filter(
+    (g) => config.phases.includes(g) && (g !== "repaint" || config.repaintSpeeds.length > 0),
+  );
+}
+
 /** Estimated wall time of one scenario (ms). */
 export function estimateScenarioMs(
   spec: Pick<ScenarioSpec, "agents" | "density">,
@@ -146,6 +194,16 @@ export function estimateScenarioMs(
   if (has("cluster")) {
     ms += timings.clusterMs + CLUSTER_SETTLE_MARGIN_MS + 2 * phase;
     ms += timings.declusterMs + CLUSTER_SETTLE_MARGIN_MS;
+  }
+  const perVariant = variantPhases(config).length * phase;
+  for (const variant of config.canvasVariants) {
+    if (variant === "one-link-per-pair") {
+      // remount with half the links: settle, load and layout again
+      const links = spec.density * spec.agents;
+      ms += config.settleMs + 1_500 + 0.01 * (spec.agents + links) + timings.layoutMs + perVariant;
+    } else {
+      ms += VARIANT_SETTLE_MS + perVariant;
+    }
   }
   return ms;
 }
@@ -190,6 +248,11 @@ export function validateSuiteConfig(config: SuiteConfig): string[] {
   if (config.phases.includes("repaint") && config.repaintSpeeds.length === 0) {
     errors.push("Select at least one playback speed for the repaint phase.");
   }
+  if (config.canvasVariants.length > 0 && variantPhases(config).length === 0) {
+    errors.push(
+      "Canvas variants are measured in idle, interaction or repaint: select one of them.",
+    );
+  }
   if (!Number.isInteger(config.seed)) errors.push("The seed must be an integer.");
   if (config.sizes.length > 0 && config.densities.length > 0 && expandMatrix(config).length === 0) {
     errors.push("No scenario left: every density must be lower than the network size.");
@@ -223,9 +286,12 @@ const seconds = (raw: string | null): number | null => {
 export function parseSuiteQuery(
   search: string,
   base: SuiteConfig = DEFAULT_SUITE_CONFIG,
-): { config: SuiteConfig; autorun: boolean } {
+): { config: SuiteConfig; autorun: boolean; preset: SuitePreset | null } {
   const q = new URLSearchParams(search);
-  const config: SuiteConfig = { ...base, stage: base.stage };
+  const presetName = q.get("preset");
+  const preset = presetName === "lod" || presetName === "default" ? presetName : null;
+  const from = preset !== null ? SUITE_PRESETS[preset] : base;
+  const config: SuiteConfig = { ...from, stage: from.stage };
   config.sizes = numberList(q.get("sizes")) ?? config.sizes;
   config.densities = numberList(q.get("densities")) ?? config.densities;
   const reps = numberList(q.get("reps"));
@@ -257,7 +323,12 @@ export function parseSuiteQuery(
   if (ring?.[0] !== undefined) config.ringRounds = ring[0];
   const prewarm = q.get("prewarm");
   if (prewarm === "0" || prewarm === "1") config.prewarm = prewarm === "1";
-  return { config, autorun: q.get("autorun") === "1" };
+  const variants = q.get("variants");
+  if (variants !== null) {
+    const wanted = variants.split(",").map((v) => v.trim());
+    config.canvasVariants = EXTRA_CANVAS_VARIANTS.filter((v) => wanted.includes(v));
+  }
+  return { config, autorun: q.get("autorun") === "1", preset };
 }
 
 /** The inverse of {@link parseSuiteQuery} (without autorun). */
@@ -276,5 +347,6 @@ export function suiteQuery(config: SuiteConfig): string {
   q.set("stage", config.stage === "fill" ? "fill" : `${config.stage.width}x${config.stage.height}`);
   q.set("ring", String(config.ringRounds));
   q.set("prewarm", config.prewarm ? "1" : "0");
+  if (config.canvasVariants.length > 0) q.set("variants", config.canvasVariants.join(","));
   return q.toString();
 }

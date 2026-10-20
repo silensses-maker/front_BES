@@ -1,4 +1,5 @@
 import type { BenchProbeEvent } from "@/shared/lib/bench-probe";
+import { chooseWindowStart } from "./layout-window";
 import { EMPTY_LOAD_TIMINGS, type LoadTimings } from "./result-schema";
 
 /**
@@ -28,12 +29,23 @@ function lastCanvasCycle(events: readonly BenchProbeEvent[]) {
   if (start === undefined) return null;
   const after = events.filter((e) => e.at >= start.at);
   const first = (name: BenchProbeEvent["name"]) => after.find((e) => e.name === name)?.at;
+  const layoutStart = first("canvas-layout-start");
+  const frozen = first("canvas-frozen");
+  const firstFrame =
+    layoutStart !== undefined
+      ? chooseWindowStart(after, {
+          from: layoutStart,
+          to: frozen ?? Number.POSITIVE_INFINITY,
+          dataEvents: ["cosmograph-graph-rebuilt"],
+        })
+      : null;
   return {
     prepareStart: start.at,
     toDataEnd: first("canvas-to-data-end"),
     prepareEnd: first("canvas-prepare-end"),
-    layoutStart: first("canvas-layout-start"),
-    frozen: first("canvas-frozen"),
+    layoutStart,
+    firstFrame: firstFrame ?? undefined,
+    frozen,
   };
 }
 
@@ -78,6 +90,7 @@ export function deriveLoadTimings(
     prepareMs: diff(canvas?.prepareEnd, canvas?.toDataEnd),
     mountMs: diff(canvas?.layoutStart, canvas?.prepareEnd),
     layoutMs: diff(canvas?.frozen, canvas?.layoutStart),
+    uploadMs: diff(canvas?.firstFrame, canvas?.layoutStart),
     totalMs: diff(canvas?.frozen, begin),
     topologyFetches: fetchStarts.length > 0 ? fetchStarts.length : null,
   };

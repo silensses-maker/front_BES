@@ -343,6 +343,8 @@ export function BenchHud({ runId, networkId, topology }: BenchHudProps) {
           value={fmtFps(live?.snapshot.currentFps)}
           tone={fpsTone(live?.snapshot.currentFps)}
         />
+        <Row label="mean" value={fmtFps(w?.fps.mean)} tone={fpsTone(w?.fps.mean)} />
+        <Row label="1% low" value={fmtFps(w?.fps.p1)} tone={fpsTone(w?.fps.p1)} />
         <Row label="median" value={fmtFps(w?.fps.median)} tone={fpsTone(w?.fps.median)} />
         <Row label="p5" value={fmtFps(w?.fps.p5)} tone={fpsTone(w?.fps.p5)} />
         <Row
@@ -384,6 +386,7 @@ export function BenchHud({ runId, networkId, topology }: BenchHudProps) {
         <Row label="topologyToData" value={fmtMs(load.toDataMs)} />
         <Row label="prepareCosmographData" value={fmtMs(load.prepareMs)} />
         <Row label="mount" value={fmtMs(load.mountMs)} />
+        <Row label="· upload (first frame)" value={fmtMs(load.uploadMs)} />
         <Row label="layout until freeze" value={fmtMs(load.layoutMs)} />
         <Row label="total" value={fmtMs(load.totalMs)} />
       </Section>
@@ -452,8 +455,8 @@ export function BenchHud({ runId, networkId, topology }: BenchHudProps) {
       {recorded !== null && recordedPhase !== undefined && (
         <Section title="Last recording (10 s)">
           <Row
-            label="median / p5 / p1"
-            value={`${fmtFps(recordedPhase.frames.fps.median)} / ${fmtFps(recordedPhase.frames.fps.p5)} / ${fmtFps(recordedPhase.frames.fps.p1)}`}
+            label="mean / 1% low / median"
+            value={`${fmtFps(recordedPhase.frames.fps.mean)} / ${fmtFps(recordedPhase.frames.fps.p1)} / ${fmtFps(recordedPhase.frames.fps.median)}`}
           />
           <Row
             label="frames > 33.3 ms"

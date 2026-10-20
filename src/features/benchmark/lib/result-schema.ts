@@ -7,10 +7,22 @@ import type { GpuMemoryEstimate } from "./gpu-estimate";
  * versioned by `schemaVersion`. The aggregation script (`benchmarks/scripts/aggregate.ts`)
  * validates both fields before reading a file.
  *
+ * Version 2 (this harness) adds, all optional for readers of version 1 files:
+ * - phases: `canvasVariant`, `links` (in the data / drawn), `lead` (the interval excluded before a
+ *   layout window: data upload until the first frame drawn with the data) and
+ *   `repaint.breakdown` (per-round timings of the repaint path);
+ * - load timings: `uploadMs` and the long tasks of the upload;
+ * - scenarios: `canvasRenderer` (GPU the canvas actually used), `timeline`, `variantLoads`.
+ * In version 1 files the `layout` / `cluster-layout` windows started at the canvas' layout
+ * commit, before the data upload: they are not comparable with version 2 (see the report).
+ *
  * Keep this module free of `@/` imports: the Bun CLI imports it through relative paths.
  */
 
-export const BENCH_SCHEMA_VERSION = 1;
+export const BENCH_SCHEMA_VERSION = 2;
+
+/** Versions the aggregation script reads. */
+export const SUPPORTED_SCHEMA_VERSIONS: readonly number[] = [1, 2];
 
 /** Marker string that only harness code contains — also used to prove normal builds drop it. */
 export const BENCH_HARNESS_MARKER = "silensess-bench-harness";
@@ -25,10 +37,73 @@ export type BenchPhaseName =
   | "cluster-interaction"
   | "hud-record";
 
+/**
+ * Canvas variants measured for the LOD decision (#50); `baseline` is the product as shipped.
+ * `one-link-per-pair` keeps one of the two reciprocal edges of every pair (a remount with the
+ * deduplicated data); the others switch a mounted canvas (see BenchCanvasOverlay).
+ */
+export const CANVAS_VARIANTS = [
+  "baseline",
+  "links-transparent",
+  "links-off",
+  "straight-links",
+  "one-link-per-pair",
+] as const;
+export type CanvasVariant = (typeof CANVAS_VARIANTS)[number];
+
+export interface DistributionStat {
+  median: number | null;
+  p95: number | null;
+  mean: number | null;
+}
+
+/** The interval excluded before a layout window (v2). */
+export interface LeadWindow {
+  /** `upload`: layout commit → first frame with the data; `cluster-update`: grouping change → first frame with the clusters. */
+  label: "upload" | "cluster-update";
+  durationMs: number;
+  /** How the window start was found: Cosmograph's first simulation tick, or none seen (fallback: no split). */
+  startedBy: "first-tick" | "fallback";
+  frames: number;
+  maxFrameMs: number | null;
+  longTasks: { supported: boolean; count: number; totalMs: number; maxMs: number };
+}
+
+/** Per-round timings of the repaint path inside the measured window (v2). */
+export interface RepaintBreakdown {
+  /** Rounds pushed to the store inside the window. */
+  rounds: number;
+  /** Replay merge of one round (`mergeRoundFromChunk`: wire parse into typed arrays). */
+  mergeMs: DistributionStat;
+  /** `store.updateFrame` → the canvas committed the frame (React render of the canvas). */
+  commitMs: DistributionStat;
+  /** Cosmograph `setConfig` calls that settled inside the window. */
+  cosmographUpdates: number;
+  /**
+   * One setConfig call, from the call until it settled: Cosmograph re-queries the point table
+   * (DuckDB-WASM worker), recomputes colours and sizes in JS and uploads them.
+   */
+  cosmographUpdateMs: DistributionStat;
+  /** The synchronous part of those calls (main thread, before the first await). */
+  cosmographSyncMs: DistributionStat;
+  /** `pointColorUpdated` events (colour buffers recomputed and uploaded). */
+  colorUpdates: number;
+  /** Mean frame time of the window. */
+  frameMs: number | null;
+  /** Long-task time per second of window (main thread blocked > 50 ms at a time). */
+  longTaskMsPerSecond: number | null;
+}
+
 export interface PhaseResult {
   phase: BenchPhaseName;
   /** Repaint: playback speed ("x16"); cluster phases: the cluster mode; otherwise null. */
   variant: string | null;
+  /** v2: canvas variant measured (absent in v1 = baseline). */
+  canvasVariant?: CanvasVariant;
+  /** v2: links in the data handed to the canvas and links actually drawn (0 when links are off). */
+  links?: { inData: number; drawn: number };
+  /** v2: layout / cluster-layout only — the interval excluded before the window. */
+  lead?: LeadWindow | null;
   warmupMs: number;
   /** Configured measured window (layout / cluster-layout: the transition itself). */
   measureMs: number;
@@ -51,6 +126,8 @@ export interface PhaseResult {
     targetRoundsPerSecond: number;
     roundsRendered: number;
     repaintsPerSecond: number;
+    /** v2. */
+    breakdown?: RepaintBreakdown | null;
   } | null;
 }
 
@@ -75,6 +152,15 @@ export interface LoadTimings {
   mountMs: number | null;
   /** Layout phase → frozen (force layout, time-boxed by LAYOUT_DURATION_MS). */
   layoutMs: number | null;
+  /**
+   * v2: layout phase → first frame Cosmograph drew with the data (its first simulation tick):
+   * the data upload. Part of `layoutMs`.
+   */
+  uploadMs?: number | null;
+  /** v2: long tasks during the upload (count, total ms) and its longest frame. */
+  uploadLongTasks?: number | null;
+  uploadLongTaskMs?: number | null;
+  uploadMaxFrameMs?: number | null;
   /** First step start → frozen. */
   totalMs: number | null;
   /** Real run: how many topology fetches ran for this network (2 = a concurrent duplicate). */
@@ -100,6 +186,12 @@ export interface ScenarioResult {
   /** Whether `gc()` was available (Chrome --js-flags=--expose-gc) and called before the scenario. */
   forcedGc: boolean;
   phases: PhaseResult[];
+  /** v2: WebGL renderer of the context the canvas drew with (the GPU actually used). */
+  canvasRenderer?: string | null;
+  /** v2: canvas / Cosmograph lifecycle events, ms after the scenario's load started. */
+  timeline?: Array<{ event: string; atMs: number }>;
+  /** v2: loads of variants that remount the canvas (one-link-per-pair), with their link count. */
+  variantLoads?: Partial<Record<CanvasVariant, LoadTimings & { links: number }>>;
 }
 
 export interface BenchBuildInfo {
@@ -112,7 +204,8 @@ export interface BenchBuildInfo {
 }
 
 export interface BenchResultDocument {
-  schemaVersion: typeof BENCH_SCHEMA_VERSION;
+  /** Written as BENCH_SCHEMA_VERSION; files of every SUPPORTED_SCHEMA_VERSIONS are read. */
+  schemaVersion: number;
   harness: typeof BENCH_HARNESS_MARKER;
   kind: "suite" | "hud-record";
   id: string;
@@ -142,10 +235,13 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 export function validateResultDocument(raw: unknown): ValidationResult {
   if (!isObject(raw)) return { ok: false, error: "not a JSON object" };
   if (raw.harness !== BENCH_HARNESS_MARKER) return { ok: false, error: "not a benchmark result" };
-  if (raw.schemaVersion !== BENCH_SCHEMA_VERSION) {
+  if (
+    typeof raw.schemaVersion !== "number" ||
+    !SUPPORTED_SCHEMA_VERSIONS.includes(raw.schemaVersion)
+  ) {
     return {
       ok: false,
-      error: `unsupported schemaVersion ${String(raw.schemaVersion)} (expected ${BENCH_SCHEMA_VERSION})`,
+      error: `unsupported schemaVersion ${String(raw.schemaVersion)} (supported: ${SUPPORTED_SCHEMA_VERSIONS.join(", ")})`,
     };
   }
   if (raw.kind !== "suite" && raw.kind !== "hud-record")
