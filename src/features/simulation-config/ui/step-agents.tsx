@@ -1,5 +1,10 @@
 import { X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n";
+import {
+  COGNITIVE_BIAS_OPTIONS,
+  SILENCE_EFFECT_OPTIONS,
+  SILENCE_STRATEGY_OPTIONS,
+} from "@/shared/i18n/enum-labels";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { InfoTooltip } from "@/shared/ui/info-tooltip";
@@ -15,27 +20,6 @@ import type {
   GeneratedSimFormValues,
   SimFormValues,
 } from "../types/simulation-config.types";
-
-const SILENCE_STRATEGIES: { value: 0 | 1 | 2 | 3; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.strategyDegroot" },
-  { value: 1, labelKey: "simulationConfig.strategyMajority" },
-  { value: 2, labelKey: "simulationConfig.strategyThreshold" },
-  { value: 3, labelKey: "simulationConfig.strategyConfidence" },
-];
-
-const SILENCE_EFFECTS: { value: 0 | 1 | 2; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.effectDegroot" },
-  { value: 1, labelKey: "simulationConfig.effectMemory" },
-  { value: 2, labelKey: "simulationConfig.effectMemoryless" },
-];
-
-const COGNITIVE_BIASES: { value: 0 | 1 | 2 | 3 | 4; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.biasNone" },
-  { value: 1, labelKey: "simulationConfig.biasConfirmation" },
-  { value: 2, labelKey: "simulationConfig.biasBackfire" },
-  { value: 3, labelKey: "simulationConfig.biasAuthority" },
-  { value: 4, labelKey: "simulationConfig.biasInsular" },
-];
 
 interface StepAgentsProps {
   values: SimFormValues;
@@ -153,14 +137,14 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
             // Mockup mechanics: options are DISABLED (with an "· en uso"
             // suffix) instead of hidden when the (strategy, effect) pair
             // evaluated against this row's other axis is taken by another row.
-            const strategyOptions = SILENCE_STRATEGIES.map((s) => ({
+            const strategyOptions = SILENCE_STRATEGY_OPTIONS.map((s) => ({
               ...s,
               inUse:
                 s.value !== row.silenceStrategy &&
                 usedCombos.includes(`${s.value}-${row.silenceEffect}`),
             }));
 
-            const effectOptions = SILENCE_EFFECTS.map((e) => ({
+            const effectOptions = SILENCE_EFFECT_OPTIONS.map((e) => ({
               ...e,
               inUse:
                 e.value !== row.silenceEffect &&
@@ -212,9 +196,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                               <SelectItem key={s.value} value={String(s.value)} disabled={s.inUse}>
                                 {s.inUse
                                   ? t("simulationConfig.optionInUse", {
-                                      label: t(s.labelKey as Parameters<typeof t>[0]),
+                                      label: t(s.labelKey),
                                     })
-                                  : t(s.labelKey as Parameters<typeof t>[0])}
+                                  : t(s.labelKey)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -240,9 +224,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                               <SelectItem key={e.value} value={String(e.value)} disabled={e.inUse}>
                                 {e.inUse
                                   ? t("simulationConfig.optionInUse", {
-                                      label: t(e.labelKey as Parameters<typeof t>[0]),
+                                      label: t(e.labelKey),
                                     })
-                                  : t(e.labelKey as Parameters<typeof t>[0])}
+                                  : t(e.labelKey)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -334,7 +318,7 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
 
         <div className="space-y-2">
           {gen.biasTypes.map((row, i) => {
-            const biasOptions = COGNITIVE_BIASES.map((b) => ({
+            const biasOptions = COGNITIVE_BIAS_OPTIONS.map((b) => ({
               ...b,
               inUse: b.value !== row.cognitiveBias && usedBiases.includes(b.value),
             }));
@@ -377,9 +361,9 @@ export function StepAgents({ values, maxAgents, onUpdate }: StepAgentsProps) {
                           <SelectItem key={b.value} value={String(b.value)} disabled={b.inUse}>
                             {b.inUse
                               ? t("simulationConfig.optionInUse", {
-                                  label: t(b.labelKey as Parameters<typeof t>[0]),
+                                  label: t(b.labelKey),
                                 })
-                              : t(b.labelKey as Parameters<typeof t>[0])}
+                              : t(b.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>

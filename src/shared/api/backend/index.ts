@@ -10,6 +10,7 @@ export type {
   CustomRunRequest,
   DeactivateResponse,
   EdgeSpec,
+  FieldIssue,
   FrameRetention,
   GeneratedRunConfig,
   GeneratedRunRequest,
@@ -34,6 +35,5 @@ export type {
   UserInfoResponse,
   UserRole,
   UserSyncResponse,
-  WsTicketResponse,
 } from "./types/backend.types";
 export { usersApi } from "./users.api";

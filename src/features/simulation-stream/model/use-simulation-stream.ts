@@ -4,7 +4,6 @@ import type { SimulationWsClient } from "@/entities/simulation";
 import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 
@@ -49,13 +48,7 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
         await clientRef.current?.connect();
       } catch (err) {
         logger.error("useSimulationStream", err);
-        if (isErrorCode(err, "rate_limited")) {
-          toast.error(t("simulation.errorRateLimited"));
-        } else if (isErrorCode(err, "forbidden")) {
-          toast.error(t("simulation.errorForbidden"));
-        } else {
-          toast.error(t("simulation.errorStream"));
-        }
+        toast.error(t("simulation.errorStream"));
       } finally {
         setIsConnecting(false);
       }

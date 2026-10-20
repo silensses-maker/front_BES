@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, SkipBack, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/shared/i18n";
+import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
 import { formatNumber } from "@/shared/lib/format-number";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -58,23 +59,8 @@ export function DataTablePanel({
   const { t, i18n } = useTranslation();
   const fmt = (n: number) => formatNumber(n, i18n.language);
 
-  const strategyLabel = (value: number): string => {
-    const map: Record<number, string> = {
-      0: t("enums.silenceStrategy.degroot"),
-      1: t("enums.silenceStrategy.majority"),
-      2: t("enums.silenceStrategy.threshold"),
-      3: t("enums.silenceStrategy.confidence"),
-    };
-    return map[value] ?? String(value);
-  };
-  const effectLabel = (value: number): string => {
-    const map: Record<number, string> = {
-      0: t("enums.silenceEffect.degroot"),
-      1: t("enums.silenceEffect.memory"),
-      2: t("enums.silenceEffect.memoryless"),
-    };
-    return map[value] ?? String(value);
-  };
+  const strategyLabel = (value: number): string => silenceStrategyLabel(t, value);
+  const effectLabel = (value: number): string => silenceEffectLabel(t, value);
 
   const csvLabels: CsvLabels = {
     strategy: strategyLabel,

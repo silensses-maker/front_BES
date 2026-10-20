@@ -9,6 +9,12 @@ import type {
   SilenceStrategy,
 } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+// Full canonical enums in the selects: the backend custom path accepts every value (#120).
+import {
+  COGNITIVE_BIAS_OPTIONS,
+  SILENCE_EFFECT_OPTIONS,
+  SILENCE_STRATEGY_OPTIONS,
+} from "@/shared/i18n/enum-labels";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -23,30 +29,6 @@ import type {
   SimConfigValidationErrors,
   SimFormValues,
 } from "../types/simulation-config.types";
-
-// ─── Label maps ───────────────────────────────────────────────────────────────
-// Full canonical enums: the backend custom path accepts every value (#120).
-
-const SILENCE_STRATEGIES: { value: SilenceStrategy; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.strategyDegroot" },
-  { value: 1, labelKey: "simulationConfig.strategyMajority" },
-  { value: 2, labelKey: "simulationConfig.strategyThreshold" },
-  { value: 3, labelKey: "simulationConfig.strategyConfidence" },
-];
-
-const SILENCE_EFFECTS: { value: SilenceEffect; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.effectDegroot" },
-  { value: 1, labelKey: "simulationConfig.effectMemory" },
-  { value: 2, labelKey: "simulationConfig.effectMemoryless" },
-];
-
-const COGNITIVE_BIASES: { value: CognitiveBias; labelKey: string }[] = [
-  { value: 0, labelKey: "simulationConfig.biasNone" },
-  { value: 1, labelKey: "simulationConfig.biasConfirmation" },
-  { value: 2, labelKey: "simulationConfig.biasBackfire" },
-  { value: 3, labelKey: "simulationConfig.biasAuthority" },
-  { value: 4, labelKey: "simulationConfig.biasInsular" },
-];
 
 // ─── Stable-key helpers ───────────────────────────────────────────────────────
 // AgentSpec / EdgeSpec are backend types without an id field.
@@ -280,9 +262,9 @@ export function StepAgentsCustom({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {SILENCE_STRATEGIES.map((s) => (
+                          {SILENCE_STRATEGY_OPTIONS.map((s) => (
                             <SelectItem key={s.value} value={String(s.value)}>
-                              {t(s.labelKey as Parameters<typeof t>[0])}
+                              {t(s.labelKey)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -303,9 +285,9 @@ export function StepAgentsCustom({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {SILENCE_EFFECTS.map((e) => (
+                          {SILENCE_EFFECT_OPTIONS.map((e) => (
                             <SelectItem key={e.value} value={String(e.value)}>
-                              {t(e.labelKey as Parameters<typeof t>[0])}
+                              {t(e.labelKey)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -517,9 +499,9 @@ export function StepAgentsCustom({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {COGNITIVE_BIASES.map((b) => (
+                            {COGNITIVE_BIAS_OPTIONS.map((b) => (
                               <SelectItem key={b.value} value={String(b.value)}>
-                                {t(b.labelKey as Parameters<typeof t>[0])}
+                                {t(b.labelKey)}
                               </SelectItem>
                             ))}
                           </SelectContent>

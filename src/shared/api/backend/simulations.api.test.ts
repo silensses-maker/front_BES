@@ -29,7 +29,6 @@ import type {
   SimulationListResponse,
   TopologyParams,
   TopologyResponse,
-  WsTicketResponse,
 } from "./types/backend.types";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -38,8 +37,6 @@ const mockSimCreated: SimCreated = {
   runId: "run-001",
   status: "running",
   networkCount: 3,
-  channelId: "chan-001",
-  wsTicket: "ticket-abc",
   wsUrl: "ws://localhost:9000/ws",
 };
 
@@ -92,10 +89,6 @@ const mockResultsResponse: ResultsResponse = {
   offset: 0,
   limit: 100,
   agents: [],
-};
-
-const mockWsTicketResponse: WsTicketResponse = {
-  wsTicket: "ticket-xyz",
 };
 
 const mockGeneratedRunRequest: GeneratedRunRequest = {
@@ -443,26 +436,6 @@ describe("simulationsApi", () => {
 
       await expect(simulationsApi.getResults("run-001", "net-001")).rejects.toThrow(
         "internal error",
-      );
-    });
-  });
-
-  describe("getWsTicket", () => {
-    it("returns WsTicketResponse when request succeeds", async () => {
-      vi.mocked(backendClient.post).mockResolvedValue({ data: mockWsTicketResponse });
-
-      const result = await simulationsApi.getWsTicket("run-001");
-
-      expect(result).toEqual(mockWsTicketResponse);
-      expect(backendClient.post).toHaveBeenCalledWith("/simulations/run-001/ws-ticket");
-    });
-
-    it("propagates error if request fails", async () => {
-      const error = new Error("ticket generation failed");
-      vi.mocked(backendClient.post).mockRejectedValue(error);
-
-      await expect(simulationsApi.getWsTicket("run-001")).rejects.toThrow(
-        "ticket generation failed",
       );
     });
   });

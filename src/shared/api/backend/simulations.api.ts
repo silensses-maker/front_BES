@@ -17,7 +17,6 @@ import type {
   SimulationListResponse,
   TopologyParams,
   TopologyResponse,
-  WsTicketResponse,
 } from "./types/backend.types";
 
 export const simulationsApi = {
@@ -217,11 +216,6 @@ export const simulationsApi = {
     );
     if (response.status === 202) return null;
     return response.data;
-  },
-
-  async getWsTicket(runId: string): Promise<WsTicketResponse> {
-    const { data } = await backendClient.post<WsTicketResponse>(`/simulations/${runId}/ws-ticket`);
-    return data;
   },
 
   /**

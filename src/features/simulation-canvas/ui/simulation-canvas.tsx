@@ -12,6 +12,7 @@ import type { SimulationStatus } from "@/entities/simulation";
 import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
 import { benchProbe } from "@/shared/lib/bench-probe";
 import { logger } from "@/shared/lib/logger";
 import {
@@ -117,16 +118,8 @@ export function SimulationCanvas({
   // useCallback keeps the reference stable so Cosmograph's isEqual guard
   // doesn't trigger a re-upload on every parent render; only re-creates
   // when the locale changes (t reference changes).
-  const silenceStrategyLabel = useCallback(
-    (value: unknown): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceStrategy.degroot"),
-        1: t("enums.silenceStrategy.majority"),
-        2: t("enums.silenceStrategy.threshold"),
-        3: t("enums.silenceStrategy.confidence"),
-      };
-      return map[value as number] ?? String(value);
-    },
+  const labelForStrategy = useCallback(
+    (value: unknown): string => silenceStrategyLabel(t, value as number),
     [t],
   );
 
@@ -173,10 +166,10 @@ export function SimulationCanvas({
       (a, b) => a - b,
     );
     return present.map((strategy) => ({
-      label: silenceStrategyLabel(strategy),
+      label: labelForStrategy(strategy),
       color: STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? "#888888",
     }));
-  }, [topology, silenceStrategyLabel]);
+  }, [topology, labelForStrategy]);
 
   // Reads by the `agentIndex` column value (Cosmograph passes the column value
   // reliably; the optional 2nd `index` arg is not dependable). Without a frame
@@ -338,15 +331,8 @@ export function SimulationCanvas({
     [frame, initialBeliefByIndex, beliefLabel],
   );
 
-  const silenceEffectLabel = useCallback(
-    (value: unknown): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceEffect.degroot"),
-        1: t("enums.silenceEffect.memory"),
-        2: t("enums.silenceEffect.memoryless"),
-      };
-      return map[value as number] ?? String(value);
-    },
+  const labelForEffect = useCallback(
+    (value: unknown): string => silenceEffectLabel(t, value as number),
     [t],
   );
 
@@ -633,9 +619,9 @@ export function SimulationCanvas({
         {...(clusterMode !== null && {
           pointClusterByFn:
             clusterMode === "strategy"
-              ? silenceStrategyLabel
+              ? labelForStrategy
               : clusterMode === "effect"
-                ? silenceEffectLabel
+                ? labelForEffect
                 : liveBeliefLabel,
         })}
         // "Colorear por" (#99 repaint mechanism): per-agent color from the

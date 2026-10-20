@@ -1,3 +1,10 @@
+/**
+ * Backend REST contract, hand-written: no codegen (#94). Source of truth: the OpenAPI spec of the
+ * backend repo, `silensses-maker/belief_evolution_simulator` → `src/main/resources/openapi.yaml`;
+ * update this file with every change there. Renamed schemas: Error is BackendError, UserInfo is
+ * UserSyncResponse, Agent is AgentSpec, Edge is EdgeSpec; the others keep their spec names.
+ */
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export type UserRole = "Administrator" | "Researcher" | "BaseUser" | "Guest";
@@ -10,19 +17,32 @@ export type FrameRetention = "ephemeral" | "persistent";
 
 // ─── Common ───────────────────────────────────────────────────────────────────
 
+/** The `error` codes the frontend branches on: a subset of the spec's, `error` stays open. */
 export type BackendErrorCode =
   | "unauthorized"
   | "forbidden"
   | "not_found"
   | "invalid_body"
   | "usage_limit_exceeded"
-  | "rate_limited"
   /** 409 — e.g. `DELETE /simulations/{runId}` on a run that already finished (#124). */
   | "conflict";
 
+/** Rejected input of a `400 invalid_body`: body member path (no array indexes) or query param. */
+export interface FieldIssue {
+  field: string;
+  issue: string;
+}
+
+/** Body of every non-2xx JSON answer. */
 export interface BackendError {
   error: BackendErrorCode | string;
   message: string;
+  /** Some `400 invalid_body` answers only. */
+  fields?: FieldIssue[];
+  /** `422 usage_limit_exceeded` only: the caller's quota. */
+  limit?: number;
+  /** `422 usage_limit_exceeded` only: the requested value. */
+  requested?: number;
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -137,8 +157,7 @@ export interface SimCreated {
    * `floor(density × densityFactor)` clamped to `[1, agentsPerNetwork − 1]` (#122).
    */
   effectiveDensity?: number;
-  channelId: string;
-  wsTicket: string;
+  /** Constant path of the persistent WebSocket (`/ws`): the client subscribes there by `runId`. */
   wsUrl: string;
 }
 
@@ -266,12 +285,6 @@ export interface ResultsResponse {
 export interface ResultsParams {
   offset?: number;
   limit?: number;
-}
-
-// ─── WebSocket ticket ─────────────────────────────────────────────────────────
-
-export interface WsTicketResponse {
-  wsTicket: string;
 }
 
 // ─── Pagination params ────────────────────────────────────────────────────────

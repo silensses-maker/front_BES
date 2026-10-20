@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
 import { useSimulationStream } from "./use-simulation-stream";
 
@@ -49,10 +48,6 @@ vi.mock("@/shared/api/backend", () => ({
 
 vi.mock("@/shared/i18n", () => ({
   useTranslation: vi.fn(),
-}));
-
-vi.mock("@/shared/lib/backend-error", () => ({
-  isErrorCode: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/logger", () => ({
@@ -122,7 +117,6 @@ describe("useSimulationStream", () => {
     vi.mocked(useTranslation).mockReturnValue({
       t: (key: string) => key,
     } as unknown as ReturnType<typeof useTranslation>);
-    vi.mocked(isErrorCode).mockReturnValue(false);
   });
 
   describe("initialization", () => {
@@ -165,11 +159,10 @@ describe("useSimulationStream", () => {
     });
   });
 
-  describe("connect() failure — rate_limited", () => {
+  describe("connect() failure", () => {
     it("logs the error with logger.error", async () => {
-      const connectError = new Error("rate limited");
+      const connectError = new Error("worker failed");
       mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "rate_limited");
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123"));
@@ -178,54 +171,24 @@ describe("useSimulationStream", () => {
       expect(logger.error).toHaveBeenCalledWith("useSimulationStream", connectError);
     });
 
-    it("calls toast.error with simulation.errorRateLimited translation key", async () => {
-      const connectError = new Error("rate limited");
-      mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "rate_limited");
-
-      await act(async () => {
-        renderHook(() => useSimulationStream("run-123"));
-      });
-
-      expect(toast.error).toHaveBeenCalledWith("simulation.errorRateLimited");
-    });
-
-    it("sets isConnecting to false after error", async () => {
-      mockClient.connect.mockRejectedValue(new Error("rate limited"));
-      vi.mocked(isErrorCode).mockReturnValue(true);
-
-      const { result } = renderHook(() => useSimulationStream("run-123"));
-
-      await act(async () => {});
-
-      expect(result.current.isConnecting).toBe(false);
-    });
-  });
-
-  describe("connect() failure — forbidden", () => {
-    it("calls toast.error with simulation.errorForbidden translation key", async () => {
-      const connectError = new Error("forbidden");
-      mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "forbidden");
-
-      await act(async () => {
-        renderHook(() => useSimulationStream("run-123"));
-      });
-
-      expect(toast.error).toHaveBeenCalledWith("simulation.errorForbidden");
-    });
-  });
-
-  describe("connect() failure — generic error", () => {
-    it("calls toast.error with simulation.errorStream when no specific code matches", async () => {
+    it("calls toast.error with simulation.errorStream", async () => {
       mockClient.connect.mockRejectedValue(new Error("unknown error"));
-      vi.mocked(isErrorCode).mockReturnValue(false);
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123"));
       });
 
       expect(toast.error).toHaveBeenCalledWith("simulation.errorStream");
+    });
+
+    it("sets isConnecting to false after error", async () => {
+      mockClient.connect.mockRejectedValue(new Error("worker failed"));
+
+      const { result } = renderHook(() => useSimulationStream("run-123"));
+
+      await act(async () => {});
+
+      expect(result.current.isConnecting).toBe(false);
     });
   });
 
