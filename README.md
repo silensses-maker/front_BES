@@ -180,6 +180,59 @@ Replaces ESLint + Prettier (~100x faster). Key rules:
 
 ---
 
+## Polarization measures (replica)
+
+The run view's **Polarization** chart and the wiki's *Polarization measures* section use a
+TypeScript **replica** of [pol_measures](https://github.com/ulvenforst/pol_measures) at commit
+[`0e05564`](https://github.com/ulvenforst/pol_measures/tree/0e05564ed0b7b23de368dd19becac3a1de4ef745),
+the PROMUEVA package of polarization measures by Juan Camilo Narváez Tascón (`ulvenforst`; BiPol
+implemented by Carlos Pinzón). pol_measures is GPL-3.0 upstream; its authors, members of PROMUEVA,
+gave this project permission to use the port. The replica covers the 10 measures the package exports
+(EstebanRay, GeneralizedER, EMDPol, Experts, ShannonPol, VanDerEijkPol, MEC, MECNormalized,
+GeneralizedMEC, BiPol), its validation, defaults and classification thresholds, and SciPy's bounded
+optimizer used by the MEC family. `src/shared/lib/polarization/golden.test.ts` checks every measure
+against values produced by the real Python package (fixture in
+`src/shared/lib/polarization/__fixtures__/`).
+
+Per round, the aggregates pipeline keeps one 210-bin histogram per belief type (210 = LCM of 3, 5, 7
+and 10), so any measure, k or parameter set is computed on demand. Variance and standard deviation
+over time are **not** part of the replica: they stay when it is disabled or removed.
+
+**Disable it** at build time (it is on by default; only the exact value `false` turns it off):
+
+```bash
+PUBLIC_ENABLE_POLARIZATION=false bun run build
+```
+
+A disabled build computes no fine histograms, shows no Polarization tab or wiki section, and the
+bundler drops the replica code (`__POLARIZATION__` is a build-time literal, like `__BENCHMARK__`).
+The default lives in `rsbuild.config.ts`, not in an `.env` file.
+
+**Remove it:**
+
+1. Delete `src/shared/lib/polarization/`, `src/features/run-polarization/`,
+   `src/shared/i18n/locales/polarization.en.ts`, `src/shared/i18n/locales/polarization.es.ts` and
+   `scripts/generate-pol-measures-golden.py`.
+2. Remove the integration points. Each one is marked with the comment `polarization replica (#129)`
+   (`grep -rn "polarization replica (#129)" src rsbuild.config.ts vitest.config.ts`):
+   - build flag: `rsbuild.config.ts`, `vitest.config.ts`, `src/shared/config/build-flags.d.ts`;
+   - per-round histogram hook: `src/shared/lib/round-stats.ts`, `src/shared/workers/simulation-frame.worker.ts`,
+     `src/entities/simulation/lib/round-aggregates.ts`, `src/entities/simulation/model/round-aggregates.store.ts`;
+   - run charts tab: `src/pages/live-run/run-view.tsx` (the `extraTabs` slot of `RunChartsCard` stays generic);
+   - wiki section: `src/pages/wiki/wiki-page.tsx`;
+   - strings: the `polarization` namespace merge in `src/shared/i18n/locales/en.ts` and `es.ts`.
+
+**Update it** to a newer pol_measures commit: follow the instructions at the top of
+`scripts/generate-pol-measures-golden.py` (download the commit, create a scratch venv with numpy and
+scipy, run the generator with `python -I`), run `vitest`, port the upstream changes until the golden
+tests pass again, and update the commit in the file headers and `POL_MEASURES_SOURCE`
+(`src/shared/lib/polarization/index.ts`).
+
+**Future work:** consume pol_measures directly, a pinned version of the Python package (for example a
+small service behind the backend), instead of maintaining this replica.
+
+---
+
 ## Versioning
 
 Follows Semantic Versioning with pre-release tags:

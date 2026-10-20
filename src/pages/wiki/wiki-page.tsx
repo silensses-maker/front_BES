@@ -1,21 +1,14 @@
 import { useEffect, useRef } from "react";
+// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+import { PolarizationWikiSection } from "@/features/run-polarization";
 import { useTranslation } from "@/shared/i18n";
 import { clearMath, typesetMath } from "@/shared/lib/load-mathjax";
 import { logger } from "@/shared/lib/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Mb, Mi } from "@/shared/ui/math";
 import { Separator } from "@/shared/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-
-/** Inline math — pass raw TeX without delimiters */
-const Mi = ({ tex }: { tex: string }) => (
-  <span dangerouslySetInnerHTML={{ __html: `\\(${tex}\\)` }} />
-);
-
-/** Display (block) math — pass raw TeX without delimiters */
-const Mb = ({ tex }: { tex: string }) => (
-  <span dangerouslySetInnerHTML={{ __html: `$$${tex}$$` }} />
-);
 
 /**
  * Typesets the TeX inside the article. MathJax is fetched on the first call (it is not in
@@ -395,7 +388,33 @@ export function WikiPage() {
 
       <Separator className="my-12" />
 
-      {/* Section 4: Conclusion */}
+      {/* Section 4: Variance over time (#129) */}
+      <section id="variance" className="flex flex-col gap-4">
+        <h2 className="font-display text-3xl font-normal tracking-tight text-foreground">
+          {t("wiki.variance.title")}
+        </h2>
+        <p className="text-lg tracking-tight text-muted-foreground">{t("wiki.variance.p1")}</p>
+        <p className="text-center text-xl text-foreground md:text-2xl">
+          <Mb tex="\sigma_t^{2} = \frac{1}{n} \sum_{i=1}^{n} \left(B_{i}^{t} - \mu_t\right)^{2}, \qquad \mu_t = \frac{1}{n} \sum_{i=1}^{n} B_{i}^{t}" />
+        </p>
+        <p className="text-lg tracking-tight text-muted-foreground">
+          {t("wiki.variance.p2_1")} <Mi tex="\sigma_t" /> {t("wiki.variance.p2_2")}{" "}
+          <Mi tex="\sigma_t^{2}" />
+          {t("wiki.variance.p2_3")}
+        </p>
+      </section>
+
+      {/* polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization */}
+      {__POLARIZATION__ && (
+        <>
+          <Separator className="my-12" />
+          <PolarizationWikiSection />
+        </>
+      )}
+
+      <Separator className="my-12" />
+
+      {/* Section 5: Conclusion */}
       <section id="conclusion" className="flex flex-col gap-4 mb-16">
         <h2 className="font-display text-3xl font-normal tracking-tight text-foreground">
           {t("wiki.conclusion.title")}

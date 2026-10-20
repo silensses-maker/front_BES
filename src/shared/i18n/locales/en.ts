@@ -1,3 +1,6 @@
+// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+import polarizationEn from "./polarization.en";
+
 const en = {
   common: {
     save: "Save",
@@ -231,6 +234,13 @@ const en = {
       publicOpinion: "Public Opinion",
       publicOpinionDesc_1: "Used in",
       publicOpinionDesc_2: "models. The most recent opinion publicly expressed by agent",
+    },
+    variance: {
+      title: "Variance over time",
+      p1: "The Variance chart of a run shows, for each round, how spread out the beliefs are around their mean, computed over every agent:",
+      p2_1: "It is drawn as the standard deviation",
+      p2_2: "(in belief units, at most 0.5) or as the variance",
+      p2_3: ", for public (solid) and private (dashed) beliefs. A curve falling toward 0 means the opinions are converging. It is not the spread (max − min) of the timeline band.",
     },
     conclusion: {
       title: "Why This Matters for SiLEnSeSS",
@@ -890,6 +900,12 @@ const en = {
     tabDistribution: "Distribution",
     tabPublicPrivate: "Public vs. private",
     tabParticipation: "Participation",
+    tabVariance: "Variance",
+    dispersionModeAria: "Show the standard deviation or the variance",
+    dispersionStd: "Std. dev. σ",
+    dispersionVariance: "Variance σ²",
+    dispersionTip:
+      "Spread of the beliefs around their mean in each round, over every agent: σ² = (1/n) Σ (bᵢ − μ)². Public (solid) and private (dashed).",
     sampleNote: "Showing 50 of {{total}} agents · uniform sampling · color = initial belief",
     divergenceNote:
       "The only place where the public-private divergence lives — now one click away.",
@@ -1066,6 +1082,8 @@ const en = {
       debug: "Debug",
     },
   },
+  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  ...(__POLARIZATION__ ? { polarization: polarizationEn } : {}),
 } as const;
 
 export default en;

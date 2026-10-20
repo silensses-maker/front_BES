@@ -55,6 +55,14 @@ const BenchHud = __BENCHMARK__
     )
   : null;
 
+// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+// Loaded when the Polarization tab first renders, so the run view's chunks carry none of it.
+const PolarizationPanel = __POLARIZATION__
+  ? lazy(() =>
+      import("@/features/run-polarization").then((m) => ({ default: m.PolarizationPanel })),
+    )
+  : null;
+
 interface RunViewProps {
   runId: string;
   networkId: string;
@@ -370,6 +378,31 @@ export function RunView({ runId, networkId }: RunViewProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [domainEnd, maxPanel, limited, seek, stepBy, goToEnd, togglePlay, jumpEvent]);
 
+  // ── Charts card props: stable, so live rounds re-render the card only through its own
+  // frame-coalesced subscriptions (#129), not through this page re-rendering every round ──
+  const toggleChartMaximized = useCallback(
+    () => setMaxPanel((current) => (current === "chart" ? "none" : "chart")),
+    [],
+  );
+  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  const chartExtraTabs = useMemo(
+    () =>
+      PolarizationPanel !== null
+        ? [
+            {
+              key: "polarization",
+              label: t("polarization.tab"),
+              content: (
+                <Suspense fallback={null}>
+                  <PolarizationPanel />
+                </Suspense>
+              ),
+            },
+          ]
+        : undefined,
+    [t],
+  );
+
   // ── Stream-error state (mockup) ────────────────────────────────────────────
   if (status === "error") {
     return (
@@ -504,7 +537,8 @@ export function RunView({ runId, networkId }: RunViewProps) {
         >
           <RunChartsCard
             maximized={maxPanel === "chart"}
-            onToggleMaximize={() => setMaxPanel(maxPanel === "chart" ? "none" : "chart")}
+            onToggleMaximize={toggleChartMaximized}
+            extraTabs={chartExtraTabs}
           />
         </div>
       )}

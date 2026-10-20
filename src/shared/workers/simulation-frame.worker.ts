@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { computeRoundStats } from "@/shared/lib/round-stats";
 import { parseSimulationFrame } from "@/shared/lib/simulation-frame";
 import type { MergedFrame } from "./simulation-frame-merger";
 import { PartitionMerger } from "./simulation-frame-merger";
@@ -16,12 +17,23 @@ const AGENT_COUNT_OFFSET = 24;
 
 let merger: PartitionMerger | null = null;
 
+/**
+ * Posts a completed round with its statistics computed here, off the main thread: the
+ * round-aggregates store only copies them (#129). The fine histograms (polarization replica)
+ * travel as transferables too.
+ */
 function emitMerged(merged: MergedFrame): void {
-  (self as DedicatedWorkerGlobalScope).postMessage(merged, [
+  const stats = computeRoundStats(merged.publicBelief, merged.privateBelief, merged.speaking, {
+    // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+    fineHistograms: __POLARIZATION__,
+  });
+  const transfer: Transferable[] = [
     merged.publicBelief.buffer,
     merged.privateBelief.buffer,
     merged.speaking.buffer,
-  ]);
+  ];
+  if (stats.fine !== null) transfer.push(stats.fine.public.buffer, stats.fine.private.buffer);
+  (self as DedicatedWorkerGlobalScope).postMessage({ ...merged, stats }, transfer);
 }
 
 function processSlice(buffer: ArrayBuffer): void {

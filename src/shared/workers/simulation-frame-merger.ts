@@ -1,3 +1,4 @@
+import type { RoundStats } from "@/shared/lib/round-stats";
 import type { SimulationFramePartition } from "@/shared/lib/simulation-frame";
 
 export interface MergedFrame {
@@ -7,6 +8,11 @@ export interface MergedFrame {
   publicBelief: Float32Array;
   privateBelief: Float32Array;
   speaking: Uint8Array;
+  /**
+   * Per-round statistics computed by the frame worker before posting (live and REST-fallback
+   * frames). Absent on frames merged on the main thread; consumers compute them then.
+   */
+  stats?: RoundStats;
 }
 
 interface RoundBuffer {

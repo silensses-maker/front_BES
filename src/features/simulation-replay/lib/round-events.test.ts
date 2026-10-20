@@ -8,7 +8,7 @@ function agg(
   participation: number,
   meanPrivate = meanPublic,
 ): RoundAggregate {
-  return { meanPublic, meanPrivate, spread, participation };
+  return { meanPublic, meanPrivate, spread, participation, variancePublic: 0, variancePrivate: 0 };
 }
 
 // Baseline round 0: spread 0.8, full participation, mean 0.5

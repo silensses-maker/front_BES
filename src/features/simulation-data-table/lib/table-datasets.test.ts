@@ -128,6 +128,8 @@ describe("buildRoundRows", () => {
       meanPrivate: m,
       spread: 0.1,
       participation: 0.9,
+      variancePublic: 0.01,
+      variancePrivate: 0.01,
     });
     const rows = buildRoundRows([agg(0.5), undefined, agg(0.6), agg(0.7)], 2);
     expect(rows.map((r) => r.round)).toEqual([0, 2]);

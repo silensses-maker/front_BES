@@ -19,6 +19,13 @@ if (BENCHMARK && (process.env.CI || process.env.VERCEL)) {
   );
 }
 
+// ── polarization replica (#129): kill switch ─────────────────────────────────────────────────
+// The TypeScript replica of pol_measures (src/shared/lib/polarization + src/features/run-polarization)
+// is compiled in by default; only PUBLIC_ENABLE_POLARIZATION=false (exactly) turns it off, which
+// drops the fine histograms, the Polarization chart tab, the wiki section and the replica code.
+// The default lives HERE, not in a .env file (Rsbuild gives .env.production priority).
+const POLARIZATION = process.env.PUBLIC_ENABLE_POLARIZATION !== 'false';
+
 /**
  * Application version from package.json, read once per build and compiled in as `__APP_VERSION__`
  * in EVERY build (#127): configuration exports and benchmark results record it. Builds always run
@@ -75,6 +82,8 @@ export default defineConfig({
       __APP_VERSION__: JSON.stringify(APP_VERSION),
       __BENCHMARK__: JSON.stringify(BENCHMARK),
       __BENCH_BUILD__: JSON.stringify(BENCHMARK ? benchBuildInfo() : null),
+      // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+      __POLARIZATION__: JSON.stringify(POLARIZATION),
     },
   },
 

@@ -1,3 +1,6 @@
+// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+import polarizationEs from "./polarization.es";
+
 const es = {
   common: {
     save: "Guardar",
@@ -235,6 +238,13 @@ const es = {
       publicOpinion: "Opinión pública",
       publicOpinionDesc_1: "Usado en modelos",
       publicOpinionDesc_2: ". La opinión más reciente expresada públicamente por el agente",
+    },
+    variance: {
+      title: "Varianza en el tiempo",
+      p1: "La gráfica Varianza de una corrida muestra, en cada ronda, qué tan dispersas están las creencias alrededor de su media, calculado sobre todos los agentes:",
+      p2_1: "Se dibuja como la desviación estándar",
+      p2_2: "(en unidades de creencia, a lo sumo 0,5) o como la varianza",
+      p2_3: ", para las creencias públicas (continua) y privadas (discontinua). Una curva que cae hacia 0 indica que las opiniones convergen. No es la dispersión (máx − mín) de la banda de la línea de tiempo.",
     },
     conclusion: {
       title: "Por qué esto importa para SiLEnSeSS",
@@ -904,6 +914,12 @@ const es = {
     tabDistribution: "Distribución",
     tabPublicPrivate: "Pública vs. privada",
     tabParticipation: "Participación",
+    tabVariance: "Varianza",
+    dispersionModeAria: "Mostrar la desviación estándar o la varianza",
+    dispersionStd: "Desv. estándar σ",
+    dispersionVariance: "Varianza σ²",
+    dispersionTip:
+      "Dispersión de las creencias alrededor de su media en cada ronda, sobre todos los agentes: σ² = (1/n) Σ (bᵢ − μ)². Pública (continua) y privada (discontinua).",
     sampleNote: "Mostrando 50 de {{total}} agentes · muestreo uniforme · color = creencia inicial",
     divergenceNote: "El único lugar donde vive la divergencia público-privado — ahora a un clic.",
     distributionTitle: "Creencia pública · ronda {{round}}",
@@ -1080,6 +1096,8 @@ const es = {
       debug: "Depuración",
     },
   },
+  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  ...(__POLARIZATION__ ? { polarization: polarizationEs } : {}),
 } as const;
 
 export default es;

@@ -109,17 +109,32 @@ describe("simulation-frame.worker", () => {
           publicBelief: Float32Array;
           privateBelief: Float32Array;
           speaking: Uint8Array;
+          stats: {
+            meanPublic: number;
+            participation: number;
+            variancePublic: number;
+            fine: { public: Uint32Array; private: Uint32Array } | null;
+          };
         },
         ArrayBuffer[],
       ];
       expect(merged.round).toBe(1);
       expect(Array.from(merged.publicBelief)).toEqual([0.5, 0.5]);
       expect(Array.from(merged.speaking)).toEqual([1, 1]);
-      // Transferable list should carry the three underlying buffers.
+      // Round statistics are computed in the worker and posted with the frame (#129)
+      expect(merged.stats.meanPublic).toBe(0.5);
+      expect(merged.stats.participation).toBe(1);
+      expect(merged.stats.variancePublic).toBe(0);
+      // 0.5 · 210 = 105: both agents in fine bin 105 (polarization replica, on under test)
+      expect(merged.stats.fine?.public[105]).toBe(2);
+      expect(merged.stats.fine?.private[105]).toBe(2);
+      // Transferable list carries the three belief buffers and the two fine histograms.
       expect(transfer).toEqual([
         merged.publicBelief.buffer,
         merged.privateBelief.buffer,
         merged.speaking.buffer,
+        merged.stats.fine?.public.buffer,
+        merged.stats.fine?.private.buffer,
       ]);
     });
 
