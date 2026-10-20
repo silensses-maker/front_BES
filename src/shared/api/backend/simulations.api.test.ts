@@ -2,18 +2,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
-vi.mock("./auth-interceptor", () => ({}));
+vi.mock("./auth-interceptor", () => ({ currentIdToken: vi.fn() }));
 
 vi.mock("./client", () => ({
   backendClient: {
     post: vi.fn(),
     get: vi.fn(),
     delete: vi.fn(),
+    defaults: { baseURL: "/api" },
   },
+}));
+
+vi.mock("@/shared/workers/topology-fetch.client", () => ({
+  fetchTopologyInWorker: vi.fn(),
 }));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+import { fetchTopologyInWorker } from "@/shared/workers/topology-fetch.client";
+import { TopologyLoadError } from "@/shared/workers/topology-transfer";
+import { currentIdToken } from "./auth-interceptor";
 import { backendClient } from "./client";
 import { simulationsApi } from "./simulations.api";
 import type {
@@ -399,6 +407,47 @@ describe("simulationsApi", () => {
       await expect(simulationsApi.getTopology("run-001", "net-001")).rejects.toThrow(
         "server error",
       );
+    });
+  });
+
+  describe("getTopologyFull (#128: topology worker)", () => {
+    it("downloads in the worker with an absolute base URL, a fresh token and the progress", async () => {
+      vi.mocked(fetchTopologyInWorker).mockResolvedValue(mockTopologyResponse);
+      const onProgress = vi.fn();
+
+      const result = await simulationsApi.getTopologyFull("run-001", "net-001", { onProgress });
+
+      expect(result).toBe(mockTopologyResponse);
+      expect(fetchTopologyInWorker).toHaveBeenCalledWith(
+        expect.objectContaining({
+          baseUrl: new URL("/api", window.location.href).href,
+          runId: "run-001",
+          networkId: "net-001",
+          getToken: currentIdToken,
+          onProgress,
+          // bench probes are compiled out of normal builds
+          onPage: undefined,
+          onResources: undefined,
+        }),
+      );
+    });
+
+    it("resolves null when the topology is not ready (202)", async () => {
+      vi.mocked(fetchTopologyInWorker).mockResolvedValue(null);
+      await expect(simulationsApi.getTopologyFull("run-001", "net-001")).resolves.toBeNull();
+    });
+
+    it("rejects when a page still fails after its retries — never a partial topology", async () => {
+      const error = new TopologyLoadError({
+        kind: "http",
+        status: 503,
+        attempts: 4,
+        message: "topology page answered 503",
+      });
+      vi.mocked(fetchTopologyInWorker).mockRejectedValue(error);
+
+      await expect(simulationsApi.getTopologyFull("run-001", "net-001")).rejects.toBe(error);
+      expect(backendClient.get).not.toHaveBeenCalled();
     });
   });
 

@@ -2,12 +2,15 @@ import type { AxiosResponseHeaders, InternalAxiosRequestConfig } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BENCH_PROBE_HISTORY_LIMIT,
+  BENCH_RESOURCE_LIMIT,
   benchProbe,
   getBenchCanvas,
   getBenchProbeHistory,
+  getBenchResources,
   HIGH_FREQUENCY_PROBES,
   isBenchmarkHost,
   nextBenchCallId,
+  recordBenchResources,
   registerBenchCanvas,
   resetBenchProbe,
   subscribeBenchProbe,
@@ -78,6 +81,21 @@ describe("benchProbe", () => {
     const a = nextBenchCallId();
     const b = nextBenchCallId();
     expect(b).toBe(a + 1);
+  });
+});
+
+describe("recordBenchResources (topology worker entries, #128)", () => {
+  it("keeps the relayed entries in order, bounded (oldest dropped first), until reset", () => {
+    const entry = (i: number) => ({ name: `page-${i}`, startTime: i, responseEnd: i + 1 });
+    recordBenchResources([entry(0), entry(1)]);
+    expect(getBenchResources()).toEqual([entry(0), entry(1)]);
+
+    recordBenchResources(Array.from({ length: BENCH_RESOURCE_LIMIT }, (_, i) => entry(i + 2)));
+    expect(getBenchResources()).toHaveLength(BENCH_RESOURCE_LIMIT);
+    expect(getBenchResources()[0]).toEqual(entry(2));
+
+    resetBenchProbe();
+    expect(getBenchResources()).toEqual([]);
   });
 });
 

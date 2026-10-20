@@ -1,7 +1,12 @@
-import "./auth-interceptor";
 import type { AxiosRequestConfig } from "axios";
-import { benchProbe, nextBenchCallId, withParseTiming } from "@/shared/lib/bench-probe";
-import { logger } from "@/shared/lib/logger";
+import {
+  benchProbe,
+  nextBenchCallId,
+  recordBenchResources,
+  withParseTiming,
+} from "@/shared/lib/bench-probe";
+import type { TopologyLoadProgress } from "@/shared/workers/topology-transfer";
+import { currentIdToken } from "./auth-interceptor";
 import { backendClient } from "./client";
 import type {
   CustomRunRequest,
@@ -18,6 +23,11 @@ import type {
   TopologyParams,
   TopologyResponse,
 } from "./types/backend.types";
+
+export interface TopologyFullOptions {
+  /** Progress of this download (pages, then assembly). */
+  onProgress?: (progress: TopologyLoadProgress) => void;
+}
 
 export const simulationsApi = {
   async startGenerated(body: GeneratedRunRequest): Promise<SimCreated> {
@@ -100,109 +110,63 @@ export const simulationsApi = {
   },
 
   /**
-   * Fetches the FULL topology by paginating through both agents and edges.
+   * Fetches the FULL topology by paginating through both agents and edges, in the topology
+   * worker (#128): fetch, JSON parse and page merge run off the main thread, and the topology
+   * comes back as typed columns that are turned into objects in short slices
+   * (`shared/workers/topology-fetch*.ts`).
    *
-   * Strategy:
-   * - First call requests aggressively-large page sizes (10k agents,
-   *   100k edges). The backend will cap to its real max — we'll see what we
-   *   actually got via the response's `agentLimit` / `edgeLimit` fields.
-   * - Remaining pages run in parallel via `Promise.all`. Browser connection
-   *   limits (~6 per origin) implicitly throttle concurrency.
-   * - Per-page failures (e.g. 404 when a DEBUG run is purged mid-fetch)
-   *   degrade gracefully — the page is logged and skipped, not propagated.
-   * - Dedup by natural key (`agent.index`, `${source}-${target}`) is robust
-   *   to pages where the server ignored our `*Limit: 0` hint.
+   * - The first page asks for 10k agents / 100k edges; its counts plan the other pages, which
+   *   run at most 6 at a time.
+   * - A failed page is retried a bounded number of times with backoff; if it still fails, the
+   *   whole call rejects with a `TopologyLoadError` — no topology with a page missing is ever
+   *   returned (pages used to be skipped silently).
+   * - Resolves null when the first page answers 202 (not ready).
+   * - Auth: a fresh Firebase ID token per call, handed to the worker (never persisted); a 401
+   *   gets one force-refreshed token and one retry, as with the axios interceptor.
+   * - `onProgress` reports the pages downloaded, then the assembly step.
    *
    * Every call is one full download. Views load topologies through
    * `loadTopology` (entities/simulation), which shares concurrent and repeated
-   * loads of the run being viewed (#140).
+   * loads of the run being viewed (#140) and fans the progress out to every consumer.
    */
-  async getTopologyFull(runId: string, networkId: string): Promise<TopologyResponse | null> {
+  async getTopologyFull(
+    runId: string,
+    networkId: string,
+    options: TopologyFullOptions = {},
+  ): Promise<TopologyResponse | null> {
     // Bench builds only (#126): load timings of the current network for the debug HUD.
     const benchCallId = __BENCHMARK__ ? nextBenchCallId() : 0;
     if (__BENCHMARK__) {
       benchProbe("topology-fetch-start", { runId, networkId, callId: benchCallId });
     }
 
-    // Request aggressively large first-page sizes to minimize round-trips.
-    // The server's effective cap is reflected in the response.
-    const first = await this.getTopology(runId, networkId, {
-      agentOffset: 0,
-      agentLimit: 10_000,
-      edgeOffset: 0,
-      edgeLimit: 100_000,
+    // Lazy chunk: the worker client (and the worker it starts) load with the first download.
+    const { fetchTopologyInWorker } = await import(
+      /* webpackChunkName: "topology-fetch" */ "@/shared/workers/topology-fetch.client"
+    );
+    const topology = await fetchTopologyInWorker({
+      baseUrl: new URL(backendClient.defaults.baseURL ?? "/", globalThis.location.href).href,
+      runId,
+      networkId,
+      getToken: currentIdToken,
+      onProgress: options.onProgress,
+      // Bench builds only (#126): per-page parse times and the worker's Resource Timing entries.
+      onPage: __BENCHMARK__
+        ? ({ parseMs }) => benchProbe("topology-parse", { runId, networkId, durationMs: parseMs })
+        : undefined,
+      onResources: __BENCHMARK__ ? recordBenchResources : undefined,
     });
-    if (first === null) return null;
 
-    const { agentCount, edgeCount, agentLimit, edgeLimit } = first;
-
-    const safePage = (params: TopologyParams): Promise<TopologyResponse | null> =>
-      this.getTopology(runId, networkId, params).catch((err: unknown) => {
-        // Per-page failures (404 from DEBUG-run purges, transient 5xx) should
-        // not abort the whole fetch — return null and let dedup skip the page.
-        logger.error("getTopologyFull.page", err);
-        return null;
-      });
-
-    const agentPagePromises: Promise<TopologyResponse | null>[] = [];
-    if (agentLimit > 0) {
-      for (let offset = agentLimit; offset < agentCount; offset += agentLimit) {
-        agentPagePromises.push(
-          safePage({ agentOffset: offset, agentLimit, edgeOffset: 0, edgeLimit: 0 }),
-        );
-      }
-    }
-
-    const edgePagePromises: Promise<TopologyResponse | null>[] = [];
-    if (edgeLimit > 0) {
-      for (let offset = edgeLimit; offset < edgeCount; offset += edgeLimit) {
-        edgePagePromises.push(
-          safePage({ agentOffset: 0, agentLimit: 0, edgeOffset: offset, edgeLimit }),
-        );
-      }
-    }
-
-    const [agentPages, edgePages] = await Promise.all([
-      Promise.all(agentPagePromises),
-      Promise.all(edgePagePromises),
-    ]);
-
-    const agentMap = new Map<number, (typeof first.agents)[number]>();
-    for (const a of first.agents) agentMap.set(a.index, a);
-    for (const page of agentPages) {
-      if (page === null) continue;
-      for (const a of page.agents) agentMap.set(a.index, a);
-    }
-
-    const edgeMap = new Map<string, (typeof first.edges)[number]>();
-    for (const e of first.edges) edgeMap.set(`${e.source}-${e.target}`, e);
-    for (const page of edgePages) {
-      if (page === null) continue;
-      for (const e of page.edges) edgeMap.set(`${e.source}-${e.target}`, e);
-    }
-
-    const agents = Array.from(agentMap.values()).sort((a, b) => a.index - b.index);
-    const edges = Array.from(edgeMap.values());
-
-    if (__BENCHMARK__) {
+    if (__BENCHMARK__ && topology !== null) {
       benchProbe("topology-fetch-end", {
         runId,
         networkId,
         callId: benchCallId,
-        agents: agents.length,
-        edges: edges.length,
+        agents: topology.agents.length,
+        edges: topology.edges.length,
       });
     }
-
-    return {
-      ...first,
-      agentOffset: 0,
-      agentLimit: agents.length,
-      edgeOffset: 0,
-      edgeLimit: edges.length,
-      agents,
-      edges,
-    };
+    return topology;
   },
 
   async getResults(

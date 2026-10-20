@@ -456,6 +456,11 @@ const en = {
     cancelSuccess: "Simulation cancelled.",
     canvas: {
       loadingNetwork: "Loading network…",
+      loadingNetworkPages: "Loading network… {{done}} / {{total}} pages",
+      loadProgressLabel: "Network download progress",
+      loadFailedTitle: "The network could not be loaded",
+      loadFailedBody:
+        "Part of the network could not be downloaded after several attempts. Rather than show an incomplete network, nothing is shown.",
       preparingData: "Preparing data…",
       computingLayout: "Computing layout…",
       windowsClusterWarning: "Clustering may be unstable on Windows",

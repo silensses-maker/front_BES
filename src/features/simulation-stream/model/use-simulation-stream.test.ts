@@ -1,7 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
+import {
+  createSimulationWsClient,
+  loadTopology,
+  useSimulationStore,
+  useTopologyLoadStatus,
+} from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
@@ -37,6 +42,7 @@ vi.mock("@/entities/simulation", () => {
     createSimulationWsClient: vi.fn(),
     loadTopology: vi.fn(),
     useSimulationStore: useSimulationStoreMock,
+    useTopologyLoadStatus: vi.fn(),
   };
 });
 
@@ -114,6 +120,7 @@ describe("useSimulationStream", () => {
       setTopology: mockSetTopology,
     });
     vi.mocked(loadTopology).mockResolvedValue(null);
+    vi.mocked(useTopologyLoadStatus).mockReturnValue({ phase: "idle" });
     vi.mocked(useTranslation).mockReturnValue({
       t: (key: string) => key,
     } as unknown as ReturnType<typeof useTranslation>);
@@ -283,6 +290,62 @@ describe("useSimulationStream", () => {
       });
 
       expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("exposes the download status of the watched network (#128)", async () => {
+      const loading = {
+        phase: "loading",
+        progress: { stage: "download", pagesDone: 4, pagesTotal: 15 },
+      } as const;
+      vi.mocked(useTopologyLoadStatus).mockReturnValue(loading);
+
+      const { result } = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+
+      expect(useTopologyLoadStatus).toHaveBeenCalledWith("run-123", "net-1");
+      expect(result.current.topologyLoad).toBe(loading);
+    });
+
+    it("never stores a topology when the download fails (#128)", async () => {
+      vi.mocked(loadTopology).mockRejectedValue(new Error("page 7 failed after 4 attempts"));
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("retryTopology loads the network again and stores the topology (#128)", async () => {
+      vi.mocked(loadTopology)
+        .mockRejectedValueOnce(new Error("503"))
+        .mockResolvedValue(topo as never);
+
+      const { result } = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+      expect(mockSetTopology).not.toHaveBeenCalled();
+
+      await act(async () => {
+        result.current.retryTopology();
+      });
+
+      expect(loadTopology).toHaveBeenCalledTimes(2);
+      expect(loadTopology).toHaveBeenLastCalledWith("run-123", "net-1");
+      expect(mockSetTopology).toHaveBeenCalledWith(topo);
+    });
+
+    it("retryTopology does nothing after unmount or while waiting for a network", async () => {
+      const waiting = renderHook(() => useSimulationStream("run-123"));
+      await act(async () => {});
+      act(() => waiting.result.current.retryTopology());
+      expect(loadTopology).not.toHaveBeenCalled();
+
+      const viewer = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+      const { retryTopology } = viewer.result.current;
+      act(() => viewer.unmount());
+      act(() => retryTopology());
+      expect(loadTopology).toHaveBeenCalledTimes(1);
     });
 
     it("does not log a topology fetch error once the component has unmounted", async () => {

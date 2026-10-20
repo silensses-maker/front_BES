@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TopologyResponse } from "@/shared/api/backend";
+import { getBenchResources } from "@/shared/lib/bench-probe";
 import { cn } from "@/shared/lib/utils";
 import { currentBuildInfo } from "../lib/build-info";
 import { downloadText } from "../lib/download";
@@ -77,16 +78,19 @@ function writeOpen(open: boolean): void {
   }
 }
 
+/** The page's Resource Timing entries plus the topology worker's, relayed by the probe (#128). */
 function readResources(): ResourceEntryLite[] {
+  let own: ResourceEntryLite[] = [];
   try {
-    return performance.getEntriesByType("resource").map((e) => ({
+    own = performance.getEntriesByType("resource").map((e) => ({
       name: e.name,
       startTime: e.startTime,
       responseEnd: (e as PerformanceResourceTiming).responseEnd,
     }));
   } catch {
-    return [];
+    // Resource Timing is optional instrumentation
   }
+  return [...own, ...getBenchResources()];
 }
 
 /** The graph canvas: the largest <canvas> on the page (timeline and charts are smaller). */

@@ -20,7 +20,7 @@ vi.mock("@/shared/lib/logger", () => ({
 // Import once at the top level so the interceptors registered by auth-interceptor.ts
 // are applied to the same backendClient instance throughout all tests.
 import { auth } from "@/shared/api/firebase";
-import "./auth-interceptor";
+import { currentIdToken } from "./auth-interceptor";
 import { backendClient } from "./client";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -164,5 +164,29 @@ describe("auth-interceptor — response interceptor (401 retry)", () => {
     await expect(backendClient.get("/test")).rejects.toThrow();
     // force-refresh must NOT be called for non-401 errors
     expect(mockGetIdToken).not.toHaveBeenCalledWith(true);
+  });
+});
+
+// ─── Tests — currentIdToken (topology worker, #128) ──────────────────────────
+
+describe("currentIdToken", () => {
+  afterEach(() => {
+    // biome-ignore lint/suspicious/noExplicitAny: resetting mock property between tests
+    (auth as any).currentUser = null;
+  });
+
+  it("returns the signed-in user's token, force-refreshed on request", async () => {
+    const mockGetIdToken = vi.fn(async (force?: boolean) => (force ? "fresh" : "cached"));
+    // biome-ignore lint/suspicious/noExplicitAny: mutating mock object property
+    (auth as any).currentUser = { getIdToken: mockGetIdToken };
+
+    expect(await currentIdToken()).toBe("cached");
+    expect(mockGetIdToken).toHaveBeenLastCalledWith(false);
+    expect(await currentIdToken(true)).toBe("fresh");
+    expect(mockGetIdToken).toHaveBeenLastCalledWith(true);
+  });
+
+  it("returns null when nobody is signed in", async () => {
+    expect(await currentIdToken()).toBeNull();
   });
 });

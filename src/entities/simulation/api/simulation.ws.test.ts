@@ -234,7 +234,11 @@ describe("createSimulationWsClient", () => {
 
         await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
-        expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(RUN_ID, "net-1");
+        expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(
+          RUN_ID,
+          "net-1",
+          expect.objectContaining({ onProgress: expect.any(Function) }),
+        );
         expect(mockStore.setTopology).toHaveBeenCalledWith(MOCK_TOPOLOGY);
       });
 
@@ -494,7 +498,11 @@ describe("createSimulationWsClient", () => {
         });
 
         expect(mockStore.setStatus).toHaveBeenCalledWith("running");
-        expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(RUN_ID, "net-1");
+        expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(
+          RUN_ID,
+          "net-1",
+          expect.objectContaining({ onProgress: expect.any(Function) }),
+        );
       });
     });
 

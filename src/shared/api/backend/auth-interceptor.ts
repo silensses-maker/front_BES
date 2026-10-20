@@ -9,11 +9,21 @@ interface RetryConfig extends InternalAxiosRequestConfig {
   _retried?: boolean;
 }
 
+// ─── Token ────────────────────────────────────────────────────────────────────
+
+/**
+ * The signed-in user's Firebase ID token, or null when nobody is signed in. `forceRefresh` after
+ * a 401. Also read by the topology worker's client (#128), which makes its requests off axios.
+ */
+export async function currentIdToken(forceRefresh = false): Promise<string | null> {
+  return (await auth.currentUser?.getIdToken(forceRefresh)) ?? null;
+}
+
 // ─── Request interceptor — attach Bearer token ────────────────────────────────
 
 backendClient.interceptors.request.use(
   async (config) => {
-    const token = await auth.currentUser?.getIdToken();
+    const token = await currentIdToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +46,7 @@ backendClient.interceptors.response.use(
       config._retried = true;
 
       try {
-        const freshToken = await auth.currentUser?.getIdToken(true);
+        const freshToken = await currentIdToken(true);
         if (freshToken) {
           config.headers.Authorization = `Bearer ${freshToken}`;
         }

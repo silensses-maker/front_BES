@@ -71,7 +71,7 @@ export function RunView({ runId, networkId }: RunViewProps) {
   const navigate = useNavigate();
   const { setSidebarContent } = useOutletContext<DashboardOutletContext>();
 
-  const { status, topology } = useSimulationStream(runId, networkId);
+  const { status, topology, topologyLoad, retryTopology } = useSimulationStream(runId, networkId);
   const agentCount = topology?.agents.length ?? null;
 
   const engine = usePlaybackEngine(runId, networkId, agentCount);
@@ -460,6 +460,8 @@ export function RunView({ runId, networkId }: RunViewProps) {
               <SimulationCanvas
                 status={status}
                 topology={topology}
+                loadStatus={topologyLoad}
+                onRetryLoad={retryTopology}
                 playbackActive={engine.isPlaying || pendingPlay || (engine.isLive && engine.follow)}
                 onClusterActiveChange={handleClusterActiveChange}
               />

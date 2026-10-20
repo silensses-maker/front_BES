@@ -460,6 +460,11 @@ const es = {
     cancelSuccess: "Simulación cancelada.",
     canvas: {
       loadingNetwork: "Cargando red…",
+      loadingNetworkPages: "Cargando red… {{done}} / {{total}} páginas",
+      loadProgressLabel: "Progreso de la descarga de la red",
+      loadFailedTitle: "No se pudo cargar la red",
+      loadFailedBody:
+        "Una parte de la red no se pudo descargar tras varios intentos. Para no mostrar una red incompleta, no se muestra nada.",
       preparingData: "Preparando datos…",
       computingLayout: "Calculando layout…",
       windowsClusterWarning: "El agrupamiento puede ser inestable en Windows",
