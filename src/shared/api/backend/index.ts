@@ -11,6 +11,7 @@ export type {
   DeactivateResponse,
   EdgeSpec,
   FrameRetention,
+  GeneratedRunConfig,
   GeneratedRunRequest,
   NetworkListResponse,
   PaginationParams,

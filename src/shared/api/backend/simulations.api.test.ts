@@ -305,6 +305,36 @@ describe("simulationsApi", () => {
     });
   });
 
+  describe("getConfig", () => {
+    it("GETs the stored configuration of a generated run (#127)", async () => {
+      const config = {
+        runId: "run-001",
+        type: "generated",
+        numberOfNetworks: 2,
+        agentsPerNetwork: 10,
+        effectiveDensity: 2,
+        iterationLimit: 100,
+        stopThreshold: 0.01,
+        seed: "9007199254740991",
+        frameRetention: "ephemeral",
+        agentTypes: [{ silenceStrategy: 0, silenceEffect: 0, count: 10 }],
+        biasTypes: [{ biasType: 0, count: 34 }],
+      };
+      vi.mocked(backendClient.get).mockResolvedValue({ data: config });
+
+      const result = await simulationsApi.getConfig("run-001");
+
+      expect(result).toEqual(config);
+      expect(backendClient.get).toHaveBeenCalledWith("/simulations/run-001/config");
+    });
+
+    it("propagates the 404 of a custom run", async () => {
+      vi.mocked(backendClient.get).mockRejectedValue(new Error("not found"));
+
+      await expect(simulationsApi.getConfig("run-c")).rejects.toThrow("not found");
+    });
+  });
+
   describe("cancel", () => {
     it("returns RunCancelledResponse when successful", async () => {
       vi.mocked(backendClient.delete).mockResolvedValue({ data: mockRunCancelledResponse });

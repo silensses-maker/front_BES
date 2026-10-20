@@ -19,6 +19,20 @@ if (BENCHMARK && (process.env.CI || process.env.VERCEL)) {
   );
 }
 
+/**
+ * Application version from package.json, read once per build and compiled in as `__APP_VERSION__`
+ * in EVERY build (#127): configuration exports and benchmark results record it. Builds always run
+ * from the project root (bun scripts, the Dockerfile's WORKDIR, Vercel), next to package.json; a
+ * missing or empty version fails the build instead of shipping "unknown".
+ */
+const APP_VERSION: string = (() => {
+  const version: unknown = JSON.parse(readFileSync('./package.json', 'utf8')).version;
+  if (typeof version !== 'string' || version.trim() === '') {
+    throw new Error('[build] package.json has no "version" to compile in as __APP_VERSION__.');
+  }
+  return version;
+})();
+
 /** Build metadata recorded with every benchmark result (bench builds only). */
 function benchBuildInfo() {
   const git = (cmd: string): string | null => {
@@ -30,7 +44,7 @@ function benchBuildInfo() {
   };
   const status = git('git status --porcelain');
   return {
-    appVersion: JSON.parse(readFileSync('./package.json', 'utf8')).version as string,
+    appVersion: APP_VERSION,
     gitCommit: git('git rev-parse --short=12 HEAD') ?? 'unknown',
     gitDirty: status === null ? null : status.length > 0,
     builtAt: new Date().toISOString(),
@@ -58,6 +72,7 @@ export default defineConfig({
       index: './src/main.tsx',
     },
     define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION),
       __BENCHMARK__: JSON.stringify(BENCHMARK),
       __BENCH_BUILD__: JSON.stringify(BENCHMARK ? benchBuildInfo() : null),
     },

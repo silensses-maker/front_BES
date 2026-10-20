@@ -68,6 +68,8 @@ export interface SimConfigValidationErrors {
   networkLimitExceeded?: boolean;
   /** Barabási–Albert density must be lower than the agents per network (#122). */
   densityExceedsAgents?: boolean;
+  /** Seed outside the whole numbers 0 … 2^53 − 1 (#127). */
+  seedInvalid?: boolean;
   countsInvalid?: boolean;
   // Custom path
   customNetworkNameEmpty?: boolean;

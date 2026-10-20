@@ -2,7 +2,7 @@ import type {
   GeneratedSimFormValues,
   SimConfigValidationErrors,
 } from "../types/simulation-config.types";
-import { MAX_CUSTOM_NAME_LENGTH } from "./validation";
+import { MAX_CUSTOM_NAME_LENGTH, MAX_SEED } from "./validation";
 
 /**
  * Pure helpers for the "Resumen en vivo" panel (and the review error panel).
@@ -97,6 +97,8 @@ export interface ValidationMessageContext {
   actual?: string;
   bias?: string;
   maxEdges?: string;
+  /** Largest seed, formatted for the locale (#127). */
+  maxSeed?: string;
 }
 
 /**
@@ -143,6 +145,8 @@ export function listValidationMessages(
       density: ctx.density ?? "",
       agents: ctx.agents ?? "",
     });
+  if (errors.seedInvalid)
+    push("simulationConfig.errorSeedInvalid", { max: ctx.maxSeed ?? String(MAX_SEED) });
   if (errors.customNoAgents) push("simulationConfig.errorCustomNoAgents");
   if (errors.customNoEdges) push("simulationConfig.errorCustomNoEdges");
   if (errors.customAgentInvalid) push("simulationConfig.errorCustomAgentInvalid");

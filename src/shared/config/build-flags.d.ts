@@ -4,6 +4,12 @@
  */
 
 /**
+ * Application version (`package.json` `version`), compiled into EVERY build (#127). Recorded in
+ * configuration exports (`appVersion`) and benchmark results.
+ */
+declare const __APP_VERSION__: string;
+
+/**
  * True only in benchmark builds (`PUBLIC_BENCHMARK=true`, `bun run bench`) (#126). Guard every
  * harness entry point with it as the FIRST operand (`if (__BENCHMARK__) …`,
  * `__BENCHMARK__ && …`) so normal builds drop the code as dead branches.

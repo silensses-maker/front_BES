@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { RunSummary } from "@/shared/api/backend/types/backend.types";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -13,9 +13,14 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Separator } from "@/shared/ui/separator";
 import { SidebarShell } from "@/shared/ui/sidebar-shell";
-import type { HistoryStatusCounts, HistoryStatusFilter } from "../model/use-simulation-history";
+import type {
+  HistoryStatusCounts,
+  HistoryStatusFilter,
+  HistoryTypeFilter,
+} from "../model/use-simulation-history";
 
 interface SimulationHistoryPanelProps {
   runs: RunSummary[];
@@ -27,6 +32,14 @@ interface SimulationHistoryPanelProps {
   statusFilter: HistoryStatusFilter;
   onFilterChange: (filter: HistoryStatusFilter) => void;
   statusCounts: HistoryStatusCounts;
+  typeFilter: HistoryTypeFilter;
+  onTypeFilterChange: (filter: HistoryTypeFilter) => void;
+  /** Creation date range bounds, `YYYY-MM-DD` or "" (open). */
+  dateFrom: string;
+  onDateFromChange: (day: string) => void;
+  dateTo: string;
+  onDateToChange: (day: string) => void;
+  onClearTypeAndDateFilters: () => void;
   pendingCancelRun: RunSummary | null;
   onRequestCancel: (id: string) => void;
   onDismissCancel: () => void;
@@ -51,6 +64,12 @@ const STATUS_LABEL_KEY = {
   error: "simulationHistory.statusError",
   cancelled: "simulationHistory.statusCancelled",
 } as const;
+
+const TYPE_FILTERS: Array<{ key: HistoryTypeFilter; labelKey: string }> = [
+  { key: "all", labelKey: "simulationHistory.filterTypeAll" },
+  { key: "generated", labelKey: "simulationHistory.runTypeGenerated" },
+  { key: "custom", labelKey: "simulationHistory.runTypeCustom" },
+];
 
 const FILTERS: Array<{ key: HistoryStatusFilter; labelKey: string }> = [
   { key: "all", labelKey: "simulationHistory.filterAll" },
@@ -84,6 +103,13 @@ export function SimulationHistoryPanel({
   statusFilter,
   onFilterChange,
   statusCounts,
+  typeFilter,
+  onTypeFilterChange,
+  dateFrom,
+  onDateFromChange,
+  dateTo,
+  onDateToChange,
+  onClearTypeAndDateFilters,
   pendingCancelRun,
   onRequestCancel,
   onDismissCancel,
@@ -92,6 +118,7 @@ export function SimulationHistoryPanel({
   onLoadMore,
 }: SimulationHistoryPanelProps) {
   const { t } = useTranslation();
+  const typeOrDateActive = typeFilter !== "all" || dateFrom !== "" || dateTo !== "";
 
   const header = (
     <div className="flex flex-col gap-2 px-3 pb-2 pt-1">
@@ -126,6 +153,59 @@ export function SimulationHistoryPanel({
             {t(labelKey as Parameters<typeof t>[0])} · {statusCounts[key]}
           </button>
         ))}
+      </div>
+      {/* Run type + creation date range (#127): same client-side scope as the pills above */}
+      <div className="flex items-center gap-1">
+        <Select
+          value={typeFilter}
+          onValueChange={(value) => onTypeFilterChange(value as HistoryTypeFilter)}
+        >
+          <SelectTrigger
+            size="sm"
+            className="h-8 w-28 shrink-0 text-xs"
+            aria-label={t("simulationHistory.filterTypeLabel")}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TYPE_FILTERS.map(({ key, labelKey }) => (
+              <SelectItem key={key} value={key} className="text-xs">
+                {t(labelKey as Parameters<typeof t>[0])}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={(e) => onDateFromChange(e.target.value)}
+          aria-label={t("simulationHistory.filterDateFrom")}
+          title={t("simulationHistory.filterDateFrom")}
+          className="h-8 min-w-0 flex-1 px-2 text-xs"
+        />
+        <Input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={(e) => onDateToChange(e.target.value)}
+          aria-label={t("simulationHistory.filterDateTo")}
+          title={t("simulationHistory.filterDateTo")}
+          className="h-8 min-w-0 flex-1 px-2 text-xs"
+        />
+        {typeOrDateActive && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClearTypeAndDateFilters}
+            aria-label={t("simulationHistory.clearTypeDateFilters")}
+            title={t("simulationHistory.clearTypeDateFilters")}
+            className="shrink-0 text-muted-foreground"
+          >
+            <X />
+          </Button>
+        )}
       </div>
       <p className="font-sans text-xs text-muted-foreground">{t("simulationHistory.filterHint")}</p>
       <Separator />

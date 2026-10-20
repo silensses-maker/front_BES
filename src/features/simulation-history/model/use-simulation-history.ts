@@ -1,17 +1,40 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useLastRunStore } from "@/entities/simulation";
+import { useLastRunStore, useLaunchedConfigStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import type { RunSummary } from "@/shared/api/backend/types/backend.types";
 import { useTranslation } from "@/shared/i18n";
 import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
+import { buildRunEnvelope, downloadEnvelopeJson } from "@/shared/lib/simulation-export";
 
 const PAGE_LIMIT = 20;
 
 export type HistoryStatusFilter = "all" | RunSummary["status"];
 
 export type HistoryStatusCounts = Record<HistoryStatusFilter, number>;
+
+export type HistoryTypeFilter = "all" | RunSummary["type"];
+
+/** Local midnight that starts the calendar day `YYYY-MM-DD` (+ `dayOffset` days), or null. */
+function localDayStart(day: string, dayOffset = 0): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (match === null) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + dayOffset).getTime();
+}
+
+/**
+ * True when the ISO timestamp `createdAt` falls on a local calendar day within `[from, to]`
+ * (`YYYY-MM-DD`, what a date input yields; both inclusive). An empty or malformed bound is open.
+ */
+export function isWithinDateRange(createdAt: string, from: string, to: string): boolean {
+  const start = localDayStart(from);
+  const end = localDayStart(to, 1);
+  if (start === null && end === null) return true;
+  const time = new Date(createdAt).getTime();
+  if (Number.isNaN(time)) return false;
+  return (start === null || time >= start) && (end === null || time < end);
+}
 
 export interface UseSimulationHistoryReturn {
   runs: RunSummary[];
@@ -25,6 +48,20 @@ export interface UseSimulationHistoryReturn {
   statusFilter: HistoryStatusFilter;
   setStatusFilter: (filter: HistoryStatusFilter) => void;
   statusCounts: HistoryStatusCounts;
+  /** Run type filter (#127); like the others, applied to the runs already loaded. */
+  typeFilter: HistoryTypeFilter;
+  setTypeFilter: (filter: HistoryTypeFilter) => void;
+  /** Creation date range, `YYYY-MM-DD` or "" (open bound), inclusive (#127). */
+  dateFrom: string;
+  setDateFrom: (day: string) => void;
+  dateTo: string;
+  setDateTo: (day: string) => void;
+  /** Resets the type and date-range filters (status and search keep their own controls). */
+  clearTypeAndDateFilters: () => void;
+  /** Run whose launch configuration this browser kept, i.e. the one that can be exported. */
+  exportableRunId: string | null;
+  /** Downloads that run's configuration with its runId and seed (#127). */
+  exportRunConfig: (run: RunSummary) => void;
   pendingCancelRun: RunSummary | null;
   requestCancel: (id: string) => void;
   dismissCancel: () => void;
@@ -52,7 +89,11 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<HistoryTypeFilter>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+  const exportableRunId = useLaunchedConfigStore((s) => s.runId);
 
   const selectedRun = runs.find((r) => r.id === selectedRunId) ?? null;
   const pendingCancelRun = runs.find((r) => r.id === pendingCancelId) ?? null;
@@ -75,11 +116,36 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     const query = searchQuery.trim().toLowerCase();
     return runs.filter((run) => {
       if (statusFilter !== "all" && run.status !== statusFilter) return false;
+      if (typeFilter !== "all" && run.type !== typeFilter) return false;
+      if (!isWithinDateRange(run.createdAt, dateFrom, dateTo)) return false;
       if (query === "") return true;
       const name = (run.name ?? "").toLowerCase();
       return name.includes(query) || run.id.toLowerCase().includes(query);
     });
-  }, [runs, statusFilter, searchQuery]);
+  }, [runs, statusFilter, typeFilter, dateFrom, dateTo, searchQuery]);
+
+  const clearTypeAndDateFilters = useCallback(() => {
+    setTypeFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  }, []);
+
+  const exportRunConfig = useCallback(
+    (run: RunSummary) => {
+      const { runId, config } = useLaunchedConfigStore.getState();
+      if (runId !== run.id || config === null) return;
+      try {
+        const envelope = buildRunEnvelope(config, { runId: run.id, seed: run.seed });
+        const networkType = typeof config.networkType === "string" ? config.networkType : run.type;
+        const file = downloadEnvelopeJson(envelope, networkType);
+        toast.success(t("simulationHistory.exportConfigSuccess", { file }));
+      } catch (error) {
+        logger.error("useSimulationHistory.exportRunConfig", error);
+        toast.error(t("simulationHistory.errorExportConfig"));
+      }
+    },
+    [t],
+  );
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
@@ -176,6 +242,15 @@ export function useSimulationHistory(): UseSimulationHistoryReturn {
     statusFilter,
     setStatusFilter,
     statusCounts,
+    typeFilter,
+    setTypeFilter,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    clearTypeAndDateFilters,
+    exportableRunId,
+    exportRunConfig,
     pendingCancelRun,
     requestCancel,
     dismissCancel,

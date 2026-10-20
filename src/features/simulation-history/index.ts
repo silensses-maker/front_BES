@@ -1,6 +1,7 @@
 export type {
   HistoryStatusCounts,
   HistoryStatusFilter,
+  HistoryTypeFilter,
   UseSimulationHistoryReturn,
 } from "./model/use-simulation-history";
 export { useSimulationHistory } from "./model/use-simulation-history";

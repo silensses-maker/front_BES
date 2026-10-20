@@ -4,7 +4,8 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
 import { formatNumber, listValidationMessages } from "../lib/live-summary";
-import { computeMaxEdges } from "../lib/validation";
+import { computeMaxEdges, MAX_SEED } from "../lib/validation";
+import type { RelaunchInfo } from "../model/simulation-config.store";
 import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
@@ -42,6 +43,8 @@ interface StepReviewProps {
   maxNetworks?: number | null;
   /** True when the draft was imported from a file — Review shows "Cargada desde archivo". */
   loadedFromFile?: boolean;
+  /** Set when the draft was pre-filled from a past run (#127): Review explains what is replayed. */
+  relaunchedFrom?: RelaunchInfo | null;
   onExport: () => void;
   onImport: (file: File) => void;
 }
@@ -54,6 +57,7 @@ export function StepReview({
   maxIterations = null,
   maxNetworks = null,
   loadedFromFile = false,
+  relaunchedFrom = null,
   onExport,
   onImport,
 }: StepReviewProps) {
@@ -81,11 +85,45 @@ export function StepReview({
     expected: gen ? fmt(gen.numberOfAgents) : "",
     bias: gen ? fmt(gen.biasTypes.reduce((sum, r) => sum + r.count, 0)) : "",
     maxEdges: fmt(maxEdges),
+    maxSeed: fmt(MAX_SEED),
   });
 
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold">{t("simulationConfig.reviewTitle")}</h3>
+
+      {/* Re-launch from the history (#127): what will and will not be replayed */}
+      {relaunchedFrom !== null && (
+        <div className="space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+          <p className="break-all">
+            {relaunchedFrom.seedKept
+              ? t("simulationConfig.relaunchNote", {
+                  id: relaunchedFrom.runId,
+                  seed: relaunchedFrom.seed,
+                })
+              : t("simulationConfig.relaunchNoteSeedDropped", {
+                  id: relaunchedFrom.runId,
+                  seed: relaunchedFrom.seed,
+                  max: fmt(MAX_SEED),
+                })}
+          </p>
+          {!relaunchedFrom.densityExact && (
+            <p className="text-muted-foreground">
+              {t("simulationConfig.relaunchDensityEstimated", {
+                effective: fmt(relaunchedFrom.effectiveDensity),
+              })}
+            </p>
+          )}
+          {relaunchedFrom.effectiveNow !== relaunchedFrom.effectiveDensity && (
+            <p className="text-warn">
+              {t("simulationConfig.relaunchDensityChanged", {
+                now: fmt(relaunchedFrom.effectiveNow),
+                effective: fmt(relaunchedFrom.effectiveDensity),
+              })}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Network summary */}
       <Card className="gap-0 py-0">

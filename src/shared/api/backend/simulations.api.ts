@@ -5,6 +5,7 @@ import { logger } from "@/shared/lib/logger";
 import { backendClient } from "./client";
 import type {
   CustomRunRequest,
+  GeneratedRunConfig,
   GeneratedRunRequest,
   NetworkListResponse,
   PaginationParams,
@@ -60,6 +61,12 @@ export const simulationsApi = {
 
   async getById(runId: string): Promise<RunSummary> {
     const { data } = await backendClient.get<RunSummary>(`/simulations/${runId}`);
+    return data;
+  },
+
+  /** Stored configuration of a generated run, to re-launch it (#127). 404 for custom runs. */
+  async getConfig(runId: string): Promise<GeneratedRunConfig> {
+    const { data } = await backendClient.get<GeneratedRunConfig>(`/simulations/${runId}/config`);
     return data;
   },
 

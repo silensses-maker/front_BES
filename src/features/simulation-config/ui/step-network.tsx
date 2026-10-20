@@ -6,7 +6,7 @@ import { InfoTooltip } from "@/shared/ui/info-tooltip";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { formatNumber } from "../lib/live-summary";
-import { computeMaxEdges } from "../lib/validation";
+import { computeMaxEdges, MAX_SEED } from "../lib/validation";
 import type {
   GeneratedSimFormValues,
   SimConfigValidationErrors,
@@ -241,14 +241,26 @@ export function StepNetwork({
             </Label>
           </div>
           {gen.seed !== null && (
+            // Whole numbers 0 … 2^53 − 1: every one is exact as a JS number (#127)
             <Input
               type="number"
-              className="w-32"
+              min={0}
+              max={MAX_SEED}
+              step={1}
+              aria-label={t("simulationConfig.seed")}
+              className="w-48 font-mono"
               value={gen.seed}
               onChange={(e) => onUpdate({ seed: Number(e.target.value) } as Partial<SimFormValues>)}
             />
           )}
         </div>
+        {errors?.seedInvalid && (
+          <p className="text-xs text-destructive">
+            {t("simulationConfig.errorSeedInvalid", {
+              max: formatNumber(MAX_SEED, i18n.language),
+            })}
+          </p>
+        )}
       </div>
 
       {/* Cross-step validation errors that would otherwise silently disable Next */}

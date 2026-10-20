@@ -1,11 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useLaunchedConfigStore } from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import type { RunSummary } from "@/shared/api/backend/types/backend.types";
 import { useTranslation } from "@/shared/i18n";
 import { logger } from "@/shared/lib/logger";
-import { useSimulationHistory } from "./use-simulation-history";
+import { downloadEnvelopeJson, type SimConfigEnvelope } from "@/shared/lib/simulation-export";
+import { isWithinDateRange, useSimulationHistory } from "./use-simulation-history";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -13,13 +15,24 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
-// Real last-run store (imported by file path to avoid the entity index pulling
-// the WS client → backend API → Firebase chain into the test environment).
+// Real last-run and launched-config stores (imported by file path to avoid the entity index
+// pulling the WS client → backend API → Firebase chain into the test environment).
 vi.mock("@/entities/simulation", async () => {
   const { useLastRunStore } = await vi.importActual<
     typeof import("@/entities/simulation/model/last-run.store")
   >("@/entities/simulation/model/last-run.store");
-  return { useLastRunStore };
+  const { useLaunchedConfigStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/launched-config.store")
+  >("@/entities/simulation/model/launched-config.store");
+  return { useLastRunStore, useLaunchedConfigStore };
+});
+
+// Real envelope builder; only the browser download is stubbed.
+vi.mock("@/shared/lib/simulation-export", async () => {
+  const actual = await vi.importActual<typeof import("@/shared/lib/simulation-export")>(
+    "@/shared/lib/simulation-export",
+  );
+  return { ...actual, downloadEnvelopeJson: vi.fn() };
 });
 
 vi.mock("@/shared/api/backend", () => ({
@@ -601,6 +614,258 @@ describe("useSimulationHistory", () => {
         result.current.setSearchQuery("polariza");
       });
       expect(result.current.filteredRuns).toEqual([]);
+    });
+  });
+
+  // ── type and date-range filters (#127) ────────────────────────────────────
+
+  describe("type and date-range filters", () => {
+    /** ISO timestamp of a LOCAL date-time, so the day boundaries hold in any time zone. */
+    const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).toISOString();
+
+    const sample = [
+      makeRun("gen-jan", { type: "generated", createdAt: at(2026, 1, 10) }),
+      makeRun("cus-jan", { type: "custom", name: "Red", createdAt: at(2026, 1, 20, 23) }),
+      makeRun("gen-feb", { type: "generated", status: "running", createdAt: at(2026, 2, 1, 0) }),
+    ];
+
+    async function loadSample(result: { current: ReturnType<typeof useSimulationHistory> }) {
+      vi.mocked(simulationsApi.listMine).mockResolvedValue({ runs: sample, limit: 20, offset: 0 });
+      await act(async () => {
+        await result.current.loadInitial();
+      });
+    }
+
+    it("start with every type and an open date range", () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      expect(result.current.typeFilter).toBe("all");
+      expect(result.current.dateFrom).toBe("");
+      expect(result.current.dateTo).toBe("");
+    });
+
+    it("typeFilter narrows filteredRuns", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setTypeFilter("custom");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["cus-jan"]);
+
+      act(() => {
+        result.current.setTypeFilter("generated");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["gen-jan", "gen-feb"]);
+    });
+
+    it("the date range is inclusive on both ends, by local calendar day", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setDateFrom("2026-01-20");
+        result.current.setDateTo("2026-02-01");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["cus-jan", "gen-feb"]);
+
+      act(() => {
+        result.current.setDateFrom("");
+        result.current.setDateTo("2026-01-20");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["gen-jan", "cus-jan"]);
+    });
+
+    it("type, date, status and search compose; counts stay over the loaded runs", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setTypeFilter("generated");
+        result.current.setDateFrom("2026-01-15");
+        result.current.setStatusFilter("running");
+      });
+      expect(result.current.filteredRuns.map((r) => r.id)).toEqual(["gen-feb"]);
+      expect(result.current.statusCounts.all).toBe(3);
+
+      act(() => {
+        result.current.setSearchQuery("jan");
+      });
+      expect(result.current.filteredRuns).toEqual([]);
+    });
+
+    it("clearTypeAndDateFilters resets type and dates but not status or search", async () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      await loadSample(result);
+
+      act(() => {
+        result.current.setTypeFilter("custom");
+        result.current.setDateFrom("2026-01-01");
+        result.current.setDateTo("2026-01-31");
+        result.current.setStatusFilter("completed");
+        result.current.setSearchQuery("red");
+      });
+      act(() => {
+        result.current.clearTypeAndDateFilters();
+      });
+
+      expect(result.current.typeFilter).toBe("all");
+      expect(result.current.dateFrom).toBe("");
+      expect(result.current.dateTo).toBe("");
+      expect(result.current.statusFilter).toBe("completed");
+      expect(result.current.searchQuery).toBe("red");
+    });
+  });
+
+  describe("isWithinDateRange", () => {
+    const noon = new Date(2026, 4, 15, 12).toISOString();
+    const lastMs = new Date(2026, 4, 15, 23, 59, 59, 999).toISOString();
+    const nextDay = new Date(2026, 4, 16, 0).toISOString();
+
+    it("is open when both bounds are empty", () => {
+      expect(isWithinDateRange(noon, "", "")).toBe(true);
+      expect(isWithinDateRange("not a date", "", "")).toBe(true);
+    });
+
+    it("includes the whole 'to' day and excludes the next one", () => {
+      expect(isWithinDateRange(lastMs, "", "2026-05-15")).toBe(true);
+      expect(isWithinDateRange(nextDay, "", "2026-05-15")).toBe(false);
+    });
+
+    it("includes the 'from' day from its local midnight", () => {
+      expect(isWithinDateRange(new Date(2026, 4, 15, 0).toISOString(), "2026-05-15", "")).toBe(
+        true,
+      );
+      expect(isWithinDateRange(lastMs, "2026-05-16", "")).toBe(false);
+    });
+
+    it("treats a malformed bound as open", () => {
+      expect(isWithinDateRange(noon, "15/05/2026", "")).toBe(true);
+      expect(isWithinDateRange(noon, "", "tomorrow")).toBe(true);
+    });
+
+    it("excludes an unparsable timestamp once a bound is set", () => {
+      expect(isWithinDateRange("not a date", "2026-05-15", "")).toBe(false);
+    });
+
+    it("an inverted range matches nothing", () => {
+      expect(isWithinDateRange(noon, "2026-05-16", "2026-05-14")).toBe(false);
+    });
+  });
+
+  // ── export from the run detail (#127) ────────────────────────────────────
+
+  describe("exportRunConfig", () => {
+    const launched = {
+      networkType: "generated",
+      numberOfAgents: 10,
+      seed: null,
+    };
+
+    beforeEach(() => {
+      useLaunchedConfigStore.getState().clear();
+    });
+
+    function lastDownload(): [SimConfigEnvelope, string] {
+      const calls = vi.mocked(downloadEnvelopeJson).mock.calls;
+      const call = calls[calls.length - 1];
+      if (call === undefined) throw new Error("downloadEnvelopeJson was not called");
+      return call;
+    }
+
+    const lastEnvelope = (): SimConfigEnvelope => lastDownload()[0];
+
+    it("exposes the run whose launch configuration was kept", () => {
+      const { result } = renderHook(() => useSimulationHistory());
+      expect(result.current.exportableRunId).toBeNull();
+
+      act(() => {
+        useLaunchedConfigStore.getState().record("run-1", launched);
+      });
+      expect(result.current.exportableRunId).toBe("run-1");
+    });
+
+    it("downloads the launched configuration with the runId and the seed", () => {
+      useLaunchedConfigStore.getState().record("run-1", launched);
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-1", { seed: "9223372036854775807" }));
+      });
+
+      const envelope = lastEnvelope();
+      expect(envelope.runId).toBe("run-1");
+      expect(envelope.seed).toBe("9223372036854775807");
+      // Beyond the wizard's range: the payload keeps the launched seed
+      expect(envelope.payload).toEqual(launched);
+      expect(lastDownload()[1]).toBe("generated");
+      expect(toast.success).toHaveBeenCalledWith("simulationHistory.exportConfigSuccess");
+    });
+
+    it("writes a replayable seed into the payload (random-seed launch)", () => {
+      useLaunchedConfigStore.getState().record("run-1", launched);
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-1", { seed: "4503599627370496" }));
+      });
+
+      expect(lastEnvelope().seed).toBe("4503599627370496");
+      expect(lastEnvelope().payload).toEqual({ ...launched, seed: 4503599627370496 });
+    });
+
+    it("exports a custom run without seed", () => {
+      const custom = { networkType: "custom", networkName: "Red", agents: [], edges: [] };
+      useLaunchedConfigStore.getState().record("run-c", custom);
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-c", { type: "custom", seed: null }));
+      });
+
+      expect(lastEnvelope()).not.toHaveProperty("seed");
+      expect(lastEnvelope().payload).toEqual(custom);
+      expect(lastDownload()[1]).toBe("custom");
+    });
+
+    it("falls back to the run type when the kept configuration has no networkType", () => {
+      useLaunchedConfigStore.getState().record("run-x", { numberOfAgents: 3 });
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-x", { type: "custom" }));
+      });
+
+      expect(lastDownload()[1]).toBe("custom");
+    });
+
+    it("does nothing for a run whose configuration was not kept", () => {
+      useLaunchedConfigStore.getState().record("run-1", launched);
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-2"));
+      });
+
+      expect(downloadEnvelopeJson).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it("logs and toasts when the download fails", () => {
+      useLaunchedConfigStore.getState().record("run-1", launched);
+      vi.mocked(downloadEnvelopeJson).mockImplementationOnce(() => {
+        throw new Error("blocked");
+      });
+      const { result } = renderHook(() => useSimulationHistory());
+
+      act(() => {
+        result.current.exportRunConfig(makeRun("run-1", { seed: "1" }));
+      });
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "useSimulationHistory.exportRunConfig",
+        expect.any(Error),
+      );
+      expect(toast.error).toHaveBeenCalledWith("simulationHistory.errorExportConfig");
     });
   });
 });

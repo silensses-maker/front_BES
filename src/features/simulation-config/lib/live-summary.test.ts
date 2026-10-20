@@ -162,6 +162,17 @@ describe("listValidationMessages", () => {
     ]);
   });
 
+  it("maps an invalid seed with the formatted maximum, or the raw one without context (#127)", () => {
+    expect(
+      listValidationMessages({ seedInvalid: true }, { maxSeed: "9.007.199.254.740.991" }),
+    ).toEqual([
+      { key: "simulationConfig.errorSeedInvalid", params: { max: "9.007.199.254.740.991" } },
+    ]);
+    expect(listValidationMessages({ seedInvalid: true })).toEqual([
+      { key: "simulationConfig.errorSeedInvalid", params: { max: "9007199254740991" } },
+    ]);
+  });
+
   it("orders the network quota right after the agent and iteration quotas", () => {
     const keys = listValidationMessages({
       networkLimitExceeded: true,

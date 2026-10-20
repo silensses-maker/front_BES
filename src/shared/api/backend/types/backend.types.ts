@@ -105,6 +105,7 @@ export interface GeneratedRunRequest {
   density: number;
   iterationLimit: number;
   stopThreshold: number;
+  /** Null / omitted: the backend draws one in [0, 2^53 − 1] (#127). */
   seed?: number | null;
   saveMode: SaveMode;
   agentTypes: AgentType[];
@@ -151,6 +152,36 @@ export interface RunSummary {
   iterationLimit: number;
   stopThreshold: number;
   createdAt: string;
+  /**
+   * Seed of a generated run — the one requested, or the one the backend drew in
+   * `[0, 2^53 − 1]` when none was — as a decimal string (the column is 64-bit) (#127). The same
+   * configuration with the same seed replays the run on the same server, except for runs created
+   * before #127 (their stored value is not replayable). `null` for custom runs; absent when the
+   * backend predates the field.
+   */
+  seed?: string | null;
+}
+
+/**
+ * Shape returned by GET /simulations/{runId}/config (#127): the stored configuration of a
+ * GENERATED run (custom runs answer 404). The requested density is not stored: `effectiveDensity`
+ * is the Barabási–Albert m the run used, after the role's densityFactor.
+ */
+export interface GeneratedRunConfig {
+  runId: string;
+  type: "generated";
+  numberOfNetworks: number;
+  agentsPerNetwork: number;
+  effectiveDensity: number;
+  iterationLimit: number;
+  stopThreshold: number;
+  /** Decimal string, same value as {@link RunSummary.seed}. */
+  seed: string;
+  frameRetention: FrameRetention;
+  /** One row per (silenceStrategy, silenceEffect), sorted by code. */
+  agentTypes: AgentType[];
+  /** One row per biasType, sorted by code. */
+  biasTypes: BiasType[];
 }
 
 export interface SimulationListResponse {

@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
+import { useLastRunStore, useLaunchedConfigStore, useSimulationStore } from "@/entities/simulation";
 import type { UserRole } from "@/entities/user";
 import { useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
@@ -52,7 +52,10 @@ vi.mock("@/entities/simulation", async () => {
   const { useLastRunStore } = await vi.importActual<
     typeof import("@/entities/simulation/model/last-run.store")
   >("@/entities/simulation/model/last-run.store");
-  return { useSimulationStore: vi.fn(), useLastRunStore };
+  const { useLaunchedConfigStore } = await vi.importActual<
+    typeof import("@/entities/simulation/model/launched-config.store")
+  >("@/entities/simulation/model/launched-config.store");
+  return { useSimulationStore: vi.fn(), useLastRunStore, useLaunchedConfigStore };
 });
 
 // Real (pure) role-table fallback, imported by file path so the entity index does not pull
@@ -909,6 +912,45 @@ describe("useSimulationConfig", () => {
         expect(lastRun.networkCount).toBe(mockSimCreated.networkCount);
       });
 
+      it("keeps the launched configuration for the run detail export (#127)", async () => {
+        useLaunchedConfigStore.getState().clear();
+        vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues(validGeneratedValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const launched = useLaunchedConfigStore.getState();
+        expect(launched.runId).toBe(mockSimCreated.runId);
+        // The wizard values as launched — the draft itself is reset afterwards
+        expect(launched.config).toEqual(validGeneratedValues);
+        expect(useSimulationConfigStore.getState().generatedValues).not.toEqual(
+          validGeneratedValues,
+        );
+      });
+
+      it("does not record a configuration when the launch fails", async () => {
+        useLaunchedConfigStore.getState().clear();
+        vi.mocked(simulationsApi.startGenerated).mockRejectedValue(new Error("boom"));
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues(validGeneratedValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(useLaunchedConfigStore.getState().runId).toBeNull();
+        expect(useLaunchedConfigStore.getState().config).toBeNull();
+      });
+
       it("navigates to the simulation board route after success", async () => {
         vi.mocked(simulationsApi.startGenerated).mockResolvedValue(mockSimCreated);
         const { result } = renderHook(() => useSimulationConfig());
@@ -1088,6 +1130,28 @@ describe("useSimulationConfig", () => {
 
         expect(simulationsApi.startCustom).toHaveBeenCalledOnce();
         expect(simulationsApi.startCustomBinary).not.toHaveBeenCalled();
+      });
+
+      it("keeps the launched custom configuration with its runId (#127)", async () => {
+        useLaunchedConfigStore.getState().clear();
+        vi.mocked(estimateJsonSize).mockReturnValue(BINARY_THRESHOLD_BYTES - 1);
+        vi.mocked(simulationsApi.startCustom).mockResolvedValue(mockSimCreated);
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.setNetworkType("custom");
+        });
+        act(() => {
+          result.current.updateValues(validCustomValues);
+        });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const launched = useLaunchedConfigStore.getState();
+        expect(launched.runId).toBe(mockSimCreated.runId);
+        expect(launched.config).toEqual(validCustomValues);
       });
     });
 
@@ -1320,6 +1384,25 @@ describe("useSimulationConfig", () => {
       });
 
       expect(result.current.activeTemplate).toBe("polarization");
+    });
+
+    it("drops the re-launch note of a draft pre-filled from a past run (#127)", () => {
+      useSimulationConfigStore.getState().applyRelaunch(validGeneratedValues, {
+        runId: "run-1",
+        seed: "42",
+        seedKept: true,
+        densityExact: true,
+        effectiveDensity: 2,
+        effectiveNow: 2,
+      });
+      const { result } = renderHook(() => useSimulationConfig());
+      expect(result.current.relaunchedFrom?.runId).toBe("run-1");
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+
+      expect(result.current.relaunchedFrom).toBeNull();
     });
 
     it("clears existing errors", () => {
