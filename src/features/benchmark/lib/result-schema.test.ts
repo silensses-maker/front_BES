@@ -83,10 +83,17 @@ describe("createResultDocument", () => {
 });
 
 describe("newResultId", () => {
-  it("uses randomUUID when available and falls back otherwise", () => {
+  it("uses randomUUID when available and getRandomValues otherwise", () => {
     expect(newResultId()).toMatch(/^[0-9a-f-]{36}$/);
-    vi.stubGlobal("crypto", undefined);
+    // Insecure context: no randomUUID, getRandomValues still there.
+    const getRandomValues = vi.fn(<T extends ArrayBufferView>(array: T) => {
+      new Uint32Array(array.buffer).set([0xdeadbeef, 42]);
+      return array;
+    });
+    vi.stubGlobal("crypto", { getRandomValues });
     expect(newResultId()).toMatch(/^[0-9a-z]+-[0-9a-z]+$/);
+    expect(newResultId().endsWith(`${(0xdeadbeef).toString(36)}${(42).toString(36)}`)).toBe(true);
+    expect(getRandomValues).toHaveBeenCalled();
   });
 });
 

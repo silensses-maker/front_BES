@@ -55,7 +55,7 @@ export function fakePhase(
     warmupMs: 2_000,
     measureMs: 10_000,
     actualMs: 10_000,
-    frames: summarizeFrames(Array<number>(100).fill(1000 / fps), 1000 / 60),
+    frames: summarizeFrames(new Array<number>(100).fill(1000 / fps), 1000 / 60),
     longTasks: { supported: true, count: 1, totalMs: 60, maxMs: 60 },
     heap: {
       supported: true,

@@ -292,11 +292,15 @@ export function resultFileStem(doc: Pick<BenchResultDocument, "kind" | "startedA
   return `${prefix}-${stamp}-${doc.build.gitCommit.slice(0, 7)}`;
 }
 
-/** A unique id for a result document. */
+/**
+ * A unique id for a result document: `crypto.randomUUID()`, or random words from
+ * `crypto.getRandomValues()` where randomUUID is missing (it needs a secure context).
+ */
 export function newResultId(): string {
-  const c = globalThis.crypto as Crypto | undefined;
-  if (c && typeof c.randomUUID === "function") return c.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const c = globalThis.crypto;
+  if (typeof c.randomUUID === "function") return c.randomUUID();
+  const words = c.getRandomValues(new Uint32Array(2));
+  return `${Date.now().toString(36)}-${Array.from(words, (w) => w.toString(36)).join("")}`;
 }
 
 export function createResultDocument(input: {

@@ -3,8 +3,9 @@
    classes; this file is imported only by harness modules, i.e. only by benchmark builds. It
    reuses the app theme and variants through @reference (nothing of theme.css is re-emitted).
    theme.css — not globals.css — is referenced: a referenced `@source not` would also apply
-   here and exclude the very folders this file scans. */
-@reference "../../../shared/styles/theme.css";
+   here and exclude the very folders this file scans. The @import goes first (CSS requires
+   @import before other rules); Tailwind resolves both regardless of their order. */
 @import "tailwindcss/utilities.css" source(none);
+@reference "../../../shared/styles/theme.css";
 @source "../";
 @source "../../../pages/bench";
