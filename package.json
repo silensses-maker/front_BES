@@ -1,6 +1,6 @@
 {
   "name": "front_bes",
-  "version": "2.0.13",
+  "version": "2.0.14",
   "type": "module",
   "private": true,
   "scripts": {
@@ -16,6 +16,12 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "doctor": "RSDOCTOR=true rsbuild build",
+    "bench": "PUBLIC_BENCHMARK=true rsbuild build && PUBLIC_BENCHMARK=true rsbuild preview",
+    "bench:build": "PUBLIC_BENCHMARK=true rsbuild build",
+    "bench:preview": "PUBLIC_BENCHMARK=true rsbuild preview",
+    "bench:isolated": "PUBLIC_BENCHMARK=true rsbuild build && PUBLIC_BENCHMARK=true BENCH_ISOLATED=true rsbuild preview",
+    "bench:dev": "PUBLIC_BENCHMARK=true rsbuild dev",
+    "bench:report": "bun benchmarks/scripts/aggregate.ts",
     "test-agent": "bun scripts/test-agent.ts"
   },
   "devDependencies": {

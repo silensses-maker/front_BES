@@ -1,4 +1,6 @@
 import "./auth-interceptor";
+import type { AxiosRequestConfig } from "axios";
+import { benchProbe, nextBenchCallId, withParseTiming } from "@/shared/lib/bench-probe";
 import { logger } from "@/shared/lib/logger";
 import { backendClient } from "./client";
 import type {
@@ -76,9 +78,16 @@ export const simulationsApi = {
     networkId: string,
     params?: TopologyParams,
   ): Promise<TopologyResponse | null> {
+    const config: AxiosRequestConfig = { params, validateStatus: (s) => s === 200 || s === 202 };
+    if (__BENCHMARK__) {
+      // Bench builds only (#126): times the JSON parse of each page for the debug HUD.
+      config.transformResponse = withParseTiming(backendClient.defaults.transformResponse, (ms) =>
+        benchProbe("topology-parse", { runId, networkId, durationMs: ms }),
+      );
+    }
     const response = await backendClient.get<TopologyResponse>(
       `/simulations/${runId}/networks/${networkId}/topology`,
-      { params, validateStatus: (s) => s === 200 || s === 202 },
+      config,
     );
     if (response.status === 202) return null;
     return response.data;
@@ -99,6 +108,12 @@ export const simulationsApi = {
    *   to pages where the server ignored our `*Limit: 0` hint.
    */
   async getTopologyFull(runId: string, networkId: string): Promise<TopologyResponse | null> {
+    // Bench builds only (#126): load timings of the current network for the debug HUD.
+    const benchCallId = __BENCHMARK__ ? nextBenchCallId() : 0;
+    if (__BENCHMARK__) {
+      benchProbe("topology-fetch-start", { runId, networkId, callId: benchCallId });
+    }
+
     // Request aggressively large first-page sizes to minimize round-trips.
     // The server's effective cap is reflected in the response.
     const first = await this.getTopology(runId, networkId, {
@@ -158,6 +173,16 @@ export const simulationsApi = {
 
     const agents = Array.from(agentMap.values()).sort((a, b) => a.index - b.index);
     const edges = Array.from(edgeMap.values());
+
+    if (__BENCHMARK__) {
+      benchProbe("topology-fetch-end", {
+        runId,
+        networkId,
+        callId: benchCallId,
+        agents: agents.length,
+        edges: edges.length,
+      });
+    }
 
     return {
       ...first,

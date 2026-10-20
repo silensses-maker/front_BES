@@ -1,0 +1,9 @@
+{
+  // Type-checks the benchmark tooling (Bun scripts) and the harness modules they import:
+  //   ./node_modules/.bin/tsc -p benchmarks/tsconfig.json
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"]
+  },
+  "include": ["scripts"]
+}

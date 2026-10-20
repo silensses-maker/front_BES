@@ -1,0 +1,10 @@
+/* Benchmark harness styles (#126). The app stylesheet excludes the harness folders from
+   Tailwind's source scan (shared/styles/globals.css), so normal builds carry none of these
+   classes; this file is imported only by harness modules, i.e. only by benchmark builds. It
+   reuses the app theme and variants through @reference (nothing of theme.css is re-emitted).
+   theme.css — not globals.css — is referenced: a referenced `@source not` would also apply
+   here and exclude the very folders this file scans. */
+@reference "../../../shared/styles/theme.css";
+@import "tailwindcss/utilities.css" source(none);
+@source "../";
+@source "../../../pages/bench";

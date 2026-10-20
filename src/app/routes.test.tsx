@@ -162,3 +162,18 @@ describe.each([
     expect(screen.queryByText("404 - Not Found")).toBeNull();
   });
 });
+
+// Tests run as a normal build (vitest.config.ts defines __BENCHMARK__ = false): the benchmark
+// suite route (#126) does not exist, even on localhost.
+describe("AppRoutes — /bench in a normal build", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+    window.history.pushState({}, "", "/bench");
+  });
+
+  it("is an unknown URL that renders the 404 page", () => {
+    expect(window.location.hostname).toBe("localhost");
+    render(<AppRoutes />);
+    expect(screen.getByRole("heading", { level: 1, name: en.notFound.title })).toBeInTheDocument();
+  });
+});

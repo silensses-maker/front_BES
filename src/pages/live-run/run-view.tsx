@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useRoundAggregatesStore, useSimulationStore } from "@/entities/simulation";
 import { DECLUSTER_PLAY_DELAY_MS, SimulationCanvas } from "@/features/simulation-canvas";
@@ -24,6 +24,7 @@ import { RunChartsCard, RunStatusPanel, useSimulationStream } from "@/features/s
 import type { ResultAgent } from "@/shared/api/backend";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { isBenchmarkHost } from "@/shared/lib/bench-probe";
 import { formatNumber } from "@/shared/lib/format-number";
 import { logger } from "@/shared/lib/logger";
 import { cn } from "@/shared/lib/utils";
@@ -41,6 +42,18 @@ type MaxPanel = "none" | "viz" | "chart";
 
 /** Batch size cap for the lazy per-network final-spread fetch. */
 const RESULTS_AGENT_LIMIT = 100_000;
+
+/**
+ * Debug HUD (#126): benchmark builds only — `__BENCHMARK__` is a build-time literal, so normal
+ * builds get `null` here and no HUD chunk.
+ */
+const BenchHud = __BENCHMARK__
+  ? lazy(() =>
+      import(/* webpackChunkName: "bench-hud" */ "@/features/benchmark").then((m) => ({
+        default: m.BenchHud,
+      })),
+    )
+  : null;
 
 interface RunViewProps {
   runId: string;
@@ -496,6 +509,13 @@ export function RunView({ runId, networkId }: RunViewProps) {
 
       {/* Spacer keeps the cancelled/limited layouts from collapsing */}
       {limited && isFinished && <div className="mb-3.5" />}
+
+      {/* Debug HUD (#126): benchmark builds on a loopback host only */}
+      {__BENCHMARK__ && BenchHud !== null && isBenchmarkHost(window.location.hostname) && (
+        <Suspense fallback={null}>
+          <BenchHud runId={runId} networkId={networkId} topology={topology} />
+        </Suspense>
+      )}
     </div>
   );
 }

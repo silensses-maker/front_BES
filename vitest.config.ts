@@ -2,6 +2,12 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  // Build-time constants (src/shared/config/build-flags.d.ts): tests run as a normal build, where
+  // the benchmark harness (#126) is compiled out.
+  define: {
+    __BENCHMARK__: "false",
+    __BENCH_BUILD__: "null",
+  },
   test: {
     globals: true,
     environment: "happy-dom",

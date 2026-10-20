@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+# benchmark build (#126, `bun run bench`)
+dist-bench
 *.tgz
 .rsbuild
 

@@ -1,6 +1,7 @@
 # Dependencias y artefactos
 node_modules
 dist
+dist-bench
 coverage
 .rsbuild
 
@@ -17,7 +18,8 @@ coverage
 # Secretos reales — NUNCA al contexto de build
 serviceAccount.json
 
-# Tooling local
+# Tooling local (benchmarks/: protocolo, resultados y scripts del harness #126 — no van a la imagen)
+benchmarks
 .claude
 .context
 .agents

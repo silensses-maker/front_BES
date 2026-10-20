@@ -12,6 +12,7 @@ import type { SimulationStatus } from "@/entities/simulation";
 import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { benchProbe } from "@/shared/lib/bench-probe";
 import { logger } from "@/shared/lib/logger";
 import {
   interpolateDivergence,
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { topologyToData } from "../lib/topology-to-data";
+import { useBenchCanvasProbe } from "../model/use-bench-canvas-probe";
 import { CanvasLegend } from "./canvas-legend";
 import type { ClusterMode } from "./cluster-toggle";
 import { ClusterToggle } from "./cluster-toggle";
@@ -34,10 +36,10 @@ type CanvasPhase = "idle" | "preparing" | "layouting" | "frozen" | "error";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Duration (ms) the force-directed layout runs before freezing. */
-const LAYOUT_DURATION_MS = 5_000;
+export const LAYOUT_DURATION_MS = 5_000;
 
 /** Duration (ms) the clustering re-run executes before re-freezing. */
-const CLUSTER_REANIMATE_MS = 4_000;
+export const CLUSTER_REANIMATE_MS = 4_000;
 
 /** Duration (ms) of the animated return to the organic layout on de-cluster. */
 const DECLUSTER_ANIMATE_MS = 2_000;
@@ -248,15 +250,28 @@ export function SimulationCanvas({
     let cancelled = false;
     setPhase("preparing");
 
+    // Bench builds only (#126): load-step marks for the harness (compiled out otherwise).
+    const benchDetail = __BENCHMARK__
+      ? {
+          runId: topology.runId,
+          networkId: topology.networkId,
+          agents: topology.agents.length,
+          edges: topology.edges.length,
+        }
+      : undefined;
+
     const run = async () => {
       try {
+        if (__BENCHMARK__) benchProbe("canvas-prepare-start", benchDetail);
         const { rawPoints, rawLinks, dataPrepConfig } = topologyToData(topology);
+        if (__BENCHMARK__) benchProbe("canvas-to-data-end", benchDetail);
         agentIndexMapRef.current = topology.agents.map((a) => a.index);
         const result = await prepareCosmographData(dataPrepConfig, rawPoints, rawLinks);
         if (cancelled) return;
         if (!result) {
           throw new Error("prepareCosmographData returned undefined");
         }
+        if (__BENCHMARK__) benchProbe("canvas-prepare-end", benchDetail);
         setPrepResult(result);
         setPhase("layouting");
       } catch (err) {
@@ -474,6 +489,13 @@ export function SimulationCanvas({
     if (current === undefined) return;
     cosmographRef.current?.setZoomLevel(current * factor, 150);
   }, []);
+
+  // ─── Benchmark probe (#126) ────────────────────────────────────────────────
+  // `__BENCHMARK__` is a build-time literal: bench builds call the hook on every render, normal
+  // builds compile the call out — the hook order is fixed either way.
+  if (__BENCHMARK__) {
+    useBenchCanvasProbe({ phase, topology, cosmographRef, setClusterMode: handleClusterMode });
+  }
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
