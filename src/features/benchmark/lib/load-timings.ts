@@ -6,6 +6,12 @@ import { EMPTY_LOAD_TIMINGS, type LoadTimings } from "./result-schema";
  * Load timings of one network from the probe events (#126) — the real-run path:
  * topology fetch (+ Resource Timing for the network part, + per-page JSON parse) and the canvas
  * steps. Pure: events and resource entries are passed in.
+ *
+ * Topology loads are shared (#140): `topology-fetch-start` marks an actual download, while
+ * `topology-fetch-join` / `topology-fetch-reuse` mark loads served by a download in flight or by
+ * a completed one. A load whose topology was reused after the network's last download ended (the
+ * selector's download when the network is opened) came from memory: it has no fetch steps and
+ * starts at the reuse.
  */
 
 export interface ResourceEntryLite {
@@ -58,9 +64,17 @@ export function deriveLoadTimings(
   const mine = forNetwork(events, networkId, runId);
   const fetchStarts = mine.filter((e) => e.name === "topology-fetch-start");
   const fetchEnds = mine.filter((e) => e.name === "topology-fetch-end");
-  const firstStart = fetchStarts[0];
+  const shared = mine.filter(
+    (e) => e.name === "topology-fetch-join" || e.name === "topology-fetch-reuse",
+  );
+  const reuses = shared.filter((e) => e.name === "topology-fetch-reuse");
+  const lastReuse = reuses[reuses.length - 1];
+  const lastEnd = fetchEnds[fetchEnds.length - 1];
+  const fromMemory =
+    lastReuse !== undefined && (lastEnd === undefined || lastReuse.at > lastEnd.at);
+  const firstStart = fromMemory ? undefined : fetchStarts[0];
   // The fetch that resolved first is the one whose topology reached the store.
-  const winner = fetchEnds[0];
+  const winner = fromMemory ? undefined : fetchEnds[0];
   const winnerStart =
     fetchStarts.find((e) => e.detail.callId === winner?.detail.callId) ?? firstStart;
 
@@ -80,7 +94,8 @@ export function deriveLoadTimings(
   }
 
   const canvas = lastCanvasCycle(forNetwork(events, networkId));
-  const begin = winnerStart?.at ?? canvas?.prepareStart;
+  const begin = fromMemory ? lastReuse.at : (winnerStart?.at ?? canvas?.prepareStart);
+  const topologyObserved = fetchStarts.length + shared.length > 0;
   return {
     ...EMPTY_LOAD_TIMINGS,
     fetchMs: diff(winner?.at, winnerStart?.at),
@@ -92,6 +107,7 @@ export function deriveLoadTimings(
     layoutMs: diff(canvas?.frozen, canvas?.layoutStart),
     uploadMs: diff(canvas?.firstFrame, canvas?.layoutStart),
     totalMs: diff(canvas?.frozen, begin),
-    topologyFetches: fetchStarts.length > 0 ? fetchStarts.length : null,
+    topologyFetches: topologyObserved ? fetchStarts.length : null,
+    topologyShared: topologyObserved ? shared.length : null,
   };
 }

@@ -106,6 +106,10 @@ export const simulationsApi = {
    *   degrade gracefully — the page is logged and skipped, not propagated.
    * - Dedup by natural key (`agent.index`, `${source}-${target}`) is robust
    *   to pages where the server ignored our `*Limit: 0` hint.
+   *
+   * Every call is one full download. Views load topologies through
+   * `loadTopology` (entities/simulation), which shares concurrent and repeated
+   * loads of the run being viewed (#140).
    */
   async getTopologyFull(runId: string, networkId: string): Promise<TopologyResponse | null> {
     // Bench builds only (#126): load timings of the current network for the debug HUD.

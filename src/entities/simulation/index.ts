@@ -1,5 +1,6 @@
 export type { SimulationWsClient } from "./api/simulation.ws";
 export { createSimulationWsClient } from "./api/simulation.ws";
+export { loadTopology, releaseTopologies } from "./api/topology-loader";
 export type { RoundAggregate } from "./lib/round-aggregates";
 export {
   computeRoundAggregate,

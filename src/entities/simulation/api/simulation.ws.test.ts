@@ -3,6 +3,7 @@ import { simulationsApi } from "@/shared/api/backend";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import { useSimulationStore } from "../model/simulation.store";
 import { createSimulationWsClient, isFrameBinary, readFinalRound } from "./simulation.ws";
+import { loadTopology, resetTopologyLoader } from "./topology-loader";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -90,6 +91,16 @@ function makeTopologyBuffer(agents: number, neighbors: number): ArrayBuffer {
   return buffer;
 }
 
+/**
+ * Delivers a control event through the raw callback registered with the manager (it discards the
+ * handler's promise) and lets the handler settle: the shared topology load spans several
+ * microtasks.
+ */
+async function deliver(onEvent: unknown, event: unknown): Promise<void> {
+  (onEvent as (data: unknown) => void)(event);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function makeMockManager() {
   return {
     subscribe: vi.fn(),
@@ -106,6 +117,7 @@ describe("createSimulationWsClient", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTopologyLoader();
 
     mockStore = {
       setRunId: vi.fn(),
@@ -200,18 +212,18 @@ describe("createSimulationWsClient", () => {
     });
 
     describe("onEvent callback — control events", () => {
-      async function getEventCallback(): Promise<(data: unknown) => Promise<void>> {
+      async function getEventCallback(): Promise<(data: unknown) => void> {
         const client = createSimulationWsClient(RUN_ID, null, mockManager);
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-        return onEvent as (data: unknown) => Promise<void>;
+        return onEvent as (data: unknown) => void;
       }
 
       it("sets status to running on topology_ready", async () => {
         vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
         expect(mockStore.setStatus).toHaveBeenCalledWith("running");
       });
@@ -220,7 +232,7 @@ describe("createSimulationWsClient", () => {
         vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
         expect(simulationsApi.getTopologyFull).toHaveBeenCalledWith(RUN_ID, "net-1");
         expect(mockStore.setTopology).toHaveBeenCalledWith(MOCK_TOPOLOGY);
@@ -230,7 +242,7 @@ describe("createSimulationWsClient", () => {
         vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(MOCK_TOPOLOGY);
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
         expect(mockWorker.postMessage).toHaveBeenCalledWith({
           type: "init",
@@ -241,7 +253,7 @@ describe("createSimulationWsClient", () => {
       it("sets status to running on network_started", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "network_started", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "network_started", runId: RUN_ID, networkId: "net-1" });
 
         expect(mockStore.setStatus).toHaveBeenCalledWith("running");
       });
@@ -249,7 +261,7 @@ describe("createSimulationWsClient", () => {
       it("does not change run status on network_converged", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "network_converged", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "network_converged", runId: RUN_ID, networkId: "net-1" });
 
         const calls = mockStore.setStatus.mock.calls.map((args) => args[0] as string);
         expect(calls).not.toContain("converged");
@@ -259,7 +271,7 @@ describe("createSimulationWsClient", () => {
       it("sets status to completed on run_completed", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "run_completed", runId: RUN_ID });
+        await deliver(onEvent, { event: "run_completed", runId: RUN_ID });
 
         expect(mockStore.setStatus).toHaveBeenCalledWith("completed");
       });
@@ -267,7 +279,7 @@ describe("createSimulationWsClient", () => {
       it("calls setError on error event", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "error", message: "something went wrong" });
+        await deliver(onEvent, { event: "error", message: "something went wrong" });
 
         expect(mockStore.setError).toHaveBeenCalledWith("something went wrong");
       });
@@ -275,7 +287,7 @@ describe("createSimulationWsClient", () => {
       it("calls setNetworkId and setFinalRound on network_converged", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({
+        await deliver(onEvent, {
           event: "network_converged",
           runId: RUN_ID,
           networkId: "net-1",
@@ -290,7 +302,7 @@ describe("createSimulationWsClient", () => {
       it("reads the legacy `round` field of network_converged (backends before #119)", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({
+        await deliver(onEvent, {
           event: "network_converged",
           runId: RUN_ID,
           networkId: "net-1",
@@ -304,7 +316,7 @@ describe("createSimulationWsClient", () => {
       it("leaves finalRound and consensus untouched when network_converged lacks them", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "network_converged", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "network_converged", runId: RUN_ID, networkId: "net-1" });
 
         // Never undefined in the store: the `/results` fallbacks only fill null.
         expect(mockStore.setNetworkId).toHaveBeenCalledWith("net-1");
@@ -315,7 +327,7 @@ describe("createSimulationWsClient", () => {
       it("stores the consensus verdict on network_converged", async () => {
         const onEvent = await getEventCallback();
 
-        await onEvent({
+        await deliver(onEvent, {
           event: "network_converged",
           runId: RUN_ID,
           networkId: "net-1",
@@ -333,7 +345,7 @@ describe("createSimulationWsClient", () => {
           // populated the topology for this network before the WS event arrives.
           mockStore.topology = MOCK_TOPOLOGY;
 
-          await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+          await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
           expect(simulationsApi.getTopologyFull).not.toHaveBeenCalled();
           expect(mockStore.setTopology).not.toHaveBeenCalled();
@@ -347,9 +359,9 @@ describe("createSimulationWsClient", () => {
           const onEvent = await getEventCallback();
           mockStore.topology = MOCK_TOPOLOGY;
 
-          await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+          await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
           mockWorker.postMessage.mockClear();
-          await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+          await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
           expect(mockWorker.postMessage).not.toHaveBeenCalled();
         });
@@ -359,7 +371,7 @@ describe("createSimulationWsClient", () => {
         vi.mocked(simulationsApi.getTopologyFull).mockResolvedValue(null);
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
         expect(mockStore.setTopology).not.toHaveBeenCalled();
         expect(mockWorker.postMessage).not.toHaveBeenCalledWith(
@@ -377,7 +389,7 @@ describe("createSimulationWsClient", () => {
         });
         const onEvent = await getEventCallback();
 
-        await onEvent({ event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
+        await deliver(onEvent, { event: "topology_ready", runId: RUN_ID, networkId: "net-1" });
 
         expect(mockStore.setTopology).not.toHaveBeenCalled();
         expect(mockWorker.postMessage).toHaveBeenCalledWith({
@@ -414,7 +426,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "network_started",
           runId: RUN_ID,
           networkId: "whichever-network",
@@ -428,7 +440,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-OTHER",
@@ -443,7 +455,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "network_started",
           runId: RUN_ID,
           networkId: "net-OTHER",
@@ -457,7 +469,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "network_converged",
           runId: RUN_ID,
           networkId: "net-OTHER",
@@ -475,7 +487,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-1",
@@ -492,7 +504,7 @@ describe("createSimulationWsClient", () => {
         const client = createSimulationWsClient(RUN_ID, null, mockManager);
         await client.connect();
         const [, onEvent, onBinary] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-1",
@@ -533,7 +545,7 @@ describe("createSimulationWsClient", () => {
           expect.objectContaining({ type: "frame" }),
         );
 
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-1",
@@ -622,7 +634,7 @@ describe("createSimulationWsClient", () => {
         const own = makeFrameBuffer(MOCK_TOPOLOGY.agentCount, 0, 0, RUN_ID);
         (onBinary as (buf: ArrayBuffer) => void)(foreign);
         (onBinary as (buf: ArrayBuffer) => void)(own);
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-1",
@@ -642,7 +654,7 @@ describe("createSimulationWsClient", () => {
         const client = createSimulationWsClient(RUN_ID, watchedUuid, mockManager);
         await client.connect();
         const [, onEvent, onBinary] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: watchedUuid,
@@ -672,7 +684,7 @@ describe("createSimulationWsClient", () => {
         const client = createSimulationWsClient(RUN_ID, watchedUuid, mockManager);
         await client.connect();
         const [, onEvent, onBinary] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: watchedUuid,
@@ -778,7 +790,7 @@ describe("createSimulationWsClient", () => {
         await client.connect();
         const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
         // Mark topology as ready via the normal WS control-event path first.
-        await (onEvent as (data: unknown) => Promise<void>)({
+        await deliver(onEvent, {
           event: "topology_ready",
           runId: RUN_ID,
           networkId: "net-1",
@@ -790,6 +802,152 @@ describe("createSimulationWsClient", () => {
 
         expect(mockWorker.postMessage).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("topology load shared with useSimulationStream's prefetch (#140)", () => {
+    type Pending = { resolve: (topology: unknown) => void; reject: (error: unknown) => void };
+
+    /** Every download stays pending until the test settles it. */
+    function pendingDownloads(): Pending[] {
+      const pending: Pending[] = [];
+      vi.mocked(simulationsApi.getTopologyFull).mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            pending.push({ resolve, reject });
+          }) as never,
+      );
+      return pending;
+    }
+
+    async function connectScoped() {
+      const client = createSimulationWsClient(RUN_ID, "net-1", mockManager);
+      await client.connect();
+      const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
+      const [storeListener] = vi.mocked(useSimulationStore.subscribe).mock.calls[0]!;
+      return {
+        client,
+        onEvent,
+        storeListener: storeListener as unknown as (state: { topology: unknown }) => void,
+      };
+    }
+
+    /**
+     * useSimulationStream's prefetch as the hook runs it: the topology goes into the store when
+     * the store has none, and the store notifies the client's subscription (zustand, mocked here).
+     */
+    function prefetch(storeListener: (state: { topology: unknown }) => void) {
+      return loadTopology(RUN_ID, "net-1")
+        .then((topology) => {
+          if (topology === null || mockStore.topology !== null) return;
+          mockStore.topology = topology;
+          storeListener({ topology });
+        })
+        .catch(() => {});
+    }
+
+    const topologyReady = { event: "topology_ready", runId: RUN_ID, networkId: "net-1" };
+    const initMessages = () =>
+      mockWorker.postMessage.mock.calls.filter(
+        ([msg]) => (msg as { type: string }).type === "init",
+      );
+
+    it("joins the prefetch still in flight when topology_ready arrives: one download, one init", async () => {
+      // Before #140 this interleaving downloaded the topology twice and initialised the worker
+      // twice (the second init dropped the round the merger was assembling).
+      const pending = pendingDownloads();
+      const { onEvent, storeListener } = await connectScoped();
+      const prefetched = prefetch(storeListener);
+
+      const handled = deliver(onEvent, topologyReady);
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(1);
+
+      pending[0]?.resolve(MOCK_TOPOLOGY);
+      await Promise.all([prefetched, handled]);
+
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(1);
+      expect(initMessages()).toEqual([[{ type: "init", agentCount: MOCK_TOPOLOGY.agentCount }]]);
+      // The prefetch filled the store first: the handler leaves it alone
+      expect(mockStore.setTopology).not.toHaveBeenCalled();
+    });
+
+    it("lets the prefetch join the WS download when topology_ready arrives first", async () => {
+      const pending = pendingDownloads();
+      const { onEvent, storeListener } = await connectScoped();
+      // Replayed synchronously by the manager on subscribe (prepareRun buffer)
+      const handled = deliver(onEvent, topologyReady);
+      const prefetched = prefetch(storeListener);
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(1);
+
+      pending[0]?.resolve(MOCK_TOPOLOGY);
+      await Promise.all([handled, prefetched]);
+
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(1);
+      expect(mockStore.setTopology).toHaveBeenCalledTimes(1);
+      expect(initMessages()).toHaveLength(1);
+    });
+
+    it("initialises the worker from the prefetch that completed before topology_ready", async () => {
+      const pending = pendingDownloads();
+      const { onEvent, storeListener } = await connectScoped();
+      const prefetched = prefetch(storeListener);
+      pending[0]?.resolve(MOCK_TOPOLOGY);
+      await prefetched;
+      expect(initMessages()).toHaveLength(1);
+
+      await deliver(onEvent, topologyReady);
+
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(1);
+      expect(mockStore.setTopology).not.toHaveBeenCalled();
+      expect(initMessages()).toHaveLength(1);
+    });
+
+    it("still loads the topology when the prefetch it joined fails", async () => {
+      const pending = pendingDownloads();
+      const { onEvent, storeListener } = await connectScoped();
+      const prefetched = prefetch(storeListener);
+      const handled = deliver(onEvent, topologyReady);
+
+      pending[0]?.reject(new Error("transient"));
+      await prefetched;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // The handler joined a request older than the event: it makes one attempt of its own
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(2);
+      pending[1]?.resolve(MOCK_TOPOLOGY);
+      await handled;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockStore.setTopology).toHaveBeenCalledWith(MOCK_TOPOLOGY);
+      expect(initMessages()).toEqual([[{ type: "init", agentCount: MOCK_TOPOLOGY.agentCount }]]);
+    });
+
+    it("downloads again on topology_ready after the prefetch failed", async () => {
+      const pending = pendingDownloads();
+      const { onEvent, storeListener } = await connectScoped();
+      const prefetched = prefetch(storeListener);
+      pending[0]?.reject(new Error("503"));
+      await prefetched;
+
+      const handled = deliver(onEvent, topologyReady);
+      expect(simulationsApi.getTopologyFull).toHaveBeenCalledTimes(2);
+      pending[1]?.resolve(MOCK_TOPOLOGY);
+      await handled;
+
+      expect(mockStore.setTopology).toHaveBeenCalledWith(MOCK_TOPOLOGY);
+      expect(initMessages()).toHaveLength(1);
+    });
+
+    it("does not touch the store or the worker once disconnected while the load runs", async () => {
+      const pending = pendingDownloads();
+      const { client, onEvent } = await connectScoped();
+      const handled = deliver(onEvent, topologyReady);
+      client.disconnect();
+
+      pending[0]?.resolve(MOCK_TOPOLOGY);
+      await handled;
+
+      expect(mockStore.setTopology).not.toHaveBeenCalled();
+      expect(initMessages()).toHaveLength(0);
     });
   });
 
@@ -827,7 +985,7 @@ describe("createSimulationWsClient", () => {
       await client.connect();
 
       const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-      await (onEvent as (data: unknown) => Promise<void>)({
+      await deliver(onEvent, {
         event: "topology_ready",
         runId: RUN_ID,
         networkId: "net-1",
@@ -843,18 +1001,18 @@ describe("createSimulationWsClient", () => {
   });
 
   describe("last-run store mirroring", () => {
-    async function connectAndGetEvent(): Promise<(data: unknown) => Promise<void>> {
+    async function connectAndGetEvent(): Promise<(data: unknown) => void> {
       const client = createSimulationWsClient(RUN_ID, null, mockManager);
       await client.connect();
       const [, onEvent] = vi.mocked(mockManager.subscribe).mock.calls[0]!;
-      return onEvent as (data: unknown) => Promise<void>;
+      return onEvent as (data: unknown) => void;
     }
 
     it("mirrors run_completed to the last-run store when runId matches", async () => {
       useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
       const onEvent = await connectAndGetEvent();
 
-      await onEvent({ event: "run_completed", runId: RUN_ID });
+      await deliver(onEvent, { event: "run_completed", runId: RUN_ID });
 
       expect(useLastRunStore.getState().status).toBe("completed");
     });
@@ -863,7 +1021,7 @@ describe("createSimulationWsClient", () => {
       useLastRunStore.getState().startRun({ runId: RUN_ID, name: null, networkCount: 1 });
       const onEvent = await connectAndGetEvent();
 
-      await onEvent({ event: "error", message: "boom" });
+      await deliver(onEvent, { event: "error", message: "boom" });
 
       expect(useLastRunStore.getState().status).toBe("error");
     });
@@ -872,7 +1030,7 @@ describe("createSimulationWsClient", () => {
       useLastRunStore.getState().startRun({ runId: "other-run", name: null, networkCount: 1 });
       const onEvent = await connectAndGetEvent();
 
-      await onEvent({ event: "run_completed", runId: RUN_ID });
+      await deliver(onEvent, { event: "run_completed", runId: RUN_ID });
 
       expect(useLastRunStore.getState().status).toBe("running");
     });

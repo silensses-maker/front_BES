@@ -89,6 +89,7 @@ describe("BenchHud", () => {
     expect(row("layout until freeze")).toBe("5000 ms");
     expect(row("total")).toBe("6400 ms");
     expect(row("topology fetches")).toBe("1");
+    expect(row("· shared loads (no download)")).toBe("0");
 
     // Live FPS readout from the HUD's own rAF loop
     await act(async () => {

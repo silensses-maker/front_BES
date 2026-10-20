@@ -110,6 +110,7 @@ export const CSV_COLUMNS = [
   "load_upload_max_frame_ms",
   "load_total_ms",
   "topology_fetches",
+  "topology_shared",
 ] as const;
 
 export type CsvColumn = (typeof CSV_COLUMNS)[number];
@@ -186,6 +187,7 @@ function scenarioColumns(doc: BenchResultDocument, s: ScenarioResult) {
     load_upload_max_frame_ms: round(s.load.uploadMaxFrameMs ?? null, 1),
     load_total_ms: round(s.load.totalMs, 1),
     topology_fetches: s.load.topologyFetches,
+    topology_shared: s.load.topologyShared ?? null,
   };
 }
 

@@ -53,7 +53,81 @@ describe("deriveLoadTimings", () => {
       uploadMs: null,
       totalMs: 6_580,
       topologyFetches: 2,
+      topologyShared: 0,
     });
+  });
+
+  it("counts the loads that joined the download in flight without changing its timings (#140)", () => {
+    const events: BenchProbeEvent[] = [
+      ev("topology-fetch-start", 100, { callId: 1 }),
+      ev("topology-fetch-join", 130),
+      ev("topology-parse", 400, { durationMs: 30 }),
+      ev("topology-fetch-end", 900, { callId: 1 }),
+      ev("canvas-prepare-start", 910),
+      ev("canvas-frozen", 5_910),
+    ];
+    const t = deriveLoadTimings(events, RUN, NET);
+    expect(t.topologyFetches).toBe(1);
+    expect(t.topologyShared).toBe(1);
+    expect(t.fetchMs).toBe(800);
+    expect(t.parseMs).toBe(30);
+    expect(t.totalMs).toBe(5_810);
+  });
+
+  it("treats a load reused from an earlier download as from memory: no fetch steps, total from the reuse", () => {
+    const events: BenchProbeEvent[] = [
+      // Selector: downloads the first network
+      ev("topology-fetch-start", 100, { callId: 1 }),
+      ev("topology-parse", 400, { durationMs: 30 }),
+      ev("topology-fetch-end", 900, { callId: 1 }),
+      // The user opens it 20 s later: the run view reuses that download
+      ev("topology-fetch-reuse", 20_000),
+      ev("canvas-prepare-start", 20_010),
+      ev("canvas-to-data-end", 20_110),
+      ev("canvas-frozen", 25_010),
+    ];
+    const resources = [
+      {
+        name: `http://x/api/simulations/run-1/networks/${NET}/topology?a=0`,
+        startTime: 101,
+        responseEnd: 850,
+      },
+    ];
+    const t = deriveLoadTimings(events, RUN, NET, resources);
+    expect(t.topologyFetches).toBe(1);
+    expect(t.topologyShared).toBe(1);
+    expect(t.fetchMs).toBeNull();
+    expect(t.networkMs).toBeNull();
+    expect(t.parseMs).toBeNull();
+    expect(t.toDataMs).toBe(100);
+    expect(t.totalMs).toBe(5_010);
+  });
+
+  it("measures the download again when the network was downloaded after its last reuse", () => {
+    const events: BenchProbeEvent[] = [
+      ev("topology-fetch-reuse", 50),
+      ev("topology-fetch-start", 100, { callId: 1 }),
+      ev("topology-fetch-end", 600, { callId: 1 }),
+      ev("canvas-prepare-start", 610),
+      ev("canvas-frozen", 1_610),
+    ];
+    const t = deriveLoadTimings(events, RUN, NET);
+    expect(t.fetchMs).toBe(500);
+    expect(t.totalMs).toBe(1_510);
+    expect(t.topologyShared).toBe(1);
+  });
+
+  it("reports zero downloads when the reused download is no longer in the event history", () => {
+    const events: BenchProbeEvent[] = [
+      ev("topology-fetch-reuse", 10),
+      ev("canvas-prepare-start", 20),
+      ev("canvas-frozen", 1_020),
+    ];
+    const t = deriveLoadTimings(events, RUN, NET);
+    expect(t.topologyFetches).toBe(0);
+    expect(t.topologyShared).toBe(1);
+    expect(t.fetchMs).toBeNull();
+    expect(t.totalMs).toBe(1_010);
   });
 
   it("measures the upload: layout commit → first tick after the data was rebuilt", () => {

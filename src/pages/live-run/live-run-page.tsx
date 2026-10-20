@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { loadTopology, releaseTopologies } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
@@ -43,16 +44,23 @@ export function LiveRunPage() {
   const consensusEntries = useNetworkConsensus(runId ?? "", selectorIds);
   const { finalSpreads, requestSpreads } = useFinalSpreads(runId ?? "");
 
+  // Topologies loaded for this run (selector + run view) are shared and kept
+  // for reuse (#140) until the user leaves the run: another runId or unmount.
+  useEffect(() => {
+    if (!runId) return;
+    return () => releaseTopologies(runId);
+  }, [runId]);
+
   // First network's topology — feeds the Composición card and the browser's
-  // agent counts (identical across a generated run's networks).
+  // agent counts (identical across a generated run's networks). Opening that
+  // network reuses this download.
   const [selectorTopology, setSelectorTopology] = useState<TopologyResponse | null>(null);
   useEffect(() => {
     const firstId = selectorIds[0];
     if (!runId || firstId === undefined) return;
     if (selectorTopology !== null && selectorTopology.runId === runId) return;
     let cancelled = false;
-    simulationsApi
-      .getTopologyFull(runId, firstId)
+    loadTopology(runId, firstId)
       .then((topology) => {
         if (!cancelled && topology !== null) setSelectorTopology(topology);
       })

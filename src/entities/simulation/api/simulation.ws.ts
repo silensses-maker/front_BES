@@ -1,10 +1,10 @@
-import { simulationsApi } from "@/shared/api/backend";
 import { readFrameNetworkId, readFrameRunId } from "@/shared/lib/simulation-frame";
 import type { SimulationWsManager } from "@/shared/lib/ws-manager";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { useLastRunStore } from "../model/last-run.store";
 import { useSimulationStore } from "../model/simulation.store";
 import type { WsControlEvent } from "../types/simulation.types";
+import { loadTopology } from "./topology-loader";
 
 const FRAME_HEADER_BYTES = 36;
 
@@ -72,6 +72,8 @@ export function createSimulationWsClient(
   manager: SimulationWsManager,
 ): SimulationWsClient {
   let worker: Worker | null = null;
+  // Bumped by connect() and disconnect(): a handler awaiting the topology across them bails out.
+  let connectionId = 0;
   let topologyReady = false;
   // Frames that arrive before the worker is initialized (topology not yet
   // loaded). Drained into the worker the moment topologyReady becomes true.
@@ -104,6 +106,18 @@ export function createSimulationWsClient(
     pendingFrames = [];
   }
 
+  /**
+   * Initializes the worker once per connection, whichever path delivers the topology first (WS
+   * event, store subscription). A second `init` would replace the worker's merger and drop the
+   * round it is assembling.
+   */
+  function initWorker(agentCount: number): void {
+    if (topologyReady) return;
+    worker?.postMessage({ type: "init", agentCount });
+    topologyReady = true;
+    drainPendingFrames();
+  }
+
   async function handleControlEvent(msg: WsControlEvent): Promise<void> {
     switch (msg.event) {
       case "topology_ready": {
@@ -113,23 +127,20 @@ export function createSimulationWsClient(
         // populated the topology for this network, skip the WS-driven refetch.
         const existing = store().topology;
         if (existing !== null && existing.networkId === msg.networkId) {
-          if (!topologyReady) {
-            worker?.postMessage({ type: "init", agentCount: existing.agentCount });
-            topologyReady = true;
-            drainPendingFrames();
-          }
+          initWorker(existing.agentCount);
           break;
         }
-        const topology = await simulationsApi.getTopologyFull(msg.runId, msg.networkId);
-        if (topology) {
-          const raceWinner = store().topology;
-          if (raceWinner === null || raceWinner.networkId !== msg.networkId) {
-            store().setTopology(topology);
-          }
-          worker?.postMessage({ type: "init", agentCount: topology.agentCount });
-          topologyReady = true;
-          drainPendingFrames();
+        // Shared load (#140): joins the prefetch's download when it is still in flight — the
+        // usual case for a large network when the subscribe replay arrives.
+        const connection = connectionId;
+        const topology = await loadTopology(msg.runId, msg.networkId);
+        // A disconnected client (unmount, run change) must not touch the store.
+        if (topology === null || connection !== connectionId) break;
+        const raceWinner = store().topology;
+        if (raceWinner === null || raceWinner.networkId !== msg.networkId) {
+          store().setTopology(topology);
         }
+        initWorker(topology.agentCount);
         break;
       }
       case "network_started":
@@ -189,6 +200,7 @@ export function createSimulationWsClient(
 
   return {
     connect: async () => {
+      connectionId++;
       topologyReady = false;
       pendingFrames = [];
 
@@ -214,9 +226,7 @@ export function createSimulationWsClient(
         const topo = state.topology;
         if (topo === null) return;
         if (networkId !== null && topo.networkId !== networkId) return;
-        worker?.postMessage({ type: "init", agentCount: topo.agentCount });
-        topologyReady = true;
-        drainPendingFrames();
+        initWorker(topo.agentCount);
         unsubTopology?.();
         unsubTopology = null;
       });
@@ -232,6 +242,7 @@ export function createSimulationWsClient(
     },
 
     disconnect: () => {
+      connectionId++;
       unsubTopology?.();
       unsubTopology = null;
       manager.unsubscribe(runId);

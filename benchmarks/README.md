@@ -187,9 +187,12 @@ Open any run in the run view of a bench build and press **Shift+H** (or the "FPS
 live FPS (current, mean, 1% low, median and p5 over 5 s), slow/dropped frames, JS heap,
 agents/edges (and the inferred density), the load timings of the network (topology fetch, its
 network part from Resource Timing, JSON parse, `topologyToData`, `prepareCosmographData`, mount,
-upload until the first frame with the data, layout until freeze; "topology fetches: 2" means a
-concurrent duplicate fetch ran; the first network of a page also pays the DuckDB-WASM cold start
-in `prepareCosmographData`), and the environment. **Copy metrics** puts a JSON snapshot on the
+upload until the first frame with the data, layout until freeze; "topology fetches" counts the
+actual downloads of the network — 2 means a concurrent duplicate ran — and "shared loads" the
+loads served without one, by the download in flight or a completed one (#140); a network opened
+from the selector reuses the selector's download, so its load has no fetch steps and its total
+starts at the reuse; the first network of a page also pays the DuckDB-WASM cold start in
+`prepareCosmographData`), and the environment. **Copy metrics** puts a JSON snapshot on the
 clipboard; **Record 10 s** measures one phase with the suite's statistics and offers it as
 JSON/CSV (same schema, `source: "real-run"`; the live readout pauses while recording). The HUD
 re-renders 4×/s while open — close it for idle readings.

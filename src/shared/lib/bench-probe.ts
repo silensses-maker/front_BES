@@ -15,10 +15,20 @@ import type {
  */
 
 export type BenchProbeName =
-  /** `simulationsApi.getTopologyFull` started (detail: runId, networkId, callId). */
+  /**
+   * `simulationsApi.getTopologyFull` started: one actual download of a network's topology
+   * (detail: runId, networkId, callId).
+   */
   | "topology-fetch-start"
   /** `getTopologyFull` resolved with the merged topology (detail: + agents, edges). */
   | "topology-fetch-end"
+  /** A topology load joined the download in flight for its network (#140; detail: runId, networkId). */
+  | "topology-fetch-join"
+  /**
+   * A topology load got the completed topology of an earlier download of its network (#140;
+   * detail: runId, networkId).
+   */
+  | "topology-fetch-reuse"
   /** One topology page was parsed by axios (detail: runId, networkId, durationMs). */
   | "topology-parse"
   /** The canvas started `topologyToData` for a topology (detail: network, agents, edges). */

@@ -377,6 +377,7 @@ export function BenchHud({ runId, networkId, topology }: BenchHudProps) {
           value={network.density === null ? "–" : String(network.density)}
         />
         <Row label="topology fetches" value={fmtInt(load.topologyFetches)} />
+        <Row label="· shared loads (no download)" value={fmtInt(load.topologyShared)} />
       </Section>
 
       <Section title="Load timings">

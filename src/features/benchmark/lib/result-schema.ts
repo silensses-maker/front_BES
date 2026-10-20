@@ -163,8 +163,13 @@ export interface LoadTimings {
   uploadMaxFrameMs?: number | null;
   /** First step start → frozen. */
   totalMs: number | null;
-  /** Real run: how many topology fetches ran for this network (2 = a concurrent duplicate). */
+  /** Real run: how many topology downloads ran for this network (2 = a concurrent duplicate). */
   topologyFetches: number | null;
+  /**
+   * Real run: topology loads of this network served without a download — joined the one in
+   * flight or reused a completed one (#140).
+   */
+  topologyShared?: number | null;
 }
 
 export interface ScenarioResult {
@@ -277,6 +282,7 @@ export const EMPTY_LOAD_TIMINGS: LoadTimings = {
   layoutMs: null,
   totalMs: null,
   topologyFetches: null,
+  topologyShared: null,
 };
 
 /** File name stem: date, time and commit, e.g. `bench-2026-10-19T20-15-03-ed59e82`. */
