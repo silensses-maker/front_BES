@@ -20,6 +20,19 @@ export const DEFAULT_CUSTOM_FORM: CustomSimFormValues = {
   edges: [],
 };
 
+/** Where a draft pre-filled from the history came from (#127) — shown by the Review step. */
+export interface RelaunchInfo {
+  runId: string;
+  /** The run's stored seed (decimal string), whether or not the wizard could hold it. */
+  seed: string;
+  seedKept: boolean;
+  densityExact: boolean;
+  /** Density the run used (stored). */
+  effectiveDensity: number;
+  /** Density the pre-filled value gives with the quotas at pre-fill time. */
+  effectiveNow: number;
+}
+
 interface SimulationConfigState {
   networkType: NetworkType;
   step: WizardStep;
@@ -28,6 +41,8 @@ interface SimulationConfigState {
   activeTemplate: string | null;
   /** True when the current draft originated from an imported file (Review shows "Cargada desde archivo"). */
   loadedFromFile: boolean;
+  /** Set when the draft was pre-filled from a past run ("Re-launch", #127); cleared like loadedFromFile. */
+  relaunchedFrom: RelaunchInfo | null;
 }
 
 interface SimulationConfigActions {
@@ -37,6 +52,9 @@ interface SimulationConfigActions {
   updateGeneratedValues: (patch: Partial<GeneratedSimFormValues>) => void;
   updateCustomValues: (patch: Partial<CustomSimFormValues>) => void;
   setActiveTemplate: (key: string | null) => void;
+  /** Replaces the generated draft with a past run's configuration and opens Review (#127). */
+  applyRelaunch: (values: GeneratedSimFormValues, info: RelaunchInfo) => void;
+  clearRelaunchedFrom: () => void;
   reset: () => void;
 }
 
@@ -75,6 +93,7 @@ const initialState: SimulationConfigState = {
   customValues: DEFAULT_CUSTOM_FORM,
   activeTemplate: null,
   loadedFromFile: false,
+  relaunchedFrom: null,
 };
 
 export const useSimulationConfigStore = create<SimulationConfigState & SimulationConfigActions>()(
@@ -87,6 +106,7 @@ export const useSimulationConfigStore = create<SimulationConfigState & Simulatio
           networkType: type,
           step: type === "load" ? "load" : "network",
           loadedFromFile: false,
+          relaunchedFrom: null,
         }),
 
       setLoadedFromFile: (loaded) => set({ loadedFromFile: loaded }),
@@ -104,6 +124,18 @@ export const useSimulationConfigStore = create<SimulationConfigState & Simulatio
         })),
 
       setActiveTemplate: (key) => set({ activeTemplate: key }),
+
+      applyRelaunch: (values, info) =>
+        set({
+          networkType: "generated",
+          step: "review",
+          generatedValues: values,
+          activeTemplate: null,
+          loadedFromFile: false,
+          relaunchedFrom: info,
+        }),
+
+      clearRelaunchedFrom: () => set({ relaunchedFrom: null }),
 
       reset: () => set(initialState),
     }),

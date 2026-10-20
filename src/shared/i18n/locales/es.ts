@@ -585,7 +585,7 @@ const es = {
     stopThresholdHint:
       "Criterio de convergencia. La simulación se detiene cuando el cambio promedio de creencias entre rondas baja de este valor. Menor = convergencia más estricta. Típico: 0.01-0.001.",
     seedHint:
-      "Semilla aleatoria para reproducibilidad. La misma semilla produce la misma topología y dinámica. Déjala aleatoria para exploración libre.",
+      "Semilla para reproducibilidad: la misma configuración con la misma semilla construye las mismas redes y la misma dinámica en el mismo servidor (en un servidor con otra CPU los resultados pueden variar levemente). Número entero de 0 a 9.007.199.254.740.991. Déjala aleatoria para exploración libre.",
     // ── Tooltips por campo (paso de agentes) ───────────────────────────────
     silenceStrategyHint:
       "Cómo decide un agente si expresa su opinión cada ronda. DeGroot: siempre habla. Mayoría: habla solo si la mayoría de vecinos está de acuerdo. Umbral: requiere una fracción mínima de vecinos de acuerdo, fijada en 0.1 por el simulador. Confianza: habla cuando su propia certeza supera un umbral, fijado en 0.1 (la confianza inicial es aleatoria).",
@@ -611,6 +611,7 @@ const es = {
     errorAgentLimit: "El total de agentes ({{requested}}) supera el máximo de tu plan ({{limit}}).",
     errorNetworkLimit:
       "El número de redes ({{requested}}) supera el máximo de tu plan ({{limit}}).",
+    errorSeedInvalid: "La semilla debe ser un número entero de 0 a {{max}}.",
     errorDensityExceedsAgents:
       "La densidad ({{density}}) debe ser menor que el total de agentes ({{agents}}).",
     errorBiasMismatch:
@@ -659,7 +660,19 @@ const es = {
     // #133: reemplaza el selector de modo de guardado (toda ejecución se guarda igual).
     storageNote:
       "En esta versión se guarda la configuración de la ejecución, y sus datos de repetición se conservan unos 60–90 minutos después de que termine.",
-    exportSuccessToast: "Configuración exportada como simulacion.json.",
+    exportSuccessToast: "Configuración exportada como {{file}}.",
+    relaunchSuccessToast:
+      "Se rellenó el asistente con la configuración de la ejecución. Revísala y lánzala.",
+    errorRelaunch:
+      "No se pudo cargar la configuración de esta ejecución. Por favor intenta de nuevo.",
+    relaunchNote:
+      "Rellenado desde la ejecución {{id}} con su semilla {{seed}}. Lanzado tal cual, repite esa ejecución en este servidor.",
+    relaunchNoteSeedDropped:
+      "Rellenado desde la ejecución {{id}}. Su semilla ({{seed}}) está fuera de 0 … {{max}} y no se puede ingresar, así que se usará una semilla aleatoria: la ejecución no se repetirá exactamente.",
+    relaunchDensityEstimated:
+      "La densidad solicitada de esa ejecución no está guardada: la densidad rellenada es la que da su densidad efectiva ({{effective}}) con tus cuotas actuales.",
+    relaunchDensityChanged:
+      "Con tus cuotas actuales esta densidad da una densidad efectiva de {{now}} en lugar de {{effective}}: las redes no serán las mismas.",
     nextInvalidToast: "Corrige los errores marcados antes de continuar.",
     launchInvalidToast: "La configuración tiene errores. Revísalos antes de lanzar.",
     launchSuccessToast: "Simulación lanzada. Recibiendo rondas en vivo…",
@@ -760,6 +773,22 @@ const es = {
     openLiveRun: "Abrir ejecución",
     runNameFallback: "Ejecución sin nombre",
     runDetailTitle: "Detalles del experimento",
+    runSeed: "Semilla",
+    exportConfig: "Exportar configuración",
+    exportConfigTip:
+      "Descarga como JSON la configuración con la que se lanzó esta ejecución, junto con su ID y su semilla. Cargar el archivo en el asistente de nueva simulación y lanzarlo repite la ejecución en este servidor.",
+    exportConfigSuccess: "Configuración de la ejecución exportada como {{file}}.",
+    relaunch: "Relanzar",
+    relaunchTip:
+      "Abre el asistente de nueva simulación con la configuración y la semilla de esta ejecución. No se inicia nada hasta que la lances y tus cuotas aplican como siempre. Lanzada tal cual, repite la ejecución en este servidor; las ejecuciones creadas antes de que las semillas fueran reproducibles obtienen la misma configuración con otros sorteos aleatorios.",
+    relaunchCustomHint:
+      "Las ejecuciones personalizadas se relanzan cargando su archivo de configuración en el asistente de nueva simulación (Cargar archivo). Expórtalo desde el paso Revisión del asistente, o desde este panel para la última ejecución lanzada desde este navegador.",
+    errorExportConfig: "No se pudo exportar la configuración. Por favor intenta de nuevo.",
+    filterTypeLabel: "Tipo de ejecución",
+    filterTypeAll: "Todos los tipos",
+    filterDateFrom: "Creados desde",
+    filterDateTo: "Creados hasta",
+    clearTypeDateFilters: "Quitar los filtros de tipo y fecha",
   },
   replay: {
     errorLoad: "No se pudieron cargar los datos de la repetición",

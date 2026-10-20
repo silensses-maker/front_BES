@@ -579,7 +579,7 @@ const en = {
     stopThresholdHint:
       "Convergence criterion. The run stops when the average belief change between rounds drops below this value. Lower = stricter convergence. Typical: 0.01-0.001.",
     seedHint:
-      "Random seed for reproducibility. Same seed produces the same topology and dynamics. Leave random for fresh exploration.",
+      "Seed for reproducibility: the same configuration with the same seed builds the same networks and dynamics on the same server (on a server with another CPU the results may differ slightly). Whole number from 0 to 9,007,199,254,740,991. Leave it random for fresh exploration.",
     // ── Field-level tooltips (agents step) ──────────────────────────────────
     silenceStrategyHint:
       "How an agent decides whether to express its opinion each round. DeGroot: always speaks. Majority: speaks only if a majority of neighbors agree. Threshold: requires a minimum fraction of agreeing neighbors, fixed at 0.1 by the simulator. Confidence: speaks when its own certainty exceeds a threshold, fixed at 0.1 (initial confidence is random).",
@@ -605,6 +605,7 @@ const en = {
     errorAgentLimit: "Total agents ({{requested}}) exceed your plan's maximum ({{limit}}).",
     errorNetworkLimit:
       "Number of networks ({{requested}}) exceeds your plan's maximum ({{limit}}).",
+    errorSeedInvalid: "The seed must be a whole number from 0 to {{max}}.",
     errorDensityExceedsAgents:
       "Density ({{density}}) must be lower than the total agents ({{agents}}).",
     errorBiasMismatch:
@@ -652,7 +653,18 @@ const en = {
     // #133: replaces the save-mode selector (every run is saved the same way for now).
     storageNote:
       "In this version, the run configuration is stored, and its replay data is kept for about 60–90 minutes after the run ends.",
-    exportSuccessToast: "Configuration exported as simulacion.json.",
+    exportSuccessToast: "Configuration exported as {{file}}.",
+    relaunchSuccessToast:
+      "The wizard was pre-filled with the run's configuration. Review it and launch it.",
+    errorRelaunch: "Failed to load this run's configuration. Please try again.",
+    relaunchNote:
+      "Pre-filled from run {{id}} with its seed {{seed}}. Launched as it is, it replays that run on this server.",
+    relaunchNoteSeedDropped:
+      "Pre-filled from run {{id}}. Its seed ({{seed}}) is outside 0 … {{max}} and cannot be entered, so a random seed will be used: the run will not be replayed exactly.",
+    relaunchDensityEstimated:
+      "The requested density of that run is not stored: the pre-filled density is the one that gives its effective density ({{effective}}) with your current quotas.",
+    relaunchDensityChanged:
+      "With your current quotas this density gives an effective density of {{now}} instead of {{effective}}: the networks will not be the same.",
     nextInvalidToast: "Fix the highlighted errors before continuing.",
     launchInvalidToast: "The configuration has errors. Review them before launching.",
     launchSuccessToast: "Simulation launched. Receiving live rounds…",
@@ -747,6 +759,22 @@ const en = {
     openLiveRun: "Open run",
     runNameFallback: "Unnamed run",
     runDetailTitle: "Experiment details",
+    runSeed: "Seed",
+    exportConfig: "Export configuration",
+    exportConfigTip:
+      "Downloads, as JSON, the configuration this run was launched with, together with its ID and its seed. Loading the file in the new simulation wizard and launching it replays the run on this server.",
+    exportConfigSuccess: "Run configuration exported as {{file}}.",
+    relaunch: "Re-launch",
+    relaunchTip:
+      "Opens the new simulation wizard pre-filled with this run's configuration and seed. Nothing starts until you launch it, and your quotas apply as usual. Launched as it is, it replays the run on this server; runs created before seeds became reproducible get the same configuration with different random draws.",
+    relaunchCustomHint:
+      "Custom runs are re-launched by loading their configuration file in the new simulation wizard (Load file). Export it from the wizard's Review step, or from this panel for the latest run launched from this browser.",
+    errorExportConfig: "Failed to export the configuration. Please try again.",
+    filterTypeLabel: "Run type",
+    filterTypeAll: "All types",
+    filterDateFrom: "Created from",
+    filterDateTo: "Created until",
+    clearTypeDateFilters: "Clear type and date filters",
   },
   replay: {
     errorLoad: "Could not load replay data",

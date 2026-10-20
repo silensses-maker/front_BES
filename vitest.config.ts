@@ -1,10 +1,17 @@
 import { defineConfig } from "vitest/config";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+
+/** Same value rsbuild.config.ts compiles in (#127). */
+const APP_VERSION: string = JSON.parse(
+  readFileSync(path.resolve(__dirname, "package.json"), "utf8"),
+).version;
 
 export default defineConfig({
   // Build-time constants (src/shared/config/build-flags.d.ts): tests run as a normal build, where
   // the benchmark harness (#126) is compiled out.
   define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
     __BENCHMARK__: "false",
     __BENCH_BUILD__: "null",
   },

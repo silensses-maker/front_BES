@@ -208,6 +208,53 @@ describe("useSimulationConfigStore", () => {
       expect(useSimulationConfigStore.getState().loadedFromFile).toBe(false);
     });
   });
+
+  describe("applyRelaunch (#127)", () => {
+    const info = {
+      runId: "run-9",
+      seed: "42",
+      seedKept: true,
+      densityExact: true,
+      effectiveDensity: 2,
+      effectiveNow: 2,
+    };
+    const values = { ...DEFAULT_FORM, numberOfNetworks: 3, seed: 42 };
+
+    it("starts with no relaunch info", () => {
+      expect(useSimulationConfigStore.getState().relaunchedFrom).toBeNull();
+    });
+
+    it("replaces the generated draft, opens Review and records where it came from", () => {
+      useSimulationConfigStore.getState().setNetworkType("custom");
+      useSimulationConfigStore.getState().setActiveTemplate("polarization");
+      useSimulationConfigStore.getState().setLoadedFromFile(true);
+
+      useSimulationConfigStore.getState().applyRelaunch(values, info);
+
+      const state = useSimulationConfigStore.getState();
+      expect(state.networkType).toBe("generated");
+      expect(state.step).toBe("review");
+      expect(state.generatedValues).toEqual(values);
+      expect(state.activeTemplate).toBeNull();
+      expect(state.loadedFromFile).toBe(false);
+      expect(state.relaunchedFrom).toEqual(info);
+    });
+
+    it("is cleared by setNetworkType, clearRelaunchedFrom and reset", () => {
+      const store = useSimulationConfigStore.getState();
+      store.applyRelaunch(values, info);
+      store.setNetworkType("generated");
+      expect(useSimulationConfigStore.getState().relaunchedFrom).toBeNull();
+
+      store.applyRelaunch(values, info);
+      store.clearRelaunchedFrom();
+      expect(useSimulationConfigStore.getState().relaunchedFrom).toBeNull();
+
+      store.applyRelaunch(values, info);
+      store.reset();
+      expect(useSimulationConfigStore.getState().relaunchedFrom).toBeNull();
+    });
+  });
 });
 
 // ─── Persisted-draft migration (#120) ────────────────────────────────────────

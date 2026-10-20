@@ -7,6 +7,7 @@ import {
   findDuplicateAgentNames,
   generatedSimSchema,
   MAX_CUSTOM_NAME_LENGTH,
+  MAX_SEED,
   validateCustomForm,
   validateGeneratedForm,
 } from "./validation";
@@ -815,6 +816,28 @@ describe("validateGeneratedForm", () => {
       Infinity,
     );
     expect(errors).toEqual({});
+  });
+
+  it("accepts whole seeds from 0 to 2^53 − 1 and flags any other seed as seedInvalid (#127)", () => {
+    expect(MAX_SEED).toBe(9_007_199_254_740_991);
+    for (const seed of [null, 0, 1, 42, MAX_SEED]) {
+      const values = makeGeneratedInput({ seed }) as GeneratedSimFormValues;
+      expect(validateGeneratedForm(values, undefined, undefined), String(seed)).toEqual({});
+    }
+    for (const seed of [
+      -1,
+      -42,
+      1.5,
+      MAX_SEED + 1,
+      2 ** 60,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      const values = makeGeneratedInput({ seed }) as GeneratedSimFormValues;
+      const errors = validateGeneratedForm(values, undefined, undefined);
+      expect(errors.seedInvalid, String(seed)).toBe(true);
+      expect(errors.countsInvalid, String(seed)).toBeUndefined();
+    }
   });
 
   it("maps the density rule to densityExceedsAgents instead of countsInvalid", () => {

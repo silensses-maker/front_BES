@@ -1,11 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildEnvelope,
+  buildRunEnvelope,
   downloadEnvelopeJson,
   parseEnvelope,
   readJsonFile,
   type SimConfigEnvelope,
+  withRunSeed,
 } from "./simulation-export";
+
+/** package.json version — what rsbuild.config.ts and vitest.config.ts compile in (#127). */
+const PACKAGE_VERSION: string = JSON.parse(
+  readFileSync(resolve(process.cwd(), "package.json"), "utf8"),
+).version;
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -34,10 +43,12 @@ describe("buildEnvelope", () => {
     expect(envelope.payload).toEqual(payload);
   });
 
-  it("sets appVersion to a non-empty string (package version or 'unknown' fallback)", () => {
+  it("sets appVersion to the package.json version compiled in at build time (#127)", () => {
     const envelope = buildEnvelope({});
-    expect(typeof envelope.appVersion).toBe("string");
-    expect(envelope.appVersion.length).toBeGreaterThan(0);
+    expect(envelope.appVersion).toBe(__APP_VERSION__);
+    expect(envelope.appVersion).toBe(PACKAGE_VERSION);
+    expect(envelope.appVersion).toMatch(/^\d+\.\d+\.\d+/);
+    expect(envelope.appVersion).not.toBe("unknown");
   });
 
   it("does not include runId when not provided", () => {
@@ -53,6 +64,68 @@ describe("buildEnvelope", () => {
   it("does not include runId when undefined is passed explicitly", () => {
     const envelope = buildEnvelope({ networkType: "generated" }, undefined);
     expect(envelope).not.toHaveProperty("runId");
+  });
+});
+
+describe("buildRunEnvelope", () => {
+  const generated = { networkType: "generated", seed: null, numberOfAgents: 10 };
+
+  it("records appVersion, runId and the exact seed, before the payload", () => {
+    const envelope = buildRunEnvelope(generated, {
+      runId: "7123456789012345678",
+      seed: "987654321",
+    });
+    expect(Object.keys(envelope)).toEqual(["createdAt", "appVersion", "runId", "seed", "payload"]);
+    expect(envelope.appVersion).toBe(PACKAGE_VERSION);
+    expect(envelope.runId).toBe("7123456789012345678");
+    expect(envelope.seed).toBe("987654321");
+    expect(envelope.payload.seed).toBe(987654321);
+    expect(new Date(envelope.createdAt).toISOString()).toBe(envelope.createdAt);
+  });
+
+  it("writes the run's seed into a generated payload, so loading the file replays the run", () => {
+    const envelope = buildRunEnvelope(generated, { runId: "1", seed: "42" });
+    expect(envelope.payload).toEqual({ ...generated, seed: 42 });
+    // The launched configuration itself is not mutated
+    expect(generated.seed).toBeNull();
+  });
+
+  it("keeps 64-bit seeds exact in the envelope; the payload only takes 0 … 2^53 − 1", () => {
+    for (const seed of ["9223372036854775807", "-9223372036854775808", "9007199254740992", "-1"]) {
+      const envelope = buildRunEnvelope(generated, { runId: "1", seed });
+      expect(JSON.parse(JSON.stringify(envelope)).seed).toBe(seed);
+      expect(envelope.payload).toBe(generated);
+    }
+    for (const [seed, value] of [
+      ["0", 0],
+      ["9007199254740991", Number.MAX_SAFE_INTEGER],
+    ] as const) {
+      expect(buildRunEnvelope(generated, { runId: "1", seed }).payload.seed).toBe(value);
+    }
+  });
+
+  it("omits seed when the backend reports none (custom runs, older backends) or a non-integer", () => {
+    const custom = { networkType: "custom", agents: [] };
+    for (const seed of [null, undefined, "", "1.5", "1e3", "0x10", " 42", "042", "abc"]) {
+      const envelope = buildRunEnvelope(custom, { runId: "r", seed });
+      expect(envelope).not.toHaveProperty("seed");
+      expect(envelope.runId).toBe("r");
+      expect(envelope.payload).toBe(custom);
+    }
+  });
+
+  it("withRunSeed leaves custom payloads and malformed seeds alone", () => {
+    const custom = { networkType: "custom", agents: [] };
+    expect(withRunSeed(custom, "42")).toBe(custom);
+    for (const seed of ["", "1.5", "1e3", "042", "abc"]) {
+      expect(withRunSeed(generated, seed)).toBe(generated);
+    }
+  });
+
+  it("round-trips through parseEnvelope with runId and seed", () => {
+    const envelope = buildRunEnvelope(generated, { runId: "run-9", seed: "5" });
+    const parsed = parseEnvelope(JSON.parse(JSON.stringify(envelope)));
+    expect(parsed).toEqual(envelope);
   });
 });
 
@@ -101,6 +174,27 @@ describe("downloadEnvelopeJson", () => {
 
     downloadEnvelopeJson(mockEnvelope, "custom");
     expect(anchor.download).toMatch(/^bes-config-custom-\d+\.json$/);
+  });
+
+  it("names the file after the run when the envelope has a runId (#127)", () => {
+    const anchor = { href: "", download: "", click: mockClick };
+    mockCreateElement.mockReturnValue(anchor);
+
+    const file = downloadEnvelopeJson(
+      { ...mockEnvelope, runId: "7123456789012345678" },
+      "generated",
+    );
+    expect(anchor.download).toBe("bes-config-generated-7123456789012345678.json");
+    expect(file).toBe(anchor.download);
+  });
+
+  it("returns the downloaded file name (shown by the export toasts)", () => {
+    const anchor = { href: "", download: "", click: mockClick };
+    mockCreateElement.mockReturnValue(anchor);
+
+    const file = downloadEnvelopeJson(mockEnvelope, "custom");
+    expect(file).toBe(anchor.download);
+    expect(file).toMatch(/^bes-config-custom-\d+\.json$/);
   });
 
   it("sets the anchor href to the created object URL", () => {
@@ -184,6 +278,18 @@ describe("parseEnvelope", () => {
       };
       const result = parseEnvelope(raw);
       expect(result?.runId).toBe("run-xyz");
+    });
+
+    it("keeps the run's seed string and ignores a non-string seed", () => {
+      const base = {
+        createdAt: "2024-01-01T00:00:00.000Z",
+        appVersion: "1.0.0",
+        payload: { networkType: "generated" },
+      };
+      expect(parseEnvelope({ ...base, seed: "9223372036854775807" })?.seed).toBe(
+        "9223372036854775807",
+      );
+      expect(parseEnvelope({ ...base, seed: 42 })).not.toHaveProperty("seed");
     });
 
     it("omits runId when not present in the envelope", () => {

@@ -11,7 +11,12 @@ import {
   listValidationMessages,
   quotaMeterPct,
 } from "../lib/live-summary";
-import { computeMaxEdges, validateCustomForm, validateGeneratedForm } from "../lib/validation";
+import {
+  computeMaxEdges,
+  MAX_SEED,
+  validateCustomForm,
+  validateGeneratedForm,
+} from "../lib/validation";
 import { useSimulationConfigStore } from "../model/simulation-config.store";
 
 /** Cycling categorical palette — chart tokens instead of the mockup's raw hex. */
@@ -136,6 +141,7 @@ export function SimulationLiveSummary() {
     expected: fmt(gen.numberOfAgents),
     bias: fmt(gen.biasTypes.reduce((sum, r) => sum + r.count, 0)),
     maxEdges: fmt(maxEdges),
+    maxSeed: fmt(MAX_SEED),
   });
 
   const agentComposition = buildAgentComposition(gen);

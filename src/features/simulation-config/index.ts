@@ -4,6 +4,8 @@ export {
   DEFAULT_FORM,
   useSimulationConfigStore,
 } from "./model/simulation-config.store";
+export type { UseRelaunchRunReturn } from "./model/use-relaunch-run";
+export { useRelaunchRun } from "./model/use-relaunch-run";
 export { useSimulationConfig } from "./model/use-simulation-config";
 export type {
   AgentTypeRow,

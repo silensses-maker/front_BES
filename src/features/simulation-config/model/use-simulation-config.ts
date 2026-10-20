@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useLastRunStore, useSimulationStore } from "@/entities/simulation";
+import { useLastRunStore, useLaunchedConfigStore, useSimulationStore } from "@/entities/simulation";
 import { getHighestRole, resolveMaxNetworks, useAuthStore } from "@/entities/user";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
@@ -106,6 +106,8 @@ export function useSimulationConfig() {
   const storeSetActiveTemplate = useSimulationConfigStore((s) => s.setActiveTemplate);
   const storeReset = useSimulationConfigStore((s) => s.reset);
   const loadedFromFile = useSimulationConfigStore((s) => s.loadedFromFile);
+  const relaunchedFrom = useSimulationConfigStore((s) => s.relaunchedFrom);
+  const storeClearRelaunchedFrom = useSimulationConfigStore((s) => s.clearRelaunchedFrom);
 
   // Non-persistent local state
   const [errors, setErrors] = useState<SimConfigValidationErrors>({});
@@ -281,6 +283,11 @@ export function useSimulationConfig() {
         name: networkType === "custom" ? customValues.networkName : null,
         networkCount: result.networkCount ?? null,
       });
+      // The draft is reset below: keep what was launched so the run detail can export it with
+      // its runId and seed (#127).
+      useLaunchedConfigStore
+        .getState()
+        .record(result.runId, values as unknown as Record<string, unknown>);
       setRunId(result.runId);
       setStatus("running");
       void navigate(`/board/simulation/${result.runId}`);
@@ -307,6 +314,7 @@ export function useSimulationConfig() {
   const applyTemplate = (key: string, template: GeneratedSimFormValues) => {
     storeUpdateGeneratedValues(template);
     storeSetActiveTemplate(key);
+    storeClearRelaunchedFrom();
     setErrors({});
     setUsageLimitError(null);
     const name =
@@ -328,8 +336,8 @@ export function useSimulationConfig() {
 
   const exportConfig = () => {
     const envelope = buildEnvelope(values as unknown as Record<string, unknown>);
-    downloadEnvelopeJson(envelope, values.networkType);
-    toast.success(t("simulationConfig.exportSuccessToast"));
+    const file = downloadEnvelopeJson(envelope, values.networkType);
+    toast.success(t("simulationConfig.exportSuccessToast", { file }));
   };
 
   const handleImportFile = async (file: File) => {
@@ -451,6 +459,7 @@ export function useSimulationConfig() {
     usageLimitError,
     activeTemplate,
     loadedFromFile,
+    relaunchedFrom,
     maxAgents: maxAgents ?? null,
     maxIterations: maxIterations ?? null,
     maxNetworks: maxNetworks ?? null,

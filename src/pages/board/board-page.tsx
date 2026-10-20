@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
-import { SimulationConfigWizard, SimulationLiveSummary } from "@/features/simulation-config";
+import {
+  SimulationConfigWizard,
+  SimulationLiveSummary,
+  useRelaunchRun,
+} from "@/features/simulation-config";
 import {
   RunDetailCard,
   SimulationHistoryPanel,
@@ -35,6 +39,15 @@ export function BoardPage() {
     statusFilter,
     setStatusFilter,
     statusCounts,
+    typeFilter,
+    setTypeFilter,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    clearTypeAndDateFilters,
+    exportableRunId,
+    exportRunConfig,
     pendingCancelRun,
     requestCancel,
     dismissCancel,
@@ -43,6 +56,7 @@ export function BoardPage() {
     loadMore,
     selectRun,
   } = useSimulationHistory();
+  const { relaunch, relaunchingRunId } = useRelaunchRun();
 
   // Load history when transitioning to "my-experiments" panel
   const prevPanel = useRef<string | null>(null);
@@ -65,6 +79,13 @@ export function BoardPage() {
         statusFilter={statusFilter}
         onFilterChange={setStatusFilter}
         statusCounts={statusCounts}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        onClearTypeAndDateFilters={clearTypeAndDateFilters}
         pendingCancelRun={pendingCancelRun}
         onRequestCancel={requestCancel}
         onDismissCancel={dismissCancel}
@@ -83,6 +104,13 @@ export function BoardPage() {
       statusFilter,
       setStatusFilter,
       statusCounts,
+      typeFilter,
+      setTypeFilter,
+      dateFrom,
+      setDateFrom,
+      dateTo,
+      setDateTo,
+      clearTypeAndDateFilters,
       pendingCancelRun,
       requestCancel,
       dismissCancel,
@@ -116,7 +144,18 @@ export function BoardPage() {
   if (activeRun) {
     return (
       <div className="mx-auto max-w-lg py-6">
-        <RunDetailCard run={activeRun} />
+        <RunDetailCard
+          run={activeRun}
+          // Only the run whose launch configuration this browser kept can be exported (#127)
+          onExportConfig={
+            activeRun.id === exportableRunId ? () => exportRunConfig(activeRun) : undefined
+          }
+          // Generated runs only: rebuilt from the stored configuration (#127)
+          onRelaunch={
+            activeRun.type === "generated" ? () => void relaunch(activeRun.id) : undefined
+          }
+          relaunching={relaunchingRunId === activeRun.id}
+        />
       </div>
     );
   }

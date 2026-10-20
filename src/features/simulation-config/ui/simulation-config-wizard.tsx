@@ -36,6 +36,7 @@ export function SimulationConfigWizard() {
     usageLimitError,
     activeTemplate,
     loadedFromFile,
+    relaunchedFrom,
     maxAgents,
     maxIterations,
     maxNetworks,
@@ -202,6 +203,7 @@ export function SimulationConfigWizard() {
               maxIterations={maxIterations}
               maxNetworks={maxNetworks}
               loadedFromFile={loadedFromFile}
+              relaunchedFrom={relaunchedFrom}
               onExport={exportConfig}
               onImport={handleImportFile}
             />

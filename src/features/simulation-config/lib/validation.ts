@@ -83,6 +83,12 @@ const biasRowSchema = z.object({
   cognitiveBias: cognitiveBiasSchema,
 });
 
+/**
+ * Largest wizard seed: 2^53 − 1, the top of the range the backend draws seeds from, so every seed
+ * is exact as a JavaScript number and can be typed back in (#127).
+ */
+export const MAX_SEED = Number.MAX_SAFE_INTEGER;
+
 export const generatedSimSchema = z
   .object({
     networkType: z.literal("generated"),
@@ -91,7 +97,12 @@ export const generatedSimSchema = z
     density: z.number().int().min(2),
     iterationLimit: z.number().int().min(1),
     stopThreshold: z.number().gt(0).lt(1),
-    seed: z.number().nullable(),
+    seed: z
+      .number()
+      .int("seedInvalid")
+      .min(0, "seedInvalid")
+      .max(MAX_SEED, "seedInvalid")
+      .nullable(),
     saveMode: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     agentTypes: z.array(agentTypeRowSchema).min(1),
     biasTypes: z.array(biasRowSchema).min(1),
@@ -279,6 +290,8 @@ export function validateGeneratedForm(
         errors.densityExceedsAgents = true;
       } else if (path === "stopThreshold") {
         errors.stopThresholdOutOfRange = true;
+      } else if (path === "seed") {
+        errors.seedInvalid = true;
       } else {
         errors.countsInvalid = true;
       }
