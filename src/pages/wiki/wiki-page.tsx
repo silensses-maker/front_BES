@@ -1,15 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "@/shared/i18n";
+import { clearMath, typesetMath } from "@/shared/lib/load-mathjax";
+import { logger } from "@/shared/lib/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Separator } from "@/shared/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-
-declare global {
-  interface Window {
-    MathJax?: { typesetPromise?: () => Promise<void> };
-  }
-}
 
 /** Inline math — pass raw TeX without delimiters */
 const Mi = ({ tex }: { tex: string }) => (
@@ -21,22 +17,40 @@ const Mb = ({ tex }: { tex: string }) => (
   <span dangerouslySetInnerHTML={{ __html: `$$${tex}$$` }} />
 );
 
+/**
+ * Typesets the TeX inside the article. MathJax is fetched on the first call (it is not in
+ * index.html); if it cannot be loaded the page still reads fine with the raw TeX in place.
+ */
+function typesetArticle(article: HTMLElement | null) {
+  if (!article) return;
+  typesetMath([article]).catch((err: unknown) => logger.error("WikiPage.typesetMath", err));
+}
+
 export function WikiPage() {
   const { t, i18n } = useTranslation();
+  const articleRef = useRef<HTMLElement>(null);
 
+  // Typeset on mount (cold deep link or in-app navigation) and again after a language change
   // biome-ignore lint/correctness/useExhaustiveDependencies: i18n.language is an intentional trigger, not a value used inside the effect
   useEffect(() => {
-    void window.MathJax?.typesetPromise?.();
+    typesetArticle(articleRef.current);
   }, [i18n.language]);
 
+  // Release MathJax's records of this article's math when the page goes away
+  useEffect(() => {
+    const article = articleRef.current;
+    return () => {
+      if (article) void clearMath([article]);
+    };
+  }, []);
+
   const handleTabChange = (_value: string) => {
-    setTimeout(() => {
-      void window.MathJax?.typesetPromise?.();
-    }, 0);
+    // The selected tab's content mounts on the next tick
+    setTimeout(() => typesetArticle(articleRef.current), 0);
   };
 
   return (
-    <article className="max-w-4xl">
+    <article ref={articleRef} className="max-w-4xl">
       <h1 className="font-display text-4xl font-normal tracking-tight text-foreground sm:text-5xl">
         {t("wiki.pageTitle")}
       </h1>

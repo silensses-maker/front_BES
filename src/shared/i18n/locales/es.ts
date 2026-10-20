@@ -436,6 +436,15 @@ const es = {
     body: "La página que buscas no existe o ya no está disponible.",
     backHome: "Volver al inicio",
   },
+  routeBoundary: {
+    loading: "Cargando página…",
+    chunkErrorTitle: "No se pudo cargar esta página",
+    chunkErrorBody:
+      "Es posible que la aplicación se haya actualizado desde que la abriste o que se haya perdido la conexión. Recarga para obtener la versión más reciente.",
+    errorTitle: "Algo salió mal",
+    errorBody: "No se pudo mostrar esta página. Recargar suele solucionarlo.",
+    reload: "Recargar",
+  },
   simulation: {
     errorStream: "La conexión con la simulación falló. Por favor intenta de nuevo.",
     errorRateLimited: "Demasiadas solicitudes. Espera antes de reconectar.",
