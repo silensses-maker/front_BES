@@ -60,7 +60,8 @@ function runWorker(
 ): Promise<TopologyColumns | null> {
   return new Promise<TopologyColumns | null>((resolve, reject) => {
     const answerTokenRequest = (requestId: number) => {
-      options
+      // getToken failures already become a null answer (the worker then fails the page).
+      void options
         .getToken(true)
         .catch(() => null)
         .then((fresh) => {

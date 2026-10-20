@@ -68,7 +68,9 @@ function pageUrl(
     edgeOffset: String(request.edgeOffset),
     edgeLimit: String(request.edgeLimit),
   });
-  const base = baseUrl.replace(/\/+$/, "");
+  // Trailing slashes trimmed with a loop (a `/\/+$/` regex backtracks super-linearly, Sonar S8786).
+  let base = baseUrl;
+  while (base.endsWith("/")) base = base.slice(0, -1);
   return `${base}/simulations/${runId}/networks/${networkId}/topology?${params.toString()}`;
 }
 
