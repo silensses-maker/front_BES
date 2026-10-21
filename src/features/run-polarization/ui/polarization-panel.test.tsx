@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -18,18 +18,39 @@ vi.mock("@/shared/ui/tooltip", () => ({
   TooltipContent: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
+interface MockSeries {
+  name?: string;
+  data: unknown[];
+  lineStyle?: { color: string };
+  markLine?: { data: unknown[] };
+}
+interface MockOption {
+  series: MockSeries[];
+  legend?: { data: string[] };
+  yAxis: { max?: number };
+  tooltip: { formatter: (params: unknown) => string };
+}
+
+/** The chart, as data attributes: lines, marks (playhead + thresholds), legend, y max, tooltip. */
 vi.mock("echarts-for-react", () => ({
-  default: ({
-    option,
-  }: {
-    option: { series: Array<{ data: unknown[]; markLine: { data: unknown[] } }> };
-  }) => (
-    <div
-      data-testid="echart"
-      data-points={option.series[0]?.data.length ?? 0}
-      data-marks={option.series[0]?.markLine.data.length ?? 0}
-    />
-  ),
+  default: ({ option }: { option: MockOption }) => {
+    const lines = option.series.filter((series) => series.name !== undefined);
+    const marks = option.series.reduce((n, series) => n + (series.markLine?.data.length ?? 0), 0);
+    // The tooltip at the playhead, for every line
+    const tooltip = option.tooltip.formatter(lines.map((_, seriesIndex) => ({ seriesIndex })));
+    return (
+      <div
+        data-testid="echart"
+        data-points={option.series[0]?.data.length ?? 0}
+        data-marks={marks}
+        data-lines={lines.length}
+        data-colors={lines.map((line) => line.lineStyle?.color).join("|")}
+        data-legend={option.legend?.data.join("|") ?? ""}
+        data-ymax={String(option.yAxis.max ?? "")}
+        data-tooltip={tooltip}
+      />
+    );
+  },
 }));
 
 import { useRoundAggregatesStore, useSimulationStore } from "@/entities/simulation";
@@ -45,6 +66,7 @@ import polarizationEn from "@/shared/i18n/locales/polarization.en";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { usePolarizationCatalogStore } from "../model/polarization-catalog.store";
 import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
+import { fromSingleSeries, type SeriesConfig } from "../model/series-list";
 import { PolarizationPanelView as PolarizationPanel } from "./polarization-panel";
 import { PolarizationWikiSection } from "./polarization-wiki-section";
 
@@ -117,6 +139,28 @@ const flush = async () => {
   }
 };
 
+/** One series (the single-series settings, migrated to the list), real values. */
+function settings(measureId: string, k: 3 | 5 | 7 | 10 = 5) {
+  usePolarizationSettingsStore.setState({
+    ...fromSingleSeries({ measureId, paramsByMeasure: {}, k, belief: "private" }),
+    axisMode: "values",
+  });
+}
+
+const seriesAt = (index: number) =>
+  usePolarizationSettingsStore.getState().series[index] as SeriesConfig;
+const first = () => seriesAt(0);
+
+const fill = (template: string, values: Record<string, string | number>) =>
+  Object.entries(values).reduce(
+    (text, [name, value]) => text.split(`{{${name}}}`).join(String(value)),
+    template,
+  );
+
+const ADD = fill(p.addSeriesAria, { max: 4 });
+const chip = (label: string) => fill(p.seriesAria, { label });
+const chips = () => within(screen.getByRole("group", { name: p.seriesGroupAria }));
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("PolarizationPanel", () => {
@@ -131,12 +175,7 @@ describe("PolarizationPanel", () => {
     vi.mocked(simulationsApi.getPolarizationMeasures).mockReset().mockResolvedValue(catalog);
     vi.mocked(simulationsApi.computePolarization).mockReset().mockImplementation(fakeServer);
     usePolarizationCatalogStore.setState({ status: "idle", catalog: null, error: null });
-    usePolarizationSettingsStore.setState({
-      measureId: "BiPol",
-      paramsByMeasure: {},
-      k: 5,
-      belief: "private",
-    });
+    settings("BiPol");
     useRoundAggregatesStore.getState().reset();
     useSimulationStore.getState().reset();
     useRoundAggregatesStore.getState().ingest("run-1|net-1", frame(0));
@@ -170,7 +209,7 @@ describe("PolarizationPanel", () => {
   });
 
   it("groups the catalog's measures (literature / proposed) and labels MEC normalized as BETA", async () => {
-    usePolarizationSettingsStore.setState({ measureId: "MECNormalized" });
+    settings("MECNormalized");
     render(<PolarizationPanel />);
     await flush();
     expect(screen.getAllByText(p.beta).length).toBeGreaterThan(0);
@@ -185,7 +224,7 @@ describe("PolarizationPanel", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: p.beliefPublic }));
     await flush();
-    expect(usePolarizationSettingsStore.getState().belief).toBe("public");
+    expect(first().belief).toBe("public");
     await waitFor(() => expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(2));
     await flush();
     // Public beliefs are a consensus: nobody at the extremes, level low
@@ -194,11 +233,11 @@ describe("PolarizationPanel", () => {
 
     expect(screen.getByRole("button", { name: "5" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "7" }));
-    expect(usePolarizationSettingsStore.getState().k).toBe(7);
+    expect(first().k).toBe(7);
   });
 
   it("Experts is only offered for k = 5 (from the catalog) and the view offers to switch", async () => {
-    usePolarizationSettingsStore.setState({ measureId: "Experts", k: 3 });
+    settings("Experts", 3);
     render(<PolarizationPanel />);
     await flush();
     expect(
@@ -206,7 +245,7 @@ describe("PolarizationPanel", () => {
     ).toBeInTheDocument();
     expect(simulationsApi.computePolarization).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: p.useCategories.replace("{{k}}", "5") }));
-    expect(usePolarizationSettingsStore.getState().k).toBe(5);
+    expect(first().k).toBe(5);
     await flush();
     expect(simulationsApi.computePolarization).toHaveBeenCalledWith(
       expect.objectContaining({ measure: "Experts", k: 5 }),
@@ -214,7 +253,7 @@ describe("PolarizationPanel", () => {
   });
 
   it("edits parameters within the catalog's range, debounced, and restores the defaults", async () => {
-    usePolarizationSettingsStore.setState({ measureId: "EstebanRay" });
+    settings("EstebanRay");
     render(<PolarizationPanel />);
     await flush();
     expect(screen.getByText(p.levels.high)).toBeInTheDocument();
@@ -225,9 +264,9 @@ describe("PolarizationPanel", () => {
     );
     fireEvent.change(alpha, { target: { value: "2" } });
     expect(alpha).toHaveAttribute("aria-invalid", "true");
-    expect(usePolarizationSettingsStore.getState().paramsByMeasure.EstebanRay).toBeUndefined();
+    expect(first().paramsByMeasure.EstebanRay).toBeUndefined();
     fireEvent.change(alpha, { target: { value: "1,2" } });
-    expect(usePolarizationSettingsStore.getState().paramsByMeasure.EstebanRay).toEqual({
+    expect(first().paramsByMeasure.EstebanRay).toEqual({
       alpha: 1.2,
     });
     await waitFor(() => expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(2));
@@ -240,12 +279,12 @@ describe("PolarizationPanel", () => {
     expect(screen.queryByText(p.levels.high)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: p.resetParamsAria }));
-    expect(usePolarizationSettingsStore.getState().paramsByMeasure.EstebanRay).toBeUndefined();
+    expect(first().paramsByMeasure.EstebanRay).toBeUndefined();
     expect(alpha).toHaveValue("0.8");
   });
 
   it("offers the f(d) whitelist of the catalog for the generalized measures", async () => {
-    usePolarizationSettingsStore.setState({ measureId: "GeneralizedMEC" });
+    settings("GeneralizedMEC");
     render(<PolarizationPanel />);
     await flush();
     expect(screen.getByRole("combobox", { name: p.alienationAria })).toHaveTextContent("d");
@@ -297,6 +336,203 @@ describe("PolarizationPanel", () => {
     expect(screen.getByText("BiPol is not defined for k = 5 categories")).toBeInTheDocument();
   });
 
+  // ── Comparison ────────────────────────────────────────────────────────────
+
+  it("+ adds a copy of the selected series (cached: no request), up to 4; × removes, never the last", async () => {
+    render(<PolarizationPanel />);
+    await flush();
+    // One series: the view as before (no chips, no axis toggle)
+    expect(screen.queryByRole("group", { name: p.seriesGroupAria })).toBeNull();
+    expect(screen.queryByRole("group", { name: p.axisAria })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: ADD }));
+    await flush();
+    const label = "BiPol · k=5 · private";
+    expect(chips().getByRole("button", { name: chip(label) })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(chips().getByRole("button", { name: chip(`${label} (2)`) })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(1);
+    const chart = screen.getByTestId("echart");
+    expect(chart).toHaveAttribute("data-lines", "2");
+    expect(chart).toHaveAttribute("data-legend", `${label}|${label} (2)`);
+    // Distinct colours per series
+    expect(new Set(chart.getAttribute("data-colors")?.split("|")).size).toBe(2);
+
+    fireEvent.click(chips().getByRole("button", { name: ADD }));
+    fireEvent.click(chips().getByRole("button", { name: ADD }));
+    await flush();
+    expect(usePolarizationSettingsStore.getState().series).toHaveLength(4);
+    expect(chips().getByRole("button", { name: ADD })).toBeDisabled();
+    expect(screen.getByText(fill(p.addSeriesLimit, { max: 4 }))).toBeInTheDocument();
+
+    for (const name of [`${label} (4)`, `${label} (3)`, `${label} (2)`]) {
+      fireEvent.click(
+        chips().getByRole("button", { name: fill(p.removeSeriesAria, { label: name }) }),
+      );
+    }
+    await flush();
+    // Back to one series: no chips, no × to remove it
+    expect(screen.queryByRole("group", { name: p.seriesGroupAria })).toBeNull();
+    expect(screen.queryByRole("button", { name: fill(p.removeSeriesAria, { label }) })).toBeNull();
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-marks", "3");
+  });
+
+  it("configures each series on its own; a chip shows (and hides) its settings", async () => {
+    render(<PolarizationPanel />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: ADD }));
+    await flush();
+    // The copy is selected: its settings are shown; make it read the public beliefs
+    expect(
+      screen.getByRole("group", {
+        name: fill(p.configAria, { label: "BiPol · k=5 · private (2)" }),
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: p.beliefPublic }));
+    expect([first().belief, seriesAt(1).belief]).toEqual(["private", "public"]);
+    await waitFor(() => expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(2));
+    await flush();
+    // The viewed round: 1 for the private poles, 0 for the public consensus
+    const values = within(
+      screen.getByRole("list", { name: fill(p.valuesAria, { round: 1 }) }),
+    ).getAllByRole("listitem");
+    expect(values.map((item) => item.textContent)).toEqual([
+      "BiPol · k=5 · private: 1.0000",
+      "BiPol · k=5 · public: 0.0000",
+    ]);
+
+    // Select the first series: its own settings (private)
+    fireEvent.click(chips().getByRole("button", { name: chip("BiPol · k=5 · private") }));
+    expect(screen.getByRole("button", { name: p.beliefPrivate })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "7" }));
+    expect([first().k, seriesAt(1).k]).toEqual([7, 5]);
+
+    // Clicking the selected chip again hides the settings, and shows them back
+    const selected = chips().getByRole("button", { name: chip("BiPol · k=7 · private") });
+    expect(selected).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(selected);
+    expect(selected).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: p.kAria })).toBeNull();
+    fireEvent.click(selected);
+    expect(screen.getByRole("group", { name: p.kAria })).toBeInTheDocument();
+  });
+
+  it("applies the Experts k = 5 constraint per series, with its own Use k = 5", async () => {
+    settings("BiPol", 3);
+    usePolarizationSettingsStore.getState().addSeries();
+    const copy = seriesAt(1).id;
+    usePolarizationSettingsStore.getState().setMeasure(copy, "Experts");
+    render(<PolarizationPanel />);
+    await flush();
+    expect(screen.getByText(fill(p.unsupportedK, { name: "Experts", k: 3 }))).toBeInTheDocument();
+    expect(
+      chips().getByRole("button", {
+        name: `${chip("Experts · k=3 · private")}, ${p.seriesProblem}`,
+      }),
+    ).toBeInTheDocument();
+    // The supported series is computed and drawn meanwhile
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-lines", "1");
+
+    fireEvent.click(screen.getByRole("button", { name: fill(p.useCategories, { k: 5 }) }));
+    expect([first().k, seriesAt(1).k]).toEqual([3, 5]);
+    await flush();
+    expect(simulationsApi.computePolarization).toHaveBeenLastCalledWith(
+      expect.objectContaining({ measure: "Experts", k: 5 }),
+    );
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-lines", "2");
+  });
+
+  it("the y-axis toggle normalizes each series to its own min–max; the tooltip shows both values", async () => {
+    // Round 2: half of the agents at the extremes (BiPol stand-in value 0.5)
+    useRoundAggregatesStore.getState().ingest("run-1|net-1", {
+      ...frame(2),
+      privateBelief: new Float32Array([0, 0.5, 0.5, 1]),
+    });
+    render(<PolarizationPanel />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: ADD }));
+    await flush();
+    const toggle = within(screen.getByRole("group", { name: p.axisAria }));
+    expect(toggle.getByRole("button", { name: p.axisValues })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const chart = () => screen.getByTestId("echart");
+    expect(chart()).toHaveAttribute("data-ymax", "");
+    expect(chart().getAttribute("data-tooltip")).toContain("BiPol · k=5 · private: <b>1.0000</b>");
+
+    fireEvent.click(toggle.getByRole("button", { name: p.axisNormalized }));
+    expect(usePolarizationSettingsStore.getState().axisMode).toBe("normalized");
+    expect(chart()).toHaveAttribute("data-ymax", "1");
+    const tooltip = chart().getAttribute("data-tooltip") ?? "";
+    expect(tooltip).toContain(`${fill(p.tooltipRound, { round: 1 })} · ${p.axisNormalized}`);
+    // Values 1, 1, 0.5 → round 1 is at the top of its range, and keeps its real value and level
+    expect(tooltip).toContain(
+      `BiPol · k=5 · private: <b>1.00</b> · ${fill(p.tooltipValue, { value: "1.0000" })} · ${p.levels.high}`,
+    );
+    // No thresholds while comparing (only the playhead)
+    expect(chart()).toHaveAttribute("data-marks", "1");
+  });
+
+  it("thresholds and the level badge only with one series; several get a legend and per-series values", async () => {
+    render(<PolarizationPanel />);
+    await flush();
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-marks", "3");
+    expect(screen.getByText(p.levels.high)).toBeInTheDocument();
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-legend", "");
+
+    fireEvent.click(screen.getByRole("button", { name: ADD }));
+    await flush();
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-marks", "1");
+    expect(screen.queryByText(p.levels.high)).toBeNull();
+    expect(screen.getByText(p.aboutCompare)).toBeInTheDocument();
+    expect(screen.getByTestId("echart").getAttribute("data-legend")).not.toBe("");
+    // The tooltip still lists each series with its level
+    expect(screen.getByTestId("echart").getAttribute("data-tooltip")).toContain(
+      `BiPol · k=5 · private (2): <b>1.0000</b> · ${p.levels.high}`,
+    );
+  });
+
+  it("a failing series shows its own error and retry; the others keep their values", async () => {
+    const failing = (body: PolarizationRequest) =>
+      body.measure === "MEC"
+        ? Promise.reject(httpError(503, "unavailable", "The polarization worker is busy"))
+        : fakeServer(body);
+    vi.mocked(simulationsApi.computePolarization).mockImplementation(failing);
+    usePolarizationSettingsStore.getState().addSeries();
+    usePolarizationSettingsStore.getState().setMeasure(seriesAt(1).id, "MEC");
+    render(<PolarizationPanel />);
+    await flush();
+
+    expect(screen.getByText(p.errorUnavailable)).toBeInTheDocument();
+    expect(screen.getByText("(The polarization worker is busy)")).toBeInTheDocument();
+    expect(
+      chips().getByRole("button", { name: `${chip("MEC · k=5 · private")}, ${p.seriesProblem}` }),
+    ).toBeInTheDocument();
+    const values = within(screen.getByRole("list", { name: fill(p.valuesAria, { round: 1 }) }));
+    expect(values.getByText("1.0000")).toBeInTheDocument();
+    expect(values.getByText("—")).toBeInTheDocument();
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-lines", "2");
+
+    vi.mocked(simulationsApi.computePolarization).mockImplementation(fakeServer);
+    fireEvent.click(screen.getByRole("button", { name: p.retry }));
+    await flush();
+    expect(screen.queryByText(p.errorUnavailable)).toBeNull();
+    expect(values.queryByText("—")).toBeNull();
+    expect(simulationsApi.computePolarization).toHaveBeenLastCalledWith(
+      expect.objectContaining({ measure: "MEC" }),
+    );
+  });
+
   it("is loaded on demand by the feature's PolarizationPanel", async () => {
     const { PolarizationPanel: LazyPanel } = await import("./lazy-polarization-panel");
     render(<LazyPanel />);
@@ -319,6 +555,16 @@ describe("PolarizationWikiSection", () => {
     expect(container.querySelectorAll("[data-slot='card']").length).toBeGreaterThanOrEqual(10);
     expect(screen.getByText(p.wiki.meaning.MEC)).toBeInTheDocument();
     expect(container.innerHTML).toContain("\\mathrm{MEC}_{\\alpha,\\beta}");
+  });
+
+  it("explains comparing measures and the normalized (shape) axis", () => {
+    const { container } = render(<PolarizationWikiSection />);
+    expect(
+      screen.getByRole("heading", { level: 3, name: p.wiki.compareTitle }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(p.wiki.compare1)).toBeInTheDocument();
+    expect(screen.getByText(p.wiki.compare3, { exact: false })).toBeInTheDocument();
+    expect(container.innerHTML).toContain("\\tilde{x}_t");
   });
 
   it("documents the package's level thresholds (the server's catalog has the same values)", () => {

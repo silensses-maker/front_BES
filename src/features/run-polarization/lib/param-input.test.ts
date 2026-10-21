@@ -2,18 +2,17 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { PolarizationCatalog, PolarizationNumberParam } from "@/shared/api/backend";
-import { readChartTheme } from "@/shared/lib/chart-theme";
 import {
   alienationLabel,
   formatMeasureValue,
   formatParamValue,
+  formatShapeValue,
   isInRange,
   paramSymbol,
   parseParamInput,
   rangeText,
 } from "./param-input";
-import { polarizationOption } from "./polarization-chart-option";
-import { polarizationErrorOf } from "./polarization-error";
+import { polarizationErrorKey, polarizationErrorOf } from "./polarization-error";
 
 /** The catalog the real worker answered (pol_measures @ 0e05564), as the backend serves it. */
 const catalog: PolarizationCatalog = JSON.parse(
@@ -95,6 +94,13 @@ describe("formatting", () => {
     expect(formatMeasureValue(null, "en")).toBe("—");
     expect(formatMeasureValue(Number.NaN, "en")).toBe("—");
   });
+
+  it("formats normalized (shape) values with 2 decimals in the UI language", () => {
+    expect(formatShapeValue(0.666, "en")).toBe("0.67");
+    expect(formatShapeValue(0.5, "es")).toBe("0,50");
+    expect(formatShapeValue(null, "en")).toBe("—");
+    expect(formatShapeValue(Number.POSITIVE_INFINITY, "en")).toBe("—");
+  });
 });
 
 describe("polarizationErrorOf", () => {
@@ -130,47 +136,16 @@ describe("polarizationErrorOf", () => {
     expect(polarizationErrorOf({ response: { status: "x" } }).status).toBeNull();
     expect(polarizationErrorOf(null).kind).toBe("error");
   });
-});
 
-describe("polarizationOption", () => {
-  const theme = readChartTheme();
-  const base = {
-    points: [
-      [0, 0.2],
-      [1, null],
-      [2, 0.6],
-    ] as Array<[number, number | null]>,
-    round: 2,
-    seriesName: "BiPol",
-    theme,
-    formatValue: (v: number) => v.toFixed(2),
-    formatTooltip: (round: number, v: number | null) => `r${round}:${v}`,
-  };
-
-  it("draws the series with gaps, the playhead and labelled thresholds", () => {
-    const option = polarizationOption({
-      ...base,
-      thresholds: [
-        { value: 0.4525, label: "medium" },
-        { value: 0.6267, label: "high" },
-      ],
+  it("picks the message the view shows for each kind", () => {
+    const info = (kind: "disabled" | "unavailable" | "error") => ({
+      kind,
+      status: null,
+      message: null,
     });
-    const series = option.series[0];
-    expect(series?.connectNulls).toBe(false);
-    expect(series?.lineStyle.color).toBe(theme.polarization);
-    expect(series?.markLine.data).toHaveLength(3);
-    expect(series?.markLine.data[0]).toEqual({ xAxis: 2 });
-    expect(series?.markLine.data[2]).toMatchObject({ yAxis: 0.6267, label: { formatter: "high" } });
-    expect(option.grid.right).toBe(64);
-    expect(option.yAxis.axisLabel.formatter?.(0.5)).toBe("0.50");
-  });
-
-  it("formats the axis tooltip from the hovered point", () => {
-    const option = polarizationOption({ ...base, thresholds: [] });
-    const formatter = option.tooltip.formatter as (params: unknown) => string;
-    expect(formatter([{ value: [1, null] }])).toBe("r1:null");
-    expect(formatter({ value: [2, 0.6] })).toBe("r2:0.6");
-    expect(formatter([])).toBe("r2:null");
-    expect(option.grid.right).toBe(18);
+    expect(polarizationErrorKey(info("disabled"))).toBe("polarization.errorDisabled");
+    expect(polarizationErrorKey(info("unavailable"))).toBe("polarization.errorUnavailable");
+    expect(polarizationErrorKey(info("error"))).toBe("polarization.errorGeneric");
+    expect(polarizationErrorKey(null)).toBe("polarization.errorGeneric");
   });
 });

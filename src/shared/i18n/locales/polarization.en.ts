@@ -54,6 +54,30 @@ const polarizationEn = {
     "The server could not compute the polarization measures right now. Try again in a few seconds.",
   errorGeneric: "The polarization measures could not be loaded.",
   retry: "Try again",
+  // ── Comparison (up to MAX_SERIES series on the chart) ──
+  seriesGroupAria: "Compared series",
+  seriesAria: "Series {{label}}",
+  seriesTip: "Show the settings of this series (click again to hide them)",
+  seriesProblem: "needs attention",
+  configAria: "Settings of the series {{label}}",
+  addSeriesAria: "Add a series to compare (a copy of the selected one, up to {{max}})",
+  addSeriesTip:
+    "Compare: add a copy of the selected series, then change what you want to compare (up to {{max}} series)",
+  addSeriesLimit: "Up to {{max}} series",
+  removeSeriesAria: "Remove the series {{label}}",
+  removeSeriesTip: "Remove this series",
+  beliefShortPrivate: "private",
+  beliefShortPublic: "public",
+  axisAria: "Y axis",
+  axisValues: "Values",
+  axisNormalized: "Normalized (shape)",
+  axisTip:
+    "Values: every series on the same axis. Normalized (shape): each series rescaled to [0, 1] by its own minimum and maximum over the rounds computed so far, to compare shapes; a constant series is drawn flat at 0.5.",
+  tooltipValue: "value {{value}}",
+  valueOf: "{{label}}: {{value}}",
+  valuesAria: "Values at round {{round}}",
+  aboutCompare:
+    "Each series is computed per round on the server with PROMUEVA's pol_measures package. Level thresholds are only drawn with a single series. Details in the wiki.",
   wiki: {
     title: "Polarization measures",
     intro:
@@ -102,6 +126,13 @@ const polarizationEn = {
     colLowMedium: "low → medium",
     colMediumHigh: "medium → high",
     levels2: "Thresholds only apply to the parameters listed; any other value shows no level.",
+    compareTitle: "Comparing measures",
+    compare1:
+      "The chart can overlay up to four series, each with its own measure, parameters, k and belief type: + adds a copy of the selected series, so you can change one setting and compare, and × removes one. Level thresholds are only drawn with a single series; with several, hovering the chart lists each series' value and level.",
+    compare2:
+      "Normalized (shape) rescales each series to [0, 1] by its own minimum and maximum over the rounds computed so far,",
+    compare3:
+      "so measures on different scales can be compared by shape; the tooltip keeps the real value. A constant series is drawn flat at 0.5.",
     sourceTitle: "Source",
     source1:
       "The values are computed on the server by PROMUEVA's pol_measures package, by {{author}}; BiPol implemented by {{bipol}}; MEC paper {{paper}}. Used with the authors' permission; the server's self-test checks every measure against the package called directly. Version used:",

@@ -17,6 +17,12 @@ export interface ChartTheme {
   private: string;
   participation: string;
   polarization: string;
+  /**
+   * Categorical palette of comparison charts (one color per compared series, in this order):
+   * chart-4 (the single-series color) then chart-6, chart-7 and chart-8. It leaves out chart-1 and
+   * chart-2, which mean public and private beliefs.
+   */
+  series: readonly string[];
   /** Text, axis and grid colors. */
   text: string;
   axisLine: string;
@@ -35,6 +41,9 @@ const FALLBACK: Readonly<Record<string, Rgb>> = {
   "--chart-1": { r: 79, g: 107, b: 216 },
   "--chart-2": { r: 124, g: 179, b: 66 },
   "--chart-4": { r: 142, g: 68, b: 214 },
+  "--chart-6": { r: 234, g: 106, b: 9 },
+  "--chart-7": { r: 151, g: 7, b: 103 },
+  "--chart-8": { r: 120, g: 101, b: 0 },
   "--warn": { r: 201, g: 138, b: 46 },
   "--muted-foreground": { r: 88, g: 98, b: 130 },
   "--foreground": { r: 30, g: 39, b: 72 },
@@ -103,12 +112,27 @@ export function readChartTheme(): ChartTheme {
   const chart1 = readToken(style, "--chart-1");
   const chart2 = readToken(style, "--chart-2");
   const chart4 = readToken(style, "--chart-4");
+  const chart6 = readToken(style, "--chart-6");
+  const chart7 = readToken(style, "--chart-7");
+  const chart8 = readToken(style, "--chart-8");
   const warn = readToken(style, "--warn");
   const muted = readToken(style, "--muted-foreground");
   const foreground = readToken(style, "--foreground");
   const popover = readToken(style, "--popover");
   const border = readToken(style, "--border");
-  const key = [chart1, chart2, chart4, warn, muted, foreground, popover, border]
+  const key = [
+    chart1,
+    chart2,
+    chart4,
+    chart6,
+    chart7,
+    chart8,
+    warn,
+    muted,
+    foreground,
+    popover,
+    border,
+  ]
     .map(({ r, g, b }) => `${r},${g},${b}`)
     .join(";");
   return {
@@ -116,6 +140,7 @@ export function readChartTheme(): ChartTheme {
     private: rgba(chart2),
     participation: rgba(warn),
     polarization: rgba(chart4),
+    series: [rgba(chart4), rgba(chart6), rgba(chart7), rgba(chart8)],
     text: rgba(muted, 0.9),
     axisLine: rgba(muted, 0.35),
     grid: rgba(muted, 0.12),

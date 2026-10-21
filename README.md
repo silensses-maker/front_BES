@@ -202,6 +202,11 @@ histograms.
   debounced while parameters are edited, results are cached per run / network, measure, parameters,
   k and belief type, and a live run only sends its new rounds, at most every 2 s (5000 rounds per
   request while catching up).
+- Up to four series can be overlaid to compare them, each with its own measure, parameters, k and
+  belief type (`run-polarization/model/series-list.ts`). Their requests go one at a time,
+  round-robin (`run-polarization/model/series-scheduler.ts`), with the same chunking, debounce and
+  cache. With several series the chart has a legend and no thresholds, and its y axis can show each
+  series normalized to its own min–max ("Normalized (shape)").
 - If the server answers 404 (polarization disabled, or an older backend) or 503 (worker down,
   timed out or busy), the chart says so; there is no client fallback.
 

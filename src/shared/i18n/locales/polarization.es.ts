@@ -54,6 +54,30 @@ const polarizationEs = {
     "El servidor no pudo calcular las medidas de polarización en este momento. Inténtalo de nuevo en unos segundos.",
   errorGeneric: "No se pudieron cargar las medidas de polarización.",
   retry: "Reintentar",
+  // ── Comparación (hasta MAX_SERIES series en la gráfica) ──
+  seriesGroupAria: "Series comparadas",
+  seriesAria: "Serie {{label}}",
+  seriesTip: "Mostrar la configuración de esta serie (otro clic la oculta)",
+  seriesProblem: "requiere atención",
+  configAria: "Configuración de la serie {{label}}",
+  addSeriesAria: "Añadir una serie para comparar (una copia de la seleccionada, hasta {{max}})",
+  addSeriesTip:
+    "Comparar: añade una copia de la serie seleccionada y cambia lo que quieras comparar (hasta {{max}} series)",
+  addSeriesLimit: "Hasta {{max}} series",
+  removeSeriesAria: "Quitar la serie {{label}}",
+  removeSeriesTip: "Quitar esta serie",
+  beliefShortPrivate: "privada",
+  beliefShortPublic: "pública",
+  axisAria: "Eje Y",
+  axisValues: "Valores",
+  axisNormalized: "Normalizado (forma)",
+  axisTip:
+    "Valores: todas las series en el mismo eje. Normalizado (forma): cada serie reescalada a [0, 1] según su propio mínimo y máximo en las rondas calculadas hasta ahora, para comparar formas; una serie constante se dibuja plana en 0,5.",
+  tooltipValue: "valor {{value}}",
+  valueOf: "{{label}}: {{value}}",
+  valuesAria: "Valores en la ronda {{round}}",
+  aboutCompare:
+    "Cada serie se calcula por ronda en el servidor con el paquete pol_measures de PROMUEVA. Los umbrales de nivel solo se dibujan con una sola serie. Detalles en la wiki.",
   wiki: {
     title: "Medidas de polarización",
     intro:
@@ -104,6 +128,13 @@ const polarizationEs = {
     colMediumHigh: "medio → alto",
     levels2:
       "Los umbrales solo aplican a los parámetros indicados; con cualquier otro valor no se muestra nivel.",
+    compareTitle: "Comparar medidas",
+    compare1:
+      "La gráfica puede superponer hasta cuatro series, cada una con su propia medida, parámetros, k y tipo de creencia: + añade una copia de la serie seleccionada, para cambiar un ajuste y comparar, y × quita una. Los umbrales de nivel solo se dibujan con una sola serie; con varias, al pasar el cursor por la gráfica se listan el valor y el nivel de cada serie.",
+    compare2:
+      "Normalizado (forma) reescala cada serie a [0, 1] según su propio mínimo y máximo en las rondas calculadas hasta ahora,",
+    compare3:
+      "para comparar por su forma medidas en escalas distintas; al pasar el cursor se conserva el valor real. Una serie constante se dibuja plana en 0,5.",
     sourceTitle: "Fuente",
     source1:
       "Los valores los calcula en el servidor el paquete pol_measures de PROMUEVA, de {{author}}; BiPol implementada por {{bipol}}; artículo de MEC {{paper}}. Usado con permiso de sus autores; la autoprueba del servidor verifica cada medida contra el paquete llamado directamente. Versión usada:",
