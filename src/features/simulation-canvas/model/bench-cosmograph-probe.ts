@@ -14,7 +14,9 @@ import { type BenchProbeDetail, benchProbe } from "@/shared/lib/bench-probe";
  * - `clustersUpdated` — new cluster assignments were applied;
  * - `onSimulationStart` / `onSimulationTick` / `onSimulationEnd` — the force simulation, ticked
  *   once per rendered frame while it runs;
- * - `pointColorUpdated` — colours recomputed and uploaded (the per-round repaint path).
+ * - `pointColorUpdated` — Cosmograph recomputed and uploaded the colours itself: per round only on
+ *   the fallback repaint path (#142); the direct path pushes the buffers to cosmos.gl without it
+ *   and reports `canvas-repaint` from the canvas instead.
  */
 
 type CosmographInstance = NonNullable<CosmographRef>;
@@ -102,8 +104,9 @@ export function attachCosmographProbe(
   ];
   if (api) for (const [type, handler] of handlers) api.addEventListener(type, handler);
 
-  // Every prop change of <Cosmograph> becomes one setConfig call; during playback that is the
-  // per-round update (point table re-query, colour/size recomputation, buffer upload).
+  // Every prop change of <Cosmograph> becomes one setConfig call. On the fallback repaint path
+  // (#142) that is the per-round update (point table re-query, colour/size recomputation, buffer
+  // upload); on the direct path the props stay static during playback.
   const original = instance.setConfig;
   let inFlight = 0;
   instance.setConfig = function timedSetConfig(this: CosmographInstance, config) {

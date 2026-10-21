@@ -177,6 +177,65 @@ describe("schema 1 files", () => {
   });
 });
 
+describe("repaint breakdown of the direct path (#142)", () => {
+  const stat = (median: number) => ({ median, p95: median, mean: median });
+  const none = { median: null, p95: null, mean: null };
+  const repaintPhase = (path: "direct" | "fallback", skipped: number) =>
+    fakePhase("repaint", 55, {
+      variant: "x16",
+      repaint: {
+        speed: 16,
+        targetRoundsPerSecond: 160,
+        roundsRendered: 550,
+        repaintsPerSecond: 55,
+        breakdown: {
+          rounds: 550,
+          mergeMs: stat(1),
+          commitMs: stat(2),
+          cosmographUpdates: 0,
+          cosmographUpdateMs: none,
+          cosmographSyncMs: none,
+          colorUpdates: 0,
+          repaintPath: path,
+          directRepaints: 540,
+          bufferBuildMs: stat(1.5),
+          bufferPushMs: stat(2.25),
+          skippedRounds: skipped,
+          frameMs: 18,
+          longTaskMsPerSecond: 0,
+        },
+      },
+    });
+
+  it("lists the direct rows (no Cosmograph update) with build, push and skipped rounds", () => {
+    const doc = fakeDocument([
+      fakeScenario(100_000, 3, 1, [fakePhase("idle", 60), repaintPhase("direct", 4)]),
+      fakeScenario(100_000, 3, 2, [fakePhase("idle", 60), repaintPhase("direct", 6)]),
+    ]);
+    const report = aggregateResults([{ file: "direct.json", doc }]);
+    const repaint = report.phases.find((p) => p.phase === "repaint");
+    expect(repaint).toMatchObject({
+      rbPath: "direct",
+      rbBuildMs: 1.5,
+      rbPushMs: 2.25,
+      rbSkipped: 5,
+    });
+    const md = renderMarkdown(report, "now");
+    expect(md).toMatch(
+      /\| x16 \| [\d.]+ \| [\d.]+ \| [\d.]+ \| 1\.00 \| 2\.0 \| direct \| 1\.50 \| 2\.25 \| 5 \| – \|/,
+    );
+  });
+
+  it("marks repetitions that took different paths as mixed", () => {
+    const doc = fakeDocument([
+      fakeScenario(100_000, 3, 1, [repaintPhase("direct", 0)]),
+      fakeScenario(100_000, 3, 2, [repaintPhase("fallback", 0)]),
+    ]);
+    const report = aggregateResults([{ file: "mixed.json", doc }]);
+    expect(report.phases.find((p) => p.phase === "repaint")?.rbPath).toBe("mixed");
+  });
+});
+
 describe("links, variants and repaint breakdown", () => {
   const stat = (median: number) => ({ median, p95: median * 1.5, mean: median });
   const breakdown = (update: number) => ({
@@ -260,7 +319,7 @@ describe("links, variants and repaint breakdown", () => {
     );
     expect(md).toContain("### Repaint breakdown (per round, medians)");
     expect(md).toMatch(
-      /\| 100,000 \| 3 \| 599,988 \| x1 \| 9\.0 \| 100\.0 \| [\d.]+ \| 1\.50 \| 4\.0 \| 100\.0 \| 150\.0 \| 3\.0 \| 800 \|/,
+      /\| 100,000 \| 3 \| 599,988 \| x1 \| 9\.0 \| 100\.0 \| [\d.]+ \| 1\.50 \| 4\.0 \| – \| – \| – \| – \| 100\.0 \| 150\.0 \| 3\.0 \| 800 \|/,
     );
   });
 

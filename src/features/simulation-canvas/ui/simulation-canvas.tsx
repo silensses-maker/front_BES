@@ -6,14 +6,14 @@ import type {
 } from "@cosmograph/react";
 import { Cosmograph, prepareCosmographData } from "@cosmograph/react";
 import { Maximize, Minus, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { SimulationStatus, TopologyLoadStatus } from "@/entities/simulation";
 import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
-import { benchProbe } from "@/shared/lib/bench-probe";
+import { type BenchProbeDetail, benchProbe } from "@/shared/lib/bench-probe";
 import { formatNumber } from "@/shared/lib/format-number";
 import { logger } from "@/shared/lib/logger";
 import {
@@ -24,13 +24,22 @@ import {
 import { Button } from "@/shared/ui/button";
 import { Progress } from "@/shared/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { DirectRepaintController, type RepaintMode } from "../lib/direct-repaint";
+import {
+  buildPointTables,
+  type ColorBy,
+  type PointTables,
+  SILENT_POINT_SIZE,
+  SPEAKING_POINT_SIZE,
+  STRATEGY_COLORS,
+  strategyColor,
+} from "../lib/point-colors";
 import { type TopologyLoadView, topologyLoadView } from "../lib/topology-load-view";
 import { topologyToData } from "../lib/topology-to-data";
 import { useBenchCanvasProbe } from "../model/use-bench-canvas-probe";
 import { CanvasLegend } from "./canvas-legend";
 import type { ClusterMode } from "./cluster-toggle";
 import { ClusterToggle } from "./cluster-toggle";
-import type { ColorBy } from "./color-by-select";
 import { ColorBySelect } from "./color-by-select";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,9 +63,6 @@ const DECLUSTER_ANIMATE_MS = 2_000;
  * begin to advance, so the two motions never overlap.
  */
 export const DECLUSTER_PLAY_DELAY_MS = DECLUSTER_ANIMATE_MS;
-
-/** Categorical palette for "Colorear por estrategia" (mockup PAL). */
-const STRATEGY_COLORS = ["#4f6bd8", "#7cb342", "#f59e0b", "#ec4899", "#8b5cf6"] as const;
 
 // ─── Base config (layouting defaults) ────────────────────────────────────────
 
@@ -84,6 +90,9 @@ const BASE_CONFIG: CosmographConfig = {
   simulationFriction: 0.85,
   simulationDecay: 1500,
 };
+
+/** Legend swatch of a strategy id outside the categorical palette. */
+const LEGEND_FALLBACK_COLOR = "#888888";
 
 const FREEZE_FLAGS: CosmographConfig = {
   enableSimulation: false,
@@ -226,6 +235,8 @@ export function SimulationCanvas({
   // Maps Cosmograph's sequential internal index → agent.index from topology.
   // Rebuilt each time topology is processed (same useEffect below).
   const agentIndexMapRef = useRef<number[]>([]);
+  // Per-point data of the direct repaint (#142), in the same point order; rebuilt with the map.
+  const pointTablesRef = useRef<PointTables | null>(null);
 
   // ─── "Colorear por" (replaces the Initial/Final toggle — round 0 = initial) ─
   const [colorBy, setColorBy] = useState<ColorBy>("pub");
@@ -261,10 +272,11 @@ export function SimulationCanvas({
     );
     return present.map((strategy) => ({
       label: labelForStrategy(strategy),
-      color: STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? "#888888",
+      color: STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? LEGEND_FALLBACK_COLOR,
     }));
   }, [topology, labelForStrategy]);
 
+  // Fallback repaint path (#142: only when the direct cosmos.gl push is unavailable).
   // Reads by the `agentIndex` column value (Cosmograph passes the column value
   // reliably; the optional 2nd `index` arg is not dependable). Without a frame
   // (layout warm-up, round 0 not yet rendered) beliefs fall back to initial.
@@ -272,10 +284,7 @@ export function SimulationCanvas({
     (value: unknown): string => {
       const agentIdx = Number(value);
       if (!Number.isFinite(agentIdx)) return OPINION_PALETTE[1];
-      if (colorBy === "estr") {
-        const strategy = strategyByIndex.get(agentIdx) ?? 0;
-        return STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? OPINION_PALETTE[1];
-      }
+      if (colorBy === "estr") return strategyColor(strategyByIndex.get(agentIdx) ?? 0);
       const fallback = initialBeliefByIndex.get(agentIdx) ?? 0.5;
       const pub = frame?.publicBelief[agentIdx] ?? fallback;
       const priv = frame?.privateBelief[agentIdx] ?? fallback;
@@ -289,8 +298,8 @@ export function SimulationCanvas({
   const speakingSizeByFn = useCallback(
     (value: unknown): number => {
       const agentIdx = Number(value);
-      if (frame === null || !Number.isFinite(agentIdx)) return 8;
-      return frame.speaking[agentIdx] ? 14 : 8;
+      if (frame === null || !Number.isFinite(agentIdx)) return SILENT_POINT_SIZE;
+      return frame.speaking[agentIdx] ? SPEAKING_POINT_SIZE : SILENT_POINT_SIZE;
     },
     [frame],
   );
@@ -318,6 +327,86 @@ export function SimulationCanvas({
   // Stable style object — prevents React.memo from re-rendering <Cosmograph>
   // on every SimulationCanvas render due to a new object literal reference.
   const canvasStyle = useMemo(() => ({ width: "100%", height: "100%" }), []);
+
+  // ─── Per-round repaint (#142) ─────────────────────────────────────────────
+  // Colours and sizes go to cosmos.gl as buffers (DirectRepaintController); Cosmograph keeps
+  // static colour props, so it never re-queries DuckDB or re-runs per-point callbacks per round.
+  // If the direct push is unavailable the controller switches to "fallback" and the *ByFn props
+  // below take over, as before.
+  const benchNetworkRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    benchNetworkRef.current = topology?.networkId ?? null;
+  }, [topology]);
+  const repaintRef = useRef<DirectRepaintController | null>(null);
+  const [repaintMode, setRepaintMode] = useState<RepaintMode>("pending");
+  if (repaintRef.current === null) {
+    const benchDetail = (extra: BenchProbeDetail): BenchProbeDetail => ({
+      networkId: benchNetworkRef.current ?? undefined,
+      ...extra,
+    });
+    repaintRef.current = new DirectRepaintController({
+      onModeChange: setRepaintMode,
+      // Bench builds only (#126/#142): per-round timings of the direct path.
+      onRepaint: __BENCHMARK__
+        ? ({ round, buildMs, pushMs }) =>
+            benchProbe(
+              "canvas-repaint",
+              benchDetail({ round: round ?? undefined, repaintPath: "direct", buildMs, pushMs }),
+            )
+        : undefined,
+      onSkip: __BENCHMARK__
+        ? (round) =>
+            benchProbe("canvas-repaint-skipped", benchDetail({ round: round ?? undefined }))
+        : undefined,
+    });
+  }
+  const repaint = repaintRef.current;
+  // A fallback decided earlier in the session applies from the first render.
+  const effectiveRepaintMode = repaint.mode === "fallback" ? "fallback" : repaintMode;
+
+  // The end of auto-advance (pause, last round, seek) always shows the latest round exactly.
+  useEffect(() => {
+    if (!playbackActive) repaint.flush();
+  }, [repaint, playbackActive]);
+
+  useEffect(() => () => repaint.dispose(), [repaint]);
+
+  // Cosmograph uploaded the data (also after a rebuild with new data): hand its instance to the
+  // controller, which paints the latest round. The ref may still be unset on the very first
+  // rebuild — then retry on the next frames.
+  const handleGraphRebuilt = useCallback(() => {
+    let tries = 0;
+    const attach = () => {
+      if (repaint.attach(cosmographRef.current) || ++tries > 60) return;
+      requestAnimationFrame(attach);
+    };
+    attach();
+  }, [repaint]);
+
+  // After every config change Cosmograph applied: re-push if it replaced the buffers.
+  const handleConfigUpdated = useCallback(() => repaint.configUpdated(), [repaint]);
+
+  // Cosmograph is unmounted (new network, reset): stop pushing to its destroyed instance.
+  const cosmographMounted =
+    (phase === "layouting" || phase === "frozen") && prepResult?.points !== undefined;
+  useEffect(() => {
+    if (!cosmographMounted) return;
+    return () => repaint.detach();
+  }, [repaint, cosmographMounted]);
+
+  // Stable click handler: a new function per render would re-render <Cosmograph> (React.memo)
+  // and make it re-apply its whole config on every round.
+  const handlePointClick = useCallback(
+    (index: number | undefined) => {
+      if (index !== undefined) {
+        const agentIdx = agentIndexMapRef.current[index];
+        if (agentIdx !== undefined) setSelectedAgentIndex(agentIdx);
+      } else {
+        setSelectedAgentIndex(null);
+      }
+    },
+    [setSelectedAgentIndex],
+  );
 
   // ─── Topology → prepareCosmographData ─────────────────────────────────────
 
@@ -353,6 +442,7 @@ export function SimulationCanvas({
         const { rawPoints, rawLinks, dataPrepConfig } = topologyToData(topology);
         if (__BENCHMARK__) benchProbe("canvas-to-data-end", benchDetail);
         agentIndexMapRef.current = topology.agents.map((a) => a.index);
+        pointTablesRef.current = buildPointTables(topology.agents);
         const result = await prepareCosmographData(dataPrepConfig, rawPoints, rawLinks);
         if (cancelled) return;
         if (!result) {
@@ -585,6 +675,28 @@ export function SimulationCanvas({
     });
   }
 
+  // ─── Per-round repaint: feed the controller (#142) ─────────────────────────
+  // Latest inputs, compared by identity: a new frame, colour mode or network repaints. The point
+  // tables are rebuilt with the data that `prepResult` carries to Cosmograph. Declared after the
+  // bench probe so that its `canvas-frame-commit` (React commit) is emitted before the push.
+  const benchFallbackFrameRef = useRef<object | null>(null);
+  useLayoutEffect(() => {
+    const tables = prepResult === null ? null : pointTablesRef.current;
+    repaint.update({ tables, colorBy, frame, round: frame?.round ?? null }, playbackActive);
+    // Bench builds only: which path repainted each new frame (the fallback's Cosmograph update
+    // is timed by the setConfig probe).
+    if (__BENCHMARK__ && frame !== null && repaint.mode === "fallback") {
+      if (benchFallbackFrameRef.current !== frame) {
+        benchFallbackFrameRef.current = frame;
+        benchProbe("canvas-repaint", {
+          networkId: frame.networkId,
+          round: frame.round,
+          repaintPath: "fallback",
+        });
+      }
+    }
+  }, [repaint, colorBy, frame, playbackActive, prepResult]);
+
   // ─── Render helpers ────────────────────────────────────────────────────────
 
   if (status === "error") {
@@ -728,35 +840,32 @@ export function SimulationCanvas({
                 ? labelForEffect
                 : liveBeliefLabel,
         })}
-        // "Colorear por" (#99 repaint mechanism): per-agent color from the
-        // VIEWED frame by index — the store's latestFrame changes on every
-        // seek/live round and this closure re-reads it. Without a frame the
-        // fns fall back to initial beliefs; strategy coloring needs no frame.
-        // Setting the strategies to undefined activates the *ByFn overrides.
-        {...((frame !== null || colorBy === "estr") && {
-          pointColorBy: "agentIndex",
-          pointColorStrategy: undefined,
-          pointColorByFn: colorByFn,
-        })}
+        // "Colorear por": the direct repaint (#142) pushes the colours and sizes of the VIEWED
+        // frame to cosmos.gl itself, so these props stay static (BASE_CONFIG: initial belief,
+        // uniform size) and Cosmograph never recomputes them per round. Only in the fallback
+        // (#99 mechanism) the per-agent fns go to Cosmograph: setting the strategies to
+        // undefined activates the *ByFn overrides.
+        {...(effectiveRepaintMode === "fallback" &&
+          (frame !== null || colorBy === "estr") && {
+            pointColorBy: "agentIndex",
+            pointColorStrategy: undefined,
+            pointColorByFn: colorByFn,
+          })}
         // Speaking agents render larger — meaningful once a round is on screen
-        {...(frame !== null && {
-          pointSizeBy: "agentIndex",
-          pointSizeStrategy: undefined,
-          pointSizeByFn: speakingSizeByFn,
-        })}
+        {...(effectiveRepaintMode === "fallback" &&
+          frame !== null && {
+            pointSizeBy: "agentIndex",
+            pointSizeStrategy: undefined,
+            pointSizeByFn: speakingSizeByFn,
+          })}
         // Hide links by making them transparent — keeps renderLinks=true so
         // Cosmograph's node selection greyout still works normally.
         {...(linksHidden && { linkDefaultColor: "rgba(204,204,204,0)" })}
         points={prepResult.points}
         links={prepResult.links}
-        onClick={(index) => {
-          if (index !== undefined) {
-            const agentIdx = agentIndexMapRef.current[index];
-            if (agentIdx !== undefined) setSelectedAgentIndex(agentIdx);
-          } else {
-            setSelectedAgentIndex(null);
-          }
-        }}
+        onClick={handlePointClick}
+        onGraphRebuilt={handleGraphRebuilt}
+        onConfigUpdated={handleConfigUpdated}
       />
 
       {/* "Computing layout…" overlay — shown only during force-layout phase */}

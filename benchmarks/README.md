@@ -163,23 +163,48 @@ Per phase, from `requestAnimationFrame` deltas:
 
 ### Repaint breakdown (where the per-round cost goes)
 
-Per round the playback pushes one frame to the store (`updateFrame`); the canvas re-renders and
-hands Cosmograph new colour/size functions; Cosmograph's `setConfig` then re-queries the point
-table from DuckDB-WASM (a worker), recomputes every colour and size in JavaScript and uploads them
-(`pointColorUpdated`). For every round inside the window the suite records:
+Per round the playback pushes one frame to the store (`updateFrame`) and the canvas re-renders.
+Since #142 the canvas repaints on one of two paths (recorded per window as `repaintPath`):
+
+- **direct** (the normal path): the canvas fills one `Float32Array` of RGBA colours (from
+  256-step lookup tables of the same palettes) and one of point sizes, in Cosmograph's point
+  order, and pushes them straight to cosmos.gl (`setPointColors` / `setPointSizes`, then
+  `create()`, which uploads them without touching the simulation). Cosmograph's props stay static
+  during playback, so it does not re-query DuckDB nor call any per-point function;
+- **fallback** (only if the direct push is unavailable — Cosmograph internals changed or a push
+  was rejected; logged once, kept for the session): the pre-#142 path — the canvas hands
+  Cosmograph new colour/size functions and Cosmograph's `setConfig` re-queries the point table
+  from DuckDB-WASM (a worker), recomputes every colour and size in JavaScript and uploads them
+  (`pointColorUpdated`).
+
+For every round inside the window the suite records:
 
 - **merge** — the replay merge of the round (`mergeRoundFromChunk`, wire parse);
-- **store → commit** — `updateFrame` until the canvas committed the frame (React render);
-- **Cosmograph update** — each `setConfig` call from the call until it settled (query, colours,
-  sizes, upload); its synchronous part separately;
-- colour updates, long-task time per second, mean frame time.
+- **store → commit** — `updateFrame` until the canvas committed the frame (React render; the
+  direct push runs right after this mark);
+- **direct path**: **build** (colour + size buffers) and **push** (to cosmos.gl, GPU upload
+  included) per repaint, the number of direct repaints, and the rounds the **adaptive repaint
+  cap** skipped on the canvas (see below);
+- **fallback path**: **Cosmograph update** — each `setConfig` call from the call until it settled
+  (query, colours, sizes, upload); its synchronous part separately; colour updates;
+- long-task time per second, mean frame time.
+
+**Adaptive repaint cap** (a safety net, `src/features/simulation-canvas/lib/repaint-cap.ts`): the
+typical cost of a direct repaint is the median of the last 8; once 5 repaints were measured and it
+exceeds 8 ms (half a 60 Hz frame), and only while rounds auto-advance, the canvas paints a new
+round only every `typical cost / 0.5` ms (repaints take at most half the main thread) and skips
+the rounds in between — on the canvas only: the store, timeline and charts still advance every
+round, and the latest round is painted when the interval ends. Seeks, manual steps, colour-mode
+changes and the end of playback always paint at once; the cap releases below 6 ms. When repaints
+are cheap it never engages (`skippedRounds` = 0).
 
 Read it with the `idle` row of the same network: idle frame time is the drawing cost with
-nothing changing; what the repaint frame adds on top is the per-round update. If the Cosmograph
-update per round is of the order of the repaint frame and long tasks fill the window, the cost is
-CPU/JavaScript (and the DuckDB round trip); if the repaint frame barely exceeds the idle frame,
-the cost is the GPU drawing. The report also fits frame time on agents and links together: a
-large per-agent term in `repaint` (and not in `idle`) points at the per-point JS update.
+nothing changing; what the repaint frame adds on top is the per-round update. If the per-round
+update is of the order of the repaint frame and long tasks fill the window, the cost is
+CPU/JavaScript (and, on the fallback path, the DuckDB round trip); if the repaint frame barely
+exceeds the idle frame, the cost is the GPU drawing. The report also fits frame time on agents and
+links together: a large per-agent term in `repaint` (and not in `idle`) points at the per-point JS
+update.
 
 ### Debug HUD on real runs (run view, bench builds only)
 

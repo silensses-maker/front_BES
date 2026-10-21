@@ -181,6 +181,52 @@ describe("version 2 fields", () => {
       rb_cosmograph_update_ms_p95: 120,
       rb_long_task_ms_per_s: 812.3,
       frame_ms_mean: 100,
+      // a breakdown recorded before #142 has no repaint path
+      rb_repaint_path: null,
+      rb_direct_repaints: null,
+      rb_buffer_build_ms_median: null,
+      rb_skipped_rounds: null,
+    });
+  });
+
+  it("flattens the direct repaint timings (#142)", () => {
+    const stat = (median: number) => ({ median, p95: median, mean: median });
+    const doc = fakeDocument([
+      fakeScenario(100_000, 3, 1, [
+        fakePhase("repaint", 60, {
+          variant: "x16",
+          repaint: {
+            speed: 16,
+            targetRoundsPerSecond: 160,
+            roundsRendered: 590,
+            repaintsPerSecond: 59,
+            breakdown: {
+              rounds: 590,
+              mergeMs: stat(1),
+              commitMs: stat(2),
+              cosmographUpdates: 0,
+              cosmographUpdateMs: { median: null, p95: null, mean: null },
+              cosmographSyncMs: { median: null, p95: null, mean: null },
+              colorUpdates: 0,
+              repaintPath: "direct",
+              directRepaints: 580,
+              bufferBuildMs: stat(1.23456),
+              bufferPushMs: stat(2.5),
+              skippedRounds: 10,
+              frameMs: 16.7,
+              longTaskMsPerSecond: 0,
+            },
+          },
+        }),
+      ]),
+    ]);
+    expect(flattenResult(doc)[0]).toMatchObject({
+      rb_repaint_path: "direct",
+      rb_direct_repaints: 580,
+      rb_buffer_build_ms_median: 1.235,
+      rb_buffer_push_ms_median: 2.5,
+      rb_skipped_rounds: 10,
+      rb_cosmograph_update_ms_median: null,
     });
   });
 
