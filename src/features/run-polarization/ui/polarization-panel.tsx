@@ -472,17 +472,17 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
           {view.classification ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span
-                  tabIndex={0}
+                <button
+                  type="button"
                   className={cn(
-                    "rounded-full px-2 py-px font-sans text-[11px] font-medium",
+                    "cursor-default rounded-full px-2 py-px font-sans text-[11px] font-medium",
                     view.level === null
                       ? "bg-muted text-muted-foreground"
                       : "bg-primary/12 text-primary",
                   )}
                 >
                   {view.level === null ? "—" : levelText(view.level)}
-                </span>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs">
                 {t("polarization.levelTip")}

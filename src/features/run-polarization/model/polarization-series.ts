@@ -44,7 +44,7 @@ const NO_VALUE = 2;
 /** Stable key of a spec (parameter order does not matter). */
 export function seriesKey({ measureId, params, k, belief }: SeriesSpec): string {
   const entries = Object.keys(params)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((name) => `${name}=${JSON.stringify(params[name] ?? null)}`);
   return [measureId, ...entries, `k=${k}`, belief].join("|");
 }

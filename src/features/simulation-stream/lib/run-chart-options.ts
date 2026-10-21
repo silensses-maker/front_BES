@@ -123,6 +123,9 @@ export function distributionOption(histogram: number[], title: string, theme: Ch
   };
 }
 
+/** Default y range of the public / private charts: beliefs live in [0, 1]. */
+const UNIT_Y_RANGE: { min?: number; max?: number } = { min: 0, max: 1 };
+
 /** Public (solid) vs private (dashed) — the mean chart and the dispersion chart share it. */
 export function publicPrivateOption(
   publicData: Array<[number, number]>,
@@ -130,7 +133,7 @@ export function publicPrivateOption(
   labels: { public: string; private: string },
   round: number,
   theme: ChartTheme,
-  yRange: { min?: number; max?: number } = { min: 0, max: 1 },
+  yRange: { min?: number; max?: number } = UNIT_Y_RANGE,
 ) {
   return {
     backgroundColor: "transparent",
