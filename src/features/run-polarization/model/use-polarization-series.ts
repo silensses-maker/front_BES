@@ -71,6 +71,8 @@ export interface PolarizationSeriesListState {
   /** Changes whenever one of the series changes (re-render signal). */
   seriesVersion: number;
   currentRound: number;
+  /** Rounds whose histograms are recorded (what the series can be computed over so far). */
+  recorded: number;
   /** Clears the error of the series at `index` and requests again. */
   retry: (index: number) => void;
 }
@@ -161,5 +163,5 @@ export function usePolarizationSeriesList(
     [series],
   );
 
-  return { series, seriesVersion, currentRound, retry };
+  return { series, seriesVersion, currentRound, recorded: pool?.size ?? 0, retry };
 }

@@ -1,13 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  agentCsvRow,
-  buildCsv,
-  type CsvLabels,
-  csvFileName,
-  downloadCsv,
-  networkCsvRow,
-  roundCsvRow,
-} from "./csv";
+import { describe, expect, it } from "vitest";
+import { agentCsvRow, type CsvLabels, csvFileName, networkCsvRow, roundCsvRow } from "./csv";
 import type { AgentRow, NetworkRow, RoundRow } from "./table-datasets";
 
 const LABELS: CsvLabels = {
@@ -18,21 +10,6 @@ const LABELS: CsvLabels = {
   consensus: "Consenso",
   noConsensus: "Sin consenso",
 };
-
-describe("buildCsv", () => {
-  it("joins with ; prefixed by the UTF-8 BOM", () => {
-    const csv = buildCsv(["a", "b"], [["1", "2"]]);
-    expect(csv.charCodeAt(0)).toBe(0xfeff);
-    expect(csv.slice(1)).toBe("a;b\n1;2");
-  });
-
-  it("quotes fields containing separator, quote or newline", () => {
-    const csv = buildCsv(["x"], [['va;l"ue'], ["multi\nline"], ["plain"]]);
-    expect(csv).toContain('"va;l""ue"');
-    expect(csv).toContain('"multi\nline"');
-    expect(csv).toContain("plain");
-  });
-});
 
 describe("csvFileName", () => {
   it("builds the mockup pattern with optional network and round segments", () => {
@@ -111,30 +88,5 @@ describe("row serializers", () => {
       finalSpread: null,
     };
     expect(networkCsvRow(pending, LABELS)).toEqual(["3", "", "", ""]);
-  });
-});
-
-describe("downloadCsv", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  it("downloads via an object-URL anchor click and revokes the URL later", () => {
-    vi.useFakeTimers();
-    const createObjectURL = vi.fn(() => "blob:mock");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-
-    downloadCsv("silensess-run-rondas.csv", "a;b\n1;2");
-
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(click).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURL).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(3000);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock");
   });
 });

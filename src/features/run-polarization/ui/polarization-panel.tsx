@@ -1,8 +1,12 @@
 import ReactECharts from "echarts-for-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useSimulationStore } from "@/entities/simulation";
 import type { PolarizationCatalog } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { buildCsv, downloadCsv } from "@/shared/lib/csv";
 import { formatNumber } from "@/shared/lib/format-number";
+import type { BeliefKind, CategoryCount } from "@/shared/lib/polarization";
 import { useChartTheme } from "@/shared/lib/use-chart-theme";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -11,13 +15,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { type AxisMode, valueRange } from "../lib/normalize";
 import { formatMeasureValue } from "../lib/param-input";
 import { type ChartSeriesInput, polarizationOption } from "../lib/polarization-chart-option";
+import { type CsvFormat, polarizationCsv, polarizationCsvFileName } from "../lib/polarization-csv";
 import { polarizationErrorKey } from "../lib/polarization-error";
+import { tableRounds } from "../lib/polarization-table";
 import { polarizationTooltip } from "../lib/polarization-tooltip";
 import { registerPolarizationStrings } from "../lib/register-strings";
+import { allMeasureEntries, allMeasureSpecs } from "../model/all-measures";
 import { type ComparedSeries, compareSeries, problemOf } from "../model/compared-series";
 import { usePolarizationCatalogStore } from "../model/polarization-catalog.store";
 import type { PolarizationSeries } from "../model/polarization-series";
 import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
+import { isPartial, measureColumns, seriesColumns } from "../model/table-columns";
 import { usePolarizationSeriesList } from "../model/use-polarization-series";
 import {
   AddSeriesButton,
@@ -27,7 +35,16 @@ import {
   SeriesNotice,
 } from "./compare-controls";
 import { ROW } from "./control-styles";
+import { PolarizationTable } from "./polarization-table";
 import { SeriesConfigRow } from "./series-config-row";
+import {
+  AllMeasuresControls,
+  ExportMenu,
+  MeasureNotices,
+  PartialNote,
+  TableModeSwitch,
+  ViewToggle,
+} from "./table-controls";
 
 const MESSAGE =
   "flex h-full flex-col items-center justify-center gap-2 px-6 text-center font-sans text-[12px] text-muted-foreground";
@@ -55,16 +72,26 @@ function ChartMessage({
   );
 }
 
+export interface PolarizationPanelProps {
+  /** The run and network shown (the CSV export records them and names the file after them). */
+  runId: string;
+  networkId: string;
+  /** Seeks the run to a round (a table row click); without it the rows are not clickable. */
+  onSeekRound?: (round: number) => void;
+}
+
 /**
  * "Polarización" view of the run charts card (#129): pol_measures measures per round over the
  * k-category histograms of the private (default) or public beliefs, computed on the SERVER by the
  * real package. One series shows its level for the viewed round and the package's thresholds;
  * up to MAX_SERIES series, each with its own measure, parameters, k and belief type, can be
- * overlaid to compare them (on the real axis or normalized to their shape). The measures, their
- * parameters, defaults, ranges and supported k come from the server's catalog (loaded once per
- * session). Loaded on demand by `PolarizationPanel` (./lazy-polarization-panel.tsx).
+ * overlaid to compare them (on the real axis or normalized to their shape). The same values can
+ * be shown as a table (the compared series, or every measure with its defaults) and exported as
+ * CSV. The measures, their parameters, defaults, ranges and supported k come from the server's
+ * catalog (loaded once per session). Loaded on demand by `PolarizationPanel`
+ * (./lazy-polarization-panel.tsx).
  */
-export function PolarizationPanelView() {
+export function PolarizationPanelView(props: PolarizationPanelProps) {
   registerPolarizationStrings();
   const { t } = useTranslation();
   const status = usePolarizationCatalogStore((s) => s.status);
@@ -77,7 +104,9 @@ export function PolarizationPanelView() {
     void load();
   }, [load]);
 
-  if (catalog !== null && catalog.measures.length > 0) return <CatalogView catalog={catalog} />;
+  if (catalog !== null && catalog.measures.length > 0) {
+    return <CatalogView catalog={catalog} {...props} />;
+  }
   if (catalog !== null) return <ChartMessage text={errorText} />;
   if (status === "error") {
     return (
@@ -99,16 +128,28 @@ interface ChartLine extends ChartSeriesInput {
   series: PolarizationSeries;
 }
 
-function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
+function CatalogView({
+  catalog,
+  runId,
+  networkId,
+  onSeekRound,
+}: PolarizationPanelProps & { catalog: PolarizationCatalog }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const theme = useChartTheme();
   const configs = usePolarizationSettingsStore((s) => s.series);
   const selectedId = usePolarizationSettingsStore((s) => s.selectedId);
   const axisMode = usePolarizationSettingsStore((s) => s.axisMode);
+  const view = usePolarizationSettingsStore((s) => s.view);
+  const tableMode = usePolarizationSettingsStore((s) => s.tableMode);
+  const allMeasuresK = usePolarizationSettingsStore((s) => s.allMeasuresK);
+  const allMeasuresBelief = usePolarizationSettingsStore((s) => s.allMeasuresBelief);
+  const simulationStatus = useSimulationStore((s) => s.status);
   const { addSeries, selectSeries, setK } = usePolarizationSettingsStore.getState();
   const [configOpen, setConfigOpen] = useState(true);
   const configId = useId();
+  const chartVisible = view === "chart";
+  const live = simulationStatus === "running" || simulationStatus === "connecting";
 
   const compared = useMemo(
     () =>
@@ -128,38 +169,62 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
       ),
     [catalog, configs, lang, t, theme.series],
   );
-  const entries = useMemo(
-    () => compared.map((item) => ({ id: item.config.id, spec: item.spec })),
-    [compared],
-  );
-  const { series, seriesVersion, currentRound, retry } = usePolarizationSeriesList(entries);
-
-  const compare = compared.length > 1;
-  const mode: AxisMode = compare ? axisMode : "values";
   const selectedIndex = Math.max(
     0,
     compared.findIndex((item) => item.config.id === selectedId),
   );
   const selected = compared[selectedIndex] as ComparedSeries;
+
+  // The table's "all measures": requested only while that mode is shown
+  const showAll = view === "table" && tableMode === "all";
+  const measuresK: CategoryCount = allMeasuresK ?? selected.config.k;
+  const measuresBelief: BeliefKind = allMeasuresBelief ?? selected.config.belief;
+  const measureSpecs = useMemo(
+    () => (showAll ? allMeasureSpecs(catalog.measures, measuresK, measuresBelief) : []),
+    [showAll, catalog, measuresK, measuresBelief],
+  );
+
+  // One list for the chart's series and the measures: one scheduler shares the server
+  const entries = useMemo(
+    () => [
+      ...compared.map((item) => ({ id: item.config.id, spec: item.spec })),
+      ...allMeasureEntries(measureSpecs),
+    ],
+    [compared, measureSpecs],
+  );
+  const { series, seriesVersion, currentRound, recorded, retry } =
+    usePolarizationSeriesList(entries);
+
+  const compare = compared.length > 1;
+  const mode: AxisMode = compare ? axisMode : "values";
   const levelText = (label: string) => t(`polarization.levels.${label}`, { defaultValue: label });
 
   // The drawn lines: the series that have a model (a measure not defined for k has none)
   // biome-ignore lint/correctness/useExhaustiveDependencies: seriesVersion signals new values
   const lines = useMemo(
     () =>
-      compared.flatMap((item, index): ChartLine[] => {
-        const model = series[index] ?? null;
-        if (model === null) return [];
-        const points = model.points();
-        return [
-          { name: item.label, color: item.color, points, range: valueRange(points), series: model },
-        ];
-      }),
-    [compared, series, seriesVersion],
+      chartVisible
+        ? compared.flatMap((item, index): ChartLine[] => {
+            const model = series[index] ?? null;
+            if (model === null) return [];
+            const points = model.points();
+            return [
+              {
+                name: item.label,
+                color: item.color,
+                points,
+                range: valueRange(points),
+                series: model,
+              },
+            ];
+          })
+        : [],
+    [chartVisible, compared, series, seriesVersion],
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: levelText only reads t
   const option = useMemo(() => {
+    if (!chartVisible) return null;
     const classification = compare ? null : (lines[0]?.series.classification ?? null);
     return polarizationOption({
       series: lines,
@@ -200,11 +265,51 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
         );
       },
     });
-  }, [lines, compare, mode, currentRound, selected.meta.name, theme, lang, t]);
+  }, [chartVisible, lines, compare, mode, currentRound, selected.meta.name, theme, lang, t]);
 
-  const chartElement = (
-    <ReactECharts option={option} notMerge={true} style={{ width: "100%", height: "100%" }} />
+  // ── The table: its columns, the rounds computed so far, the export ────────────────────────
+  const tableColumns = useMemo(() => {
+    if (view !== "table") return [];
+    return showAll
+      ? measureColumns(measureSpecs, measuresK, measuresBelief, series, compared.length)
+      : seriesColumns(compared, series);
+  }, [view, showAll, measureSpecs, measuresK, measuresBelief, series, compared]);
+  // Rows change only when a series has answered more rounds (not on every status change)
+  const answeredKey = tableColumns.map((column) => column.series?.answered ?? 0).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: answeredKey signals new rounds
+  const rounds = useMemo(
+    () => tableRounds(tableColumns.map((column) => column.series)),
+    [tableColumns, answeredKey],
   );
+  const partial = isPartial(tableColumns, recorded, live);
+
+  const exportCsv = (format: CsvFormat) => {
+    const csv = polarizationCsv(format, tableColumns, rounds, {
+      runId,
+      networkId,
+      fallbackPackage: { version: catalog.package.version, ref: catalog.package.commit },
+    });
+    const fileName = polarizationCsvFileName({
+      mode: tableMode,
+      format,
+      runId,
+      networkId,
+      date: new Date(),
+    });
+    downloadCsv(fileName, buildCsv(csv.headers, csv.rows));
+    toast.success(
+      t("polarization.table.exportToast", {
+        count: csv.rows.length,
+        display: formatNumber(csv.rows.length, lang),
+        file: fileName,
+      }),
+    );
+  };
+
+  const chartElement =
+    option === null ? null : (
+      <ReactECharts option={option} notMerge={true} style={{ width: "100%", height: "100%" }} />
+    );
   const computing = (
     <span
       role="status"
@@ -217,9 +322,91 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
   const roundText = (
     <span>{t("polarization.valueAt", { round: formatNumber(currentRound, lang) })}</span>
   );
+  // In the table view the toggle leads the table's toolbar instead
+  const viewToggle = chartVisible ? <ViewToggle /> : null;
+  const problems = compared.map((item, index) => problemOf(item, series[index] ?? null));
+  const notices = problems.some((problem) => problem !== null) ? (
+    <ul className="flex flex-none flex-col gap-0.5 px-3 pt-1 font-sans text-[11px] text-muted-foreground">
+      {compared.map((item, index) => {
+        const problem = problems[index] ?? null;
+        if (problem === null) return null;
+        return (
+          <SeriesNotice
+            key={item.config.id}
+            item={item}
+            problem={problem}
+            onRetry={() => retry(index)}
+          />
+        );
+      })}
+    </ul>
+  ) : null;
 
-  // ── One series: the view as it was before the comparison ──────────────────────────────────
-  if (!compare) {
+  let seriesHeader: ReactNode;
+  let chartBody: ReactNode;
+  if (compare) {
+    // ── Several series: chips, the selected one's settings, per-series notices ─────────────
+    const loading = compared.some((_, index) => series[index]?.status === "loading");
+    const openChip = (id: number) => {
+      if (id === selected.config.id) {
+        setConfigOpen((open) => !open);
+        return;
+      }
+      selectSeries(id);
+      setConfigOpen(true);
+    };
+    chartBody = chartElement;
+    seriesHeader = (
+      <>
+        <div className={ROW}>
+          {viewToggle}
+          <div
+            role="group"
+            aria-label={t("polarization.seriesGroupAria")}
+            className="flex min-w-0 flex-wrap items-center gap-1"
+          >
+            {compared.map((item, index) => (
+              <SeriesChip
+                key={item.config.id}
+                item={item}
+                selected={index === selectedIndex}
+                expanded={index === selectedIndex && configOpen}
+                problem={problems[index] !== null}
+                controls={configId}
+                onOpen={() => openChip(item.config.id)}
+              />
+            ))}
+            <AddSeriesButton
+              count={compared.length}
+              onAdd={() => {
+                addSeries();
+                setConfigOpen(true);
+              }}
+            />
+          </div>
+          <span className="min-w-2 flex-1" />
+          {chartVisible ? <AxisModeToggle mode={mode} /> : null}
+          <span className="flex flex-none flex-wrap items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground">
+            {loading ? computing : null}
+            {roundText}
+            <RoundValues compared={compared} series={series} round={currentRound} />
+            <InfoTooltip side="top" ariaLabel={t("polarization.aboutAria")}>
+              {t("polarization.aboutCompare")}
+            </InfoTooltip>
+          </span>
+        </div>
+        <SeriesConfigRow
+          catalog={catalog}
+          item={selected}
+          compare={true}
+          id={configId}
+          hidden={!configOpen}
+        />
+        {notices}
+      </>
+    );
+  } else {
+    // ── One series: the view as it was before the comparison ──────────────────────────────
     const model = series[0] ?? null;
     const value = model?.valueAt(currentRound) ?? null;
     const level = value === null ? null : (model?.levelAt(currentRound) ?? null);
@@ -227,10 +414,9 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
     const status = model?.status ?? "idle";
     const error = model?.error ?? null;
 
-    let chart: ReactNode;
     if (!selected.supported) {
       const firstK = selected.firstSupportedK;
-      chart = (
+      chartBody = (
         <ChartMessage
           text={t("polarization.unsupportedK", { name: selected.meta.name, k: selected.config.k })}
           action={
@@ -244,14 +430,14 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
         />
       );
     } else if (status === "error" && error?.kind === "invalid") {
-      chart = (
+      chartBody = (
         <ChartMessage
           text={t("polarization.invalidParams", { name: selected.meta.name })}
           detail={error.message}
         />
       );
     } else if (status === "error") {
-      chart = (
+      chartBody = (
         <ChartMessage
           text={t(polarizationErrorKey(error))}
           detail={error?.message}
@@ -263,12 +449,12 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
         />
       );
     } else {
-      chart = chartElement;
+      chartBody = chartElement;
     }
 
-    return (
-      <div className="flex h-full flex-col">
-        <SeriesConfigRow catalog={catalog} item={selected} compare={false}>
+    seriesHeader = (
+      <>
+        <SeriesConfigRow catalog={catalog} item={selected} compare={false} leading={viewToggle}>
           <AddSeriesButton count={compared.length} onAdd={addSeries} />
           <span className="min-w-2 flex-1" />
           {/* ── Viewed-round value + level ─────────────────── */}
@@ -303,85 +489,59 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
             </InfoTooltip>
           </span>
         </SeriesConfigRow>
-        <div className="relative min-h-0 flex-1">{chart}</div>
+        {/* The chart shows a single series' problem in its place; the table lists it */}
+        {chartVisible ? null : notices}
+      </>
+    );
+  }
+
+  if (chartVisible) {
+    return (
+      <div className="flex h-full flex-col">
+        {seriesHeader}
+        <div className="relative min-h-0 flex-1">{chartBody}</div>
       </div>
     );
   }
 
-  // ── Several series: chips, the selected one's settings, per-series notices ───────────────
-  const problems = compared.map((item, index) => problemOf(item, series[index] ?? null));
-  const loading = series.some((model) => model?.status === "loading");
-  const openChip = (id: number) => {
-    if (id === selected.config.id) {
-      setConfigOpen((open) => !open);
-      return;
-    }
-    selectSeries(id);
-    setConfigOpen(true);
-  };
-
+  // ── The table view: its toolbar, the series' settings (series mode), the table ──────────
+  const tableLoading = tableColumns.some((column) => column.series?.status === "loading");
   return (
     <div className="flex h-full flex-col">
       <div className={ROW}>
-        <div
-          role="group"
-          aria-label={t("polarization.seriesGroupAria")}
-          className="flex min-w-0 flex-wrap items-center gap-1"
-        >
-          {compared.map((item, index) => (
-            <SeriesChip
-              key={item.config.id}
-              item={item}
-              selected={index === selectedIndex}
-              expanded={index === selectedIndex && configOpen}
-              problem={problems[index] !== null}
-              controls={configId}
-              onOpen={() => openChip(item.config.id)}
-            />
-          ))}
-          <AddSeriesButton
-            count={compared.length}
-            onAdd={() => {
-              addSeries();
-              setConfigOpen(true);
-            }}
-          />
-        </div>
+        <ViewToggle />
+        <TableModeSwitch />
+        {showAll ? <AllMeasuresControls k={measuresK} belief={measuresBelief} /> : null}
         <span className="min-w-2 flex-1" />
-        <AxisModeToggle mode={mode} />
-        <span className="flex flex-none flex-wrap items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground">
-          {loading ? computing : null}
-          {roundText}
-          <RoundValues compared={compared} series={series} round={currentRound} />
-          <InfoTooltip side="top" ariaLabel={t("polarization.aboutAria")}>
-            {t("polarization.aboutCompare")}
-          </InfoTooltip>
+        <span className="flex flex-none items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground">
+          {tableLoading ? computing : null}
+          <span>
+            {t("polarization.table.rounds", {
+              count: rounds.length,
+              display: formatNumber(rounds.length, lang),
+            })}
+          </span>
+          {partial && rounds.length > 0 ? <PartialNote live={live} /> : null}
         </span>
+        <ExportMenu
+          disabled={rounds.length === 0}
+          partial={partial}
+          live={live}
+          onExport={exportCsv}
+        />
       </div>
-      <SeriesConfigRow
-        catalog={catalog}
-        item={selected}
-        compare={true}
-        id={configId}
-        hidden={!configOpen}
-      />
-      {problems.some((problem) => problem !== null) ? (
-        <ul className="flex flex-none flex-col gap-0.5 px-3 pt-1 font-sans text-[11px] text-muted-foreground">
-          {compared.map((item, index) => {
-            const problem = problems[index] ?? null;
-            if (problem === null) return null;
-            return (
-              <SeriesNotice
-                key={item.config.id}
-                item={item}
-                problem={problem}
-                onRetry={() => retry(index)}
-              />
-            );
-          })}
-        </ul>
-      ) : null}
-      <div className="relative min-h-0 flex-1">{chartElement}</div>
+      {showAll ? <MeasureNotices columns={tableColumns} onRetry={retry} /> : seriesHeader}
+      <div className="mt-1.5 flex min-h-0 flex-1 flex-col">
+        <PolarizationTable
+          columns={tableColumns}
+          rounds={rounds}
+          currentRound={currentRound}
+          onSeekRound={onSeekRound}
+          emptyText={
+            recorded === 0 ? t("polarization.table.emptyNoRounds") : t("polarization.table.empty")
+          }
+        />
+      </div>
     </div>
   );
 }

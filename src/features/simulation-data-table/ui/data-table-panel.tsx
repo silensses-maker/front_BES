@@ -2,21 +2,14 @@ import { ChevronLeft, ChevronRight, SkipBack, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/shared/i18n";
 import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
+import { buildCsv, downloadCsv } from "@/shared/lib/csv";
 import { formatNumber } from "@/shared/lib/format-number";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
-import {
-  agentCsvRow,
-  buildCsv,
-  type CsvLabels,
-  csvFileName,
-  downloadCsv,
-  networkCsvRow,
-  roundCsvRow,
-} from "../lib/csv";
+import { agentCsvRow, type CsvLabels, csvFileName, networkCsvRow, roundCsvRow } from "../lib/csv";
 import type { AgentFilter, NetworkFilter, TableDataset } from "../lib/table-datasets";
 import type { PageSize, UseDataTableReturn } from "../model/use-data-table";
 

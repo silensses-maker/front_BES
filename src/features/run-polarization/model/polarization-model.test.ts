@@ -37,6 +37,7 @@ import { usePolarizationCatalogStore } from "./polarization-catalog.store";
 import {
   CHUNK_ROUNDS,
   LIVE_INTERVAL_MS,
+  MAX_CACHED_SERIES,
   PolarizationSeries,
   PolarizationSeriesCache,
   type SeriesSpec,
@@ -264,6 +265,8 @@ describe("PolarizationSeries", () => {
     });
     const pool = poolWith(3, [2, 0, 1]);
     const series = new PolarizationSeries(SPEC, server);
+    expect(series.maxRound).toBe(-1);
+    expect(series.answeredAt(0)).toBe(false);
     expect(series.nextSyncDelay(pool, 0)).toBe(0);
     await series.sync(pool, 0);
 
@@ -292,6 +295,12 @@ describe("PolarizationSeries", () => {
     ]);
     expect(series.classification?.thresholds).toEqual([0.4525, 0.6267]);
     expect(series.packageRef).toBe("0e05564ed0b7b23de368dd19becac3a1de4ef745");
+    expect(series.packageVersion).toBe("0.1.0a2");
+    expect(series.maxRound).toBe(2);
+    expect([0, 1, 2].map((round) => series.answeredAt(round))).toEqual([true, true, true]);
+    expect(series.answeredAt(3)).toBe(false);
+    expect(series.answeredAt(-1)).toBe(false);
+    expect(series.answeredAt(1000)).toBe(false);
     expect(series.nextSyncDelay(pool, 0)).toBeNull();
   });
 
@@ -302,6 +311,8 @@ describe("PolarizationSeries", () => {
     await series.sync(pool, 0);
     expect(series.status).toBe("ready");
     expect(series.valueAt(1)).toBeNull();
+    // Answered (no value, the package's error), unlike a round not sent yet
+    expect(series.answeredAt(1)).toBe(true);
     expect(series.errorAt(1)).toContain("At least one weight must be positive");
     expect(series.points()).toEqual([
       [0, 0.5],
@@ -412,13 +423,17 @@ describe("PolarizationSeries", () => {
 });
 
 describe("PolarizationSeriesCache", () => {
-  it("returns the same series for the same spec and evicts the least recently used past 16", () => {
+  it("returns the same series for the same spec and evicts the least recently used past MAX_CACHED_SERIES", () => {
     const cache = new PolarizationSeriesCache(fakeServer());
     const first = cache.get(SPEC);
     expect(cache.get({ ...SPEC, params: {} })).toBe(first);
-    for (let i = 0; i < 16; i++) cache.get({ ...SPEC, params: { alpha: i } });
-    expect(cache.size).toBe(16);
+    for (let i = 0; i < MAX_CACHED_SERIES; i++) cache.get({ ...SPEC, params: { alpha: i } });
+    expect(cache.size).toBe(MAX_CACHED_SERIES);
     expect(cache.get(SPEC)).not.toBe(first);
+  });
+
+  it("keeps the compared series and every catalog measure of the table cached at once", () => {
+    expect(MAX_CACHED_SERIES).toBeGreaterThanOrEqual(MAX_SERIES + catalog.measures.length);
   });
 
   it("is one cache per pool (run / network)", () => {

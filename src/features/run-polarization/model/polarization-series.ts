@@ -60,6 +60,8 @@ export class PolarizationSeries {
   classification: PolarizationClassification | null = null;
   /** The pol_measures commit the server computed with. */
   packageRef: string | null = null;
+  /** The pol_measures version the server computed with (the CSV export records it). */
+  packageVersion: string | null = null;
   /** Bumped on every change (re-render signal). */
   version = 0;
 
@@ -92,6 +94,16 @@ export class PolarizationSeries {
 
   get hasValues(): boolean {
     return this.maxRoundSeen >= 0;
+  }
+
+  /** The highest round answered so far (-1 = none). */
+  get maxRound(): number {
+    return this.maxRoundSeen;
+  }
+
+  /** Whether the server has answered `round` (with a value, none, or the package's error). */
+  answeredAt(round: number): boolean {
+    return round >= 0 && round < this.states.length && this.states[round] !== PENDING;
   }
 
   /** The value at `round` (null when not computed yet, undefined for the measure or an error). */
@@ -159,6 +171,7 @@ export class PolarizationSeries {
         this.cursor = end;
         this.classification = result.classification;
         this.packageRef = result.package?.ref ?? null;
+        this.packageVersion = result.package?.version ?? null;
         this.status = "ready";
         this.error = null;
       })
@@ -211,7 +224,11 @@ export class PolarizationSeries {
   }
 }
 
-const MAX_CACHED_SERIES = 16;
+/**
+ * Series kept per pool: the compared series (up to MAX_SERIES) and the table's "all measures"
+ * (one per catalog measure) all stay cached, with room to go back to earlier specs.
+ */
+export const MAX_CACHED_SERIES = 32;
 
 /** LRU of series for one pool (one run / network). */
 export class PolarizationSeriesCache {

@@ -21,18 +21,25 @@ import {
 export type { AxisMode } from "../lib/normalize";
 export type { ParamValues } from "./series-list";
 
+/** The Polarization tab shows the chart or the table (same series, cache and scheduling). */
+export type PolarizationView = "chart" | "table";
+/**
+ * What the table lists: the compared series (as the chart), or every catalog measure with its
+ * default parameters for one k and belief type (requested only while this mode is shown).
+ */
+export type TableMode = "series" | "all";
+
 /** Measure shown first, when the server's catalog has it (otherwise its first measure). */
 export const DEFAULT_MEASURE = "EstebanRay";
 
 /**
  * Polarization view settings (#129): the compared series (each with its measure, the parameters
- * edited per measure, k and belief type), the selected one and the y-axis mode. Kept for the
- * session so switching tabs, rounds or networks does not lose them. The view starts with one
- * series: the single-series defaults (Esteban–Ray, k = 5, private beliefs) migrated to a list.
+ * edited per measure, k and belief type), the selected one, the y-axis mode, chart or table, and
+ * the table's mode and "all measures" k / belief. Kept for the session so switching tabs, rounds
+ * or networks does not lose them. The view starts with one series: the single-series defaults
+ * (Esteban–Ray, k = 5, private beliefs) migrated to a list.
  */
-interface PolarizationSettingsState extends SeriesListState {
-  axisMode: AxisMode;
-
+interface PolarizationSettingsState extends SeriesListState, ViewSettings {
   /** Adds a copy of the selected series (at most MAX_SERIES) and selects it. */
   addSeries: () => void;
   /** Removes a series (never the last one). */
@@ -44,10 +51,28 @@ interface PolarizationSettingsState extends SeriesListState {
   setK: (id: number, k: CategoryCount) => void;
   setBelief: (id: number, belief: BeliefKind) => void;
   setAxisMode: (mode: AxisMode) => void;
+  setView: (view: PolarizationView) => void;
+  setTableMode: (mode: TableMode) => void;
+  setAllMeasuresK: (k: CategoryCount) => void;
+  setAllMeasuresBelief: (belief: BeliefKind) => void;
 }
 
-/** The initial settings: the single-series defaults as a one-series list, real values. */
-export function defaultSettings(): SeriesListState & { axisMode: AxisMode } {
+/** The y axis, the view and the table's settings. */
+export interface ViewSettings {
+  axisMode: AxisMode;
+  view: PolarizationView;
+  tableMode: TableMode;
+  /** k of the table's "all measures" (null = the selected series' k, until one is chosen). */
+  allMeasuresK: CategoryCount | null;
+  /** Belief type of the "all measures" (null = the selected series' one, until one is chosen). */
+  allMeasuresBelief: BeliefKind | null;
+}
+
+/**
+ * The initial settings: the single-series defaults as a one-series list, real values, the chart;
+ * the table lists the series, and its "all measures" follow the selected series' k and belief.
+ */
+export function defaultSettings(): SeriesListState & ViewSettings {
   return {
     ...fromSingleSeries({
       measureId: DEFAULT_MEASURE,
@@ -56,6 +81,10 @@ export function defaultSettings(): SeriesListState & { axisMode: AxisMode } {
       belief: "private",
     }),
     axisMode: "values",
+    view: "chart",
+    tableMode: "series",
+    allMeasuresK: null,
+    allMeasuresBelief: null,
   };
 }
 
@@ -75,6 +104,10 @@ export const usePolarizationSettingsStore = /* #__PURE__ */ create<PolarizationS
     setK: (id, k) => set((state) => updateSeries(state, id, (s) => ({ ...s, k }))),
     setBelief: (id, belief) => set((state) => updateSeries(state, id, (s) => ({ ...s, belief }))),
     setAxisMode: (axisMode) => set({ axisMode }),
+    setView: (view) => set({ view }),
+    setTableMode: (tableMode) => set({ tableMode }),
+    setAllMeasuresK: (allMeasuresK) => set({ allMeasuresK }),
+    setAllMeasuresBelief: (allMeasuresBelief) => set({ allMeasuresBelief }),
   }),
 );
 

@@ -38,7 +38,8 @@ import { ROW, SEGMENT, SEGMENT_BUTTON, SEGMENT_OFF, SEGMENT_ON, SWATCH } from ".
  * single-series view shows them as its toolbar; compared series show the selected one's.
  */
 
-function BetaBadge() {
+/** "BETA" next to a measure still being developed upstream (MEC normalized). */
+export function BetaBadge() {
   const { t } = useTranslation();
   return (
     <span
@@ -297,13 +298,17 @@ function BeliefSegment({ item }: { item: ComparedSeries }) {
   );
 }
 
-/** The selected series' controls: measure, parameters, k, belief (and `children` after them). */
+/**
+ * The selected series' controls: measure, parameters, k, belief (`leading` before them, e.g. the
+ * Chart | Table toggle, and `children` after them).
+ */
 export function SeriesConfigRow({
   catalog,
   item,
   compare,
   id,
   hidden = false,
+  leading,
   children,
 }: {
   catalog: PolarizationCatalog;
@@ -313,6 +318,7 @@ export function SeriesConfigRow({
   id?: string;
   /** Collapsed (its chip toggles it); kept in the DOM for the chip's aria-controls. */
   hidden?: boolean;
+  leading?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -325,6 +331,7 @@ export function SeriesConfigRow({
       aria-label={compare ? t("polarization.configAria", { label: item.label }) : undefined}
       className={ROW}
     >
+      {leading}
       {compare ? (
         <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: item.color }} />
       ) : null}

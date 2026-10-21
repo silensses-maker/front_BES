@@ -65,7 +65,10 @@ import en from "@/shared/i18n/locales/en";
 import polarizationEn from "@/shared/i18n/locales/polarization.en";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import { usePolarizationCatalogStore } from "../model/polarization-catalog.store";
-import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
+import {
+  defaultSettings,
+  usePolarizationSettingsStore,
+} from "../model/polarization-settings.store";
 import { fromSingleSeries, type SeriesConfig } from "../model/series-list";
 import { PolarizationPanelView as PolarizationPanel } from "./polarization-panel";
 import { PolarizationWikiSection } from "./polarization-wiki-section";
@@ -139,11 +142,14 @@ const flush = async () => {
   }
 };
 
-/** One series (the single-series settings, migrated to the list), real values. */
+/** The run / network the panel belongs to (the page passes them). */
+const IDS = { runId: "run-1", networkId: "net-1" };
+
+/** One series (the single-series settings, migrated to the list), real values, the chart. */
 function settings(measureId: string, k: 3 | 5 | 7 | 10 = 5) {
   usePolarizationSettingsStore.setState({
+    ...defaultSettings(),
     ...fromSingleSeries({ measureId, paramsByMeasure: {}, k, belief: "private" }),
-    axisMode: "values",
   });
 }
 
@@ -185,7 +191,7 @@ describe("PolarizationPanel", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("loads the catalog, then shows the server's value and level for the viewed round", async () => {
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     expect(screen.getByText(p.catalogLoading)).toBeInTheDocument();
     await flush();
     expect(simulationsApi.getPolarizationMeasures).toHaveBeenCalledTimes(1);
@@ -210,13 +216,13 @@ describe("PolarizationPanel", () => {
 
   it("groups the catalog's measures (literature / proposed) and labels MEC normalized as BETA", async () => {
     settings("MECNormalized");
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getAllByText(p.beta).length).toBeGreaterThan(0);
   });
 
   it("switches belief type and k (private by default, k = 5)", async () => {
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByRole("button", { name: p.beliefPrivate })).toHaveAttribute(
       "aria-pressed",
@@ -238,7 +244,7 @@ describe("PolarizationPanel", () => {
 
   it("Experts is only offered for k = 5 (from the catalog) and the view offers to switch", async () => {
     settings("Experts", 3);
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(
       screen.getByText(p.unsupportedK.replace("{{name}}", "Experts").replace("{{k}}", "3")),
@@ -254,7 +260,7 @@ describe("PolarizationPanel", () => {
 
   it("edits parameters within the catalog's range, debounced, and restores the defaults", async () => {
     settings("EstebanRay");
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByText(p.levels.high)).toBeInTheDocument();
     const alpha = screen.getByRole("textbox", { name: p.paramAria.replace("{{name}}", "α") });
@@ -285,7 +291,7 @@ describe("PolarizationPanel", () => {
 
   it("offers the f(d) whitelist of the catalog for the generalized measures", async () => {
     settings("GeneralizedMEC");
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByRole("combobox", { name: p.alienationAria })).toHaveTextContent("d");
     expect(simulationsApi.computePolarization).toHaveBeenCalledWith(
@@ -297,7 +303,7 @@ describe("PolarizationPanel", () => {
     vi.mocked(simulationsApi.getPolarizationMeasures).mockRejectedValue(
       httpError(404, "not_found", "Polarization measures are disabled on this server"),
     );
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByText(p.errorDisabled)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: p.retry })).toBeNull();
@@ -311,7 +317,7 @@ describe("PolarizationPanel", () => {
     vi.mocked(simulationsApi.computePolarization).mockRejectedValueOnce(
       httpError(503, "unavailable", "The polarization worker did not answer within 30 s"),
     );
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByText(p.errorUnavailable)).toBeInTheDocument();
     expect(screen.getByText("The polarization worker could not be started")).toBeInTheDocument();
@@ -330,7 +336,7 @@ describe("PolarizationPanel", () => {
     vi.mocked(simulationsApi.computePolarization).mockRejectedValue(
       httpError(422, "invalid_measure", "BiPol is not defined for k = 5 categories"),
     );
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByText(p.invalidParams.replace("{{name}}", "BiPol"))).toBeInTheDocument();
     expect(screen.getByText("BiPol is not defined for k = 5 categories")).toBeInTheDocument();
@@ -339,7 +345,7 @@ describe("PolarizationPanel", () => {
   // ── Comparison ────────────────────────────────────────────────────────────
 
   it("+ adds a copy of the selected series (cached: no request), up to 4; × removes, never the last", async () => {
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     // One series: the view as before (no chips, no axis toggle)
     expect(screen.queryByRole("group", { name: p.seriesGroupAria })).toBeNull();
@@ -383,7 +389,7 @@ describe("PolarizationPanel", () => {
   });
 
   it("configures each series on its own; a chip shows (and hides) its settings", async () => {
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     fireEvent.click(screen.getByRole("button", { name: ADD }));
     await flush();
@@ -430,7 +436,7 @@ describe("PolarizationPanel", () => {
     usePolarizationSettingsStore.getState().addSeries();
     const copy = seriesAt(1).id;
     usePolarizationSettingsStore.getState().setMeasure(copy, "Experts");
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByText(fill(p.unsupportedK, { name: "Experts", k: 3 }))).toBeInTheDocument();
     expect(
@@ -457,7 +463,7 @@ describe("PolarizationPanel", () => {
       ...frame(2),
       privateBelief: new Float32Array([0, 0.5, 0.5, 1]),
     });
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     fireEvent.click(screen.getByRole("button", { name: ADD }));
     await flush();
@@ -484,7 +490,7 @@ describe("PolarizationPanel", () => {
   });
 
   it("thresholds and the level badge only with one series; several get a legend and per-series values", async () => {
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
     expect(screen.getByTestId("echart")).toHaveAttribute("data-marks", "3");
     expect(screen.getByText(p.levels.high)).toBeInTheDocument();
@@ -510,7 +516,7 @@ describe("PolarizationPanel", () => {
     vi.mocked(simulationsApi.computePolarization).mockImplementation(failing);
     usePolarizationSettingsStore.getState().addSeries();
     usePolarizationSettingsStore.getState().setMeasure(seriesAt(1).id, "MEC");
-    render(<PolarizationPanel />);
+    render(<PolarizationPanel {...IDS} />);
     await flush();
 
     expect(screen.getByText(p.errorUnavailable)).toBeInTheDocument();
@@ -535,7 +541,7 @@ describe("PolarizationPanel", () => {
 
   it("is loaded on demand by the feature's PolarizationPanel", async () => {
     const { PolarizationPanel: LazyPanel } = await import("./lazy-polarization-panel");
-    render(<LazyPanel />);
+    render(<LazyPanel {...IDS} />);
     expect(await screen.findByRole("group", { name: p.kAria })).toBeInTheDocument();
   });
 });
