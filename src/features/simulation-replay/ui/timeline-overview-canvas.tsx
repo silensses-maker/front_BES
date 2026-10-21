@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRoundAggregatesStore } from "@/entities/simulation";
 import { useTranslation } from "@/shared/i18n";
 import { formatNumber } from "@/shared/lib/format-number";
 import { findNearbyEvent, type RoundEvent } from "../lib/round-events";
+import { clampTooltipLeft } from "../lib/tooltip-position";
 import {
   eventColor,
   fineWindowFor,
@@ -235,8 +236,24 @@ export function TimelineOverviewCanvas({
         ? ` · ${t("runView.hoverNotReceived")}`
         : "";
 
+  // The hover tooltip is centred on the pointer but clamped inside the timeline: near the ends it
+  // used to stick out and give the page a horizontal scrollbar. Measured before paint.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [tooltipLeft, setTooltipLeft] = useState<number | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hoverSuffix changes the tooltip width
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const tooltip = tooltipRef.current;
+    if (hover === null || container === null || tooltip === null) {
+      setTooltipLeft(null);
+      return;
+    }
+    setTooltipLeft(clampTooltipLeft(hover.x, tooltip.offsetWidth, container.clientWidth));
+  }, [hover, hoverSuffix]);
+
   return (
-    <div className="relative h-[52px]">
+    <div ref={containerRef} className="relative h-[52px]">
       <canvas
         ref={canvasRef}
         aria-label={t("runView.timelineAria")}
@@ -264,8 +281,12 @@ export function TimelineOverviewCanvas({
       />
       {hover !== null && (
         <div
-          className="pointer-events-none absolute bottom-[calc(100%+6px)] z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 font-sans text-[11px] text-background"
-          style={{ left: hover.x }}
+          ref={tooltipRef}
+          className="pointer-events-none absolute bottom-[calc(100%+6px)] z-20 whitespace-nowrap rounded-md bg-foreground px-2 py-1 font-sans text-[11px] text-background"
+          style={{
+            left: tooltipLeft ?? 0,
+            visibility: tooltipLeft === null ? "hidden" : "visible",
+          }}
         >
           {t("runView.roundLabel", { round: formatNumber(hover.round, i18n.language) })}
           {hoverSuffix}
