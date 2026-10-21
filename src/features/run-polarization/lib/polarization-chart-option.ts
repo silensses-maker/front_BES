@@ -8,11 +8,26 @@ import {
 } from "@/shared/lib/chart-options";
 import type { ChartTheme } from "@/shared/lib/chart-theme";
 import { type AxisMode, normalizePoints, type ValueRange } from "./normalize";
+import {
+  dashGeometry,
+  echartsLineStyle,
+  type LineDash,
+  MARKER_SIZE,
+  markerPhase,
+  markerPoints,
+} from "./series-style";
+
+/** The legend is drawn up to this many series; more are identified by the chips above. */
+export const LEGEND_MAX_SERIES = 4;
 
 export interface ChartSeriesInput {
   /** Unique name (legend, tooltip). */
   name: string;
   color: string;
+  /** Line style (series-style.ts, from the series' slot). */
+  dash: LineDash;
+  /** The series' slot (staggers its markers). */
+  slot: number;
   /** [round, value | null] real values (null = undefined for that round: a gap). */
   points: Array<[number, number | null]>;
   /** Min–max of the values, for the normalized axis. */
@@ -22,8 +37,8 @@ export interface ChartSeriesInput {
 export interface PolarizationChartInput {
   series: readonly ChartSeriesInput[];
   /**
-   * Several series are compared (the view has two or more): legend, no thresholds, `axisMode`.
-   * Otherwise the single-series chart.
+   * Several series are compared (the view has two or more): legend (up to LEGEND_MAX_SERIES), no
+   * thresholds, `axisMode`. Otherwise the single-series chart.
    */
   compare: boolean;
   round: number;
@@ -66,11 +81,58 @@ export function tooltipTarget(
   return { round, indices };
 }
 
+/** A marked line's sparse markers: a silent scatter series of its own, out of the tooltip. */
+function markerSeries(
+  line: ChartSeriesInput,
+  data: ReadonlyArray<readonly [number, number | null]>,
+) {
+  const marker = dashGeometry(line.dash).marker;
+  if (marker === null) return [];
+  return [
+    {
+      type: "scatter" as const,
+      data: markerPoints(data, markerPhase(line.slot)),
+      symbol: marker,
+      symbolSize: MARKER_SIZE,
+      itemStyle: { color: line.color },
+      silent: true,
+      tooltip: { show: false },
+      z: 3,
+    },
+  ];
+}
+
 /**
- * Per-round polarization lines (one per series, in its colour) and the playhead. The single-series
- * chart: the package's thresholds as dotted rules, no legend, the real axis (the view as it was
- * before the comparison). Compared series: a legend, no thresholds, and the y axis either the
- * shared real values or each series' min–max normalization to [0, 1].
+ * The compared series' legend: each icon is a short line in the series' colour and dash, like the
+ * chips' samples (ECharts draws a line series' icon from its line style, with its symbol in the
+ * middle, hidden here: it would cover the dash). Up to LEGEND_MAX_SERIES: past that, a one-line
+ * legend would page through the names a few at a time, and the chips above the chart (wrapping,
+ * with the same line samples) are the key.
+ */
+function compareLegend(series: readonly ChartSeriesInput[], theme: ChartTheme) {
+  return {
+    ...legendStyle(theme),
+    type: "scroll" as const,
+    left: CHART_GRID.left,
+    itemWidth: 22,
+    itemHeight: 8,
+    itemGap: 12,
+    itemStyle: { opacity: 0 },
+    // Identifies the series; adding, removing and configuring happen in the chips.
+    selectedMode: false,
+    data: series.map((line) => line.name),
+    pageIconColor: theme.text,
+    pageIconInactiveColor: theme.axisLine,
+    pageTextStyle: { color: theme.text, fontSize: 10 },
+  };
+}
+
+/**
+ * Per-round polarization lines (one per series, in its colour and line style, the dashed and
+ * dotted ones with sparse markers) and the playhead. The single-series chart: the package's
+ * thresholds as dotted rules, no legend, the real axis (the view as it was before the
+ * comparison). Compared series: a legend (up to LEGEND_MAX_SERIES), no thresholds, and the y
+ * axis either the shared real values or each series' min–max normalization to [0, 1].
  */
 export function polarizationOption({
   series,
@@ -102,47 +164,39 @@ export function polarizationOption({
       })),
     ],
   };
-  const lines = series.map((line) => ({
-    name: line.name,
-    type: "line" as const,
-    data: normalized ? normalizePoints(line.points, line.range) : line.points,
-    showSymbol: false,
-    connectNulls: false,
-    itemStyle: { color: line.color },
-    lineStyle: { color: line.color, width: 2 },
-    ...(single ? { markLine: marks } : {}),
-  }));
+  const drawnData = series.map((line) =>
+    normalized ? normalizePoints(line.points, line.range) : line.points,
+  );
+  const lines = series.map((line, index) => {
+    const marker = dashGeometry(line.dash).marker;
+    return {
+      name: line.name,
+      type: "line" as const,
+      data: drawnData[index] ?? [],
+      showSymbol: false,
+      // The point under the pointer is shown with the line's marker (solid: the default circle)
+      ...(marker === null ? {} : { symbol: marker, symbolSize: MARKER_SIZE }),
+      connectNulls: false,
+      itemStyle: { color: line.color },
+      lineStyle: echartsLineStyle(line.color, line.dash),
+      ...(single ? { markLine: marks } : {}),
+    };
+  });
   // Several series: the playhead rides on a series of its own, so it never depends on a line.
   const playhead = { type: "line" as const, data: [], silent: true, markLine: marks };
+  // After the lines (and the playhead): the tooltip only reads indices below series.length
+  const markers = series.flatMap((line, index) => markerSeries(line, drawnData[index] ?? []));
+  const legend = !single && series.length <= LEGEND_MAX_SERIES;
 
   return {
     backgroundColor: "transparent",
     animation: false,
     grid: {
       ...CHART_GRID,
-      top: single ? 10 : 22,
+      top: legend ? 22 : 10,
       right: drawn.length > 0 ? 64 : CHART_GRID.right,
     },
-    ...(single
-      ? {}
-      : {
-          legend: {
-            ...legendStyle(theme),
-            type: "scroll" as const,
-            left: CHART_GRID.left,
-            // Dots like the chips' swatches, on one compact line
-            icon: "circle",
-            itemWidth: 8,
-            itemHeight: 8,
-            itemGap: 12,
-            // Identifies the series; adding, removing and configuring happen in the chips.
-            selectedMode: false,
-            data: series.map((line) => line.name),
-            pageIconColor: theme.text,
-            pageIconInactiveColor: theme.axisLine,
-            pageTextStyle: { color: theme.text, fontSize: 10 },
-          },
-        }),
+    ...(legend ? { legend: compareLegend(series, theme) } : {}),
     tooltip: axisTooltip(theme, (params: unknown) => {
       const target = tooltipTarget(params, round, series.length);
       return formatTooltip(target.round, target.indices);
@@ -151,6 +205,6 @@ export function polarizationOption({
     yAxis: normalized
       ? valueAxis(theme, { min: 0, max: 1, formatter: formatValue })
       : valueAxis(theme, { formatter: formatValue }),
-    series: single ? lines : [...lines, playhead],
+    series: single ? [...lines, ...markers] : [...lines, playhead, ...markers],
   };
 }

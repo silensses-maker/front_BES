@@ -189,7 +189,7 @@ describe("usePolarizationSettingsStore", () => {
 
     store.selectSeries(first.id);
     expect(usePolarizationSettingsStore.getState().selectedId).toBe(first.id);
-    for (let i = 0; i < 5; i++) store.addSeries();
+    for (let i = 0; i <= MAX_SERIES; i++) store.addSeries();
     expect(usePolarizationSettingsStore.getState().series).toHaveLength(MAX_SERIES);
 
     for (const series of usePolarizationSettingsStore.getState().series) {
@@ -199,6 +199,38 @@ describe("usePolarizationSettingsStore", () => {
     expect(state.series).toHaveLength(1); // the last one stays
     expect(state.series[0]?.slot).toBe(0);
     expect(state.selectedId).toBe(state.series[0]?.id);
+  });
+
+  it("overlays every measure (replacing the list) and puts the previous list back on undo", () => {
+    const store = usePolarizationSettingsStore.getState();
+    store.setK(store.selectedId, 3);
+    store.addSeries();
+    store.setBelief(usePolarizationSettingsStore.getState().selectedId, "public");
+    const before = usePolarizationSettingsStore.getState();
+    const result = store.overlayAllMeasures(catalog.measures);
+    const after = usePolarizationSettingsStore.getState();
+    expect(result.previous).toEqual({
+      series: before.series,
+      selectedId: before.selectedId,
+      nextId: before.nextId,
+    });
+    expect(result.skipped).toEqual(["Experts"]);
+    expect(after.series).toBe(result.state.series);
+    expect(after.series).toHaveLength(9);
+    expect(after.series.every((s) => s.k === 3 && s.belief === "public")).toBe(true);
+    // The rest of the settings stay
+    expect(after.axisMode).toBe(before.axisMode);
+
+    store.restoreList(result.previous);
+    const undone = usePolarizationSettingsStore.getState();
+    expect(undone.series).toBe(before.series);
+    expect(undone.selectedId).toBe(before.selectedId);
+    expect(undone.nextId).toBe(after.nextId);
+
+    // Nothing defined for k: the list stays as it is
+    const none = store.overlayAllMeasures([measure("Experts")]);
+    expect(none.state.series).toBe(undone.series);
+    expect(usePolarizationSettingsStore.getState().series).toBe(undone.series);
   });
 
   it("selects the stored measure, else the default one, else the catalog's first", () => {

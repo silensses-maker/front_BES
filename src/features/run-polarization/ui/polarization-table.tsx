@@ -15,7 +15,7 @@ import {
   visibleWindow,
 } from "../lib/polarization-table";
 import type { TableColumn } from "../model/table-columns";
-import { SWATCH } from "./control-styles";
+import { LineSample } from "./line-sample";
 import { BetaBadge } from "./series-config-row";
 
 /**
@@ -273,12 +273,12 @@ export function PolarizationTable({
   );
 }
 
-/** A column's header: colour dot and label (series), or the measure name and its beta badge. */
+/** A column's header: line sample and label (series), or the measure name and its beta badge. */
 function ColumnHeader({ column, notForK }: { column: TableColumn; notForK: string }) {
   return (
     <span className="flex items-center justify-end gap-1.5">
-      {column.color === null ? null : (
-        <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: column.color }} />
+      {column.color === null || column.dash === null ? null : (
+        <LineSample color={column.color} dash={column.dash} />
       )}
       <span className="max-w-[220px] truncate text-foreground">{column.label}</span>
       {column.color === null && column.meta.beta ? <BetaBadge /> : null}

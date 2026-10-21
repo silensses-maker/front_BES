@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { PolarizationCatalog } from "@/shared/api/backend";
-import { type SeriesLabelText, seriesLabel, uniqueLabels } from "./series-label";
+import { type SeriesLabelText, seriesLabel, seriesLabelParts, uniqueLabels } from "./series-label";
 
 /** The catalog the real worker answered (pol_measures @ 0e05564), as the backend serves it. */
 const catalog: PolarizationCatalog = JSON.parse(
@@ -96,5 +96,24 @@ describe("uniqueLabels", () => {
   it("numbers repeated labels in order (an unchanged copy)", () => {
     expect(uniqueLabels(["A", "B", "A", "A"])).toEqual(["A", "B", "A (2)", "A (3)"]);
     expect(uniqueLabels([])).toEqual([]);
+  });
+
+  it("stays unique when a suffix would collide with another label, up to 10 series", () => {
+    expect(uniqueLabels(["A", "A", "A (2)"])).toEqual(["A", "A (3)", "A (2)"]);
+    expect(uniqueLabels(["A (2)", "A", "A"])).toEqual(["A (2)", "A", "A (3)"]);
+    const ten = uniqueLabels([...Array(9).fill("MEC (k=5, private)"), "MEC (k=5, private) (2)"]);
+    expect(new Set(ten).size).toBe(10);
+    expect(ten[9]).toBe("MEC (k=5, private) (2)");
+  });
+});
+
+describe("seriesLabelParts", () => {
+  it("splits a label into the measure, k, belief and edited parameters", () => {
+    expect(
+      seriesLabelParts(
+        { measure: measure("MEC"), params: { alpha: 1.5, beta: 1.15 }, k: 7, belief: "private" },
+        es,
+      ),
+    ).toEqual({ measure: "MEC", k: "k=7", belief: "privada", params: ["α=1,5"] });
   });
 });

@@ -3,6 +3,7 @@ import type { BeliefKind } from "@/shared/lib/polarization";
 import type { CsvColumn } from "../lib/polarization-csv";
 import { csvLabel } from "../lib/polarization-csv";
 import { uniqueLabels } from "../lib/series-label";
+import type { LineDash } from "../lib/series-style";
 import type { MeasureSpec } from "./all-measures";
 import type { ComparedSeries } from "./compared-series";
 import { type PolarizationSeries, type SeriesSpec, seriesKey } from "./polarization-series";
@@ -20,6 +21,8 @@ export interface TableColumn extends CsvColumn {
   label: string;
   /** The series' colour ("series" mode), null for the measures. */
   color: string | null;
+  /** The series' line style ("series" mode, with its colour), null for the measures. */
+  dash: LineDash | null;
   meta: PolarizationMeasureInfo;
   params: ParamValues;
   k: number;
@@ -58,6 +61,7 @@ export function seriesColumns(
       key: `series-${item.config.id}`,
       label: item.label,
       color: item.color,
+      dash: item.dash,
       meta: item.meta,
       params: item.params,
       k: item.config.k,
@@ -83,6 +87,7 @@ export function measureColumns(
       key: `measure-${item.meta.id}`,
       label: names[index] ?? item.meta.name,
       color: null,
+      dash: null,
       meta: item.meta,
       params: item.params,
       k,

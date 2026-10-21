@@ -66,6 +66,16 @@ const polarizationEn = {
   addSeriesLimit: "Up to {{max}} series",
   removeSeriesAria: "Remove the series {{label}}",
   removeSeriesTip: "Remove this series",
+  overlayAria: "Overlay all measures",
+  overlayTip:
+    "Overlay all measures: replaces the series with every measure defined for k = {{k}}, with the package's default parameters and {{belief}} beliefs (the selected series' k and belief type), up to {{max}}. You can undo it. Normalized (shape) compares measures on different scales.",
+  overlayNone: "No measure is defined for k = {{k}}",
+  overlayToast_one: "Overlaid {{display}} measure (k = {{k}}, {{belief}})",
+  overlayToast_other: "Overlaid {{display}} measures (k = {{k}}, {{belief}})",
+  overlaySkipped_one: "Skipped, not defined for k = {{k}}: {{names}}.",
+  overlaySkipped_other: "Skipped, not defined for k = {{k}}: {{names}}.",
+  overlayOmitted: "Left out (up to {{max}} series): {{names}}.",
+  overlayUndo: "Undo",
   beliefShortPrivate: "private",
   beliefShortPublic: "public",
   axisAria: "Y axis",
@@ -172,7 +182,7 @@ const polarizationEn = {
     levels2: "Thresholds only apply to the parameters listed; any other value shows no level.",
     compareTitle: "Comparing measures",
     compare1:
-      "The chart can overlay up to four series, each with its own measure, parameters, k and belief type: + adds a copy of the selected series, so you can change one setting and compare, and × removes one. Level thresholds are only drawn with a single series; with several, hovering the chart lists each series' value and level.",
+      "The chart can overlay up to ten series, each with its own measure, parameters, k and belief type: + adds a copy of the selected series, so you can change one setting and compare, × removes one, and Overlay all measures replaces them with every measure defined for the selected series' k, with the package's default parameters (it can be undone). Series are told apart by color and line style: solid, then dashed and dotted lines with a few markers. Level thresholds are only drawn with a single series; with several, hovering the chart lists each series' value and level.",
     compare2:
       "Normalized (shape) rescales each series to [0, 1] by its own minimum and maximum over the rounds computed so far,",
     compare3:

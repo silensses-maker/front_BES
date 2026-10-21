@@ -12,6 +12,9 @@ vi.mock("@/shared/api/backend", () => ({
   simulationsApi: { computePolarization: vi.fn(), getPolarizationMeasures: vi.fn() },
 }));
 
+// The overlay's notice (with its undo) and the export's
+vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+
 vi.mock("@/shared/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -20,8 +23,9 @@ vi.mock("@/shared/ui/tooltip", () => ({
 
 interface MockSeries {
   name?: string;
+  type: string;
   data: unknown[];
-  lineStyle?: { color: string };
+  lineStyle?: { color: string; type: unknown };
   markLine?: { data: unknown[] };
 }
 interface MockOption {
@@ -31,7 +35,10 @@ interface MockOption {
   tooltip: { formatter: (params: unknown) => string };
 }
 
-/** The chart, as data attributes: lines, marks (playhead + thresholds), legend, y max, tooltip. */
+/**
+ * The chart, as data attributes: lines (colours, dash patterns), markers, marks (playhead +
+ * thresholds), legend, y max, tooltip.
+ */
 vi.mock("echarts-for-react", () => ({
   default: ({ option }: { option: MockOption }) => {
     const lines = option.series.filter((series) => series.name !== undefined);
@@ -45,6 +52,8 @@ vi.mock("echarts-for-react", () => ({
         data-marks={marks}
         data-lines={lines.length}
         data-colors={lines.map((line) => line.lineStyle?.color).join("|")}
+        data-dashes={lines.map((line) => JSON.stringify(line.lineStyle?.type)).join("|")}
+        data-markers={option.series.filter((series) => series.type === "scatter").length}
         data-legend={option.legend?.data.join("|") ?? ""}
         data-ymax={String(option.yAxis.max ?? "")}
         data-tooltip={tooltip}
@@ -53,6 +62,7 @@ vi.mock("echarts-for-react", () => ({
   },
 }));
 
+import { toast } from "sonner";
 import { useRoundAggregatesStore, useSimulationStore } from "@/entities/simulation";
 import {
   type PolarizationCatalog,
@@ -69,7 +79,7 @@ import {
   defaultSettings,
   usePolarizationSettingsStore,
 } from "../model/polarization-settings.store";
-import { fromSingleSeries, type SeriesConfig } from "../model/series-list";
+import { fromSingleSeries, MAX_SERIES, type SeriesConfig } from "../model/series-list";
 import { PolarizationPanelView as PolarizationPanel } from "./polarization-panel";
 import { PolarizationWikiSection } from "./polarization-wiki-section";
 
@@ -163,7 +173,7 @@ const fill = (template: string, values: Record<string, string | number>) =>
     template,
   );
 
-const ADD = fill(p.addSeriesAria, { max: 4 });
+const ADD = fill(p.addSeriesAria, { max: MAX_SERIES });
 const chip = (label: string) => fill(p.seriesAria, { label });
 const chips = () => within(screen.getByRole("group", { name: p.seriesGroupAria }));
 
@@ -344,7 +354,7 @@ describe("PolarizationPanel", () => {
 
   // ── Comparison ────────────────────────────────────────────────────────────
 
-  it("+ adds a copy of the selected series (cached: no request), up to 4; × removes, never the last", async () => {
+  it("+ adds a copy of the selected series (cached: no request), up to 10; × removes, never the last", async () => {
     render(<PolarizationPanel {...IDS} />);
     await flush();
     // One series: the view as before (no chips, no axis toggle)
@@ -369,16 +379,19 @@ describe("PolarizationPanel", () => {
     // Distinct colours per series
     expect(new Set(chart.getAttribute("data-colors")?.split("|")).size).toBe(2);
 
-    fireEvent.click(chips().getByRole("button", { name: ADD }));
-    fireEvent.click(chips().getByRole("button", { name: ADD }));
+    for (let i = 2; i < MAX_SERIES; i++)
+      fireEvent.click(chips().getByRole("button", { name: ADD }));
     await flush();
-    expect(usePolarizationSettingsStore.getState().series).toHaveLength(4);
+    expect(usePolarizationSettingsStore.getState().series).toHaveLength(10);
     expect(chips().getByRole("button", { name: ADD })).toBeDisabled();
-    expect(screen.getByText(fill(p.addSeriesLimit, { max: 4 }))).toBeInTheDocument();
+    expect(screen.getByText(fill(p.addSeriesLimit, { max: 10 }))).toBeInTheDocument();
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(1);
 
-    for (const name of [`${label} (4)`, `${label} (3)`, `${label} (2)`]) {
+    for (let n = MAX_SERIES; n >= 2; n--) {
       fireEvent.click(
-        chips().getByRole("button", { name: fill(p.removeSeriesAria, { label: name }) }),
+        chips().getByRole("button", {
+          name: fill(p.removeSeriesAria, { label: `${label} (${n})` }),
+        }),
       );
     }
     await flush();
@@ -537,6 +550,150 @@ describe("PolarizationPanel", () => {
     expect(simulationsApi.computePolarization).toHaveBeenLastCalledWith(
       expect.objectContaining({ measure: "MEC" }),
     );
+  });
+
+  // ── Many series ─────────────────────────────────────────────────────────
+
+  /** The line sample of every chip, as "dash:colour", by the chip's (full) label. */
+  const chipStyles = () =>
+    new Map(
+      chips()
+        .getAllByRole("button", { pressed: false })
+        .concat(chips().getAllByRole("button", { pressed: true }))
+        .map((button) => {
+          const sample = button.querySelector("svg[data-dash]");
+          const line = sample?.querySelector("line");
+          return [
+            button.getAttribute("aria-label") ?? "",
+            `${sample?.getAttribute("data-dash")}:${line?.getAttribute("stroke")}`,
+          ];
+        }),
+    );
+
+  it("overlays every measure defined for the selected series' k, with a skipped notice and undo", async () => {
+    settings("BiPol", 3);
+    render(<PolarizationPanel {...IDS} />);
+    await flush();
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(1);
+    const before = usePolarizationSettingsStore.getState().series;
+
+    fireEvent.click(screen.getByRole("button", { name: p.overlayAria }));
+    await flush();
+    const series = usePolarizationSettingsStore.getState().series;
+    // Experts is only defined for k = 5: nine measures, in catalog order, with defaults
+    expect(series.map((s) => s.measureId)).toEqual(
+      catalog.measures.map((m) => m.id).filter((id) => id !== "Experts"),
+    );
+    expect(series.every((s) => s.k === 3 && s.belief === "private")).toBe(true);
+    expect(chips().getAllByRole("button", { name: /^Series / })).toHaveLength(9);
+    // BiPol with its defaults was already computed: one request per other measure
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(9);
+    expect(screen.getByTestId("echart")).toHaveAttribute("data-lines", "9");
+    // The settings fold away to leave the chart room; the selected series' measure stays selected
+    expect(chips().getByRole("button", { name: chip("BiPol · k=3 · private") })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    const [message, options] = vi.mocked(toast.success).mock.calls[0] as [
+      string,
+      { description?: string; action: { label: string; onClick: () => void } },
+    ];
+    expect(message).toBe(fill(p.overlayToast_other, { display: 9, k: 3, belief: "private" }));
+    expect(options.description).toBe(fill(p.overlaySkipped_one, { k: 3, names: "Experts" }));
+    expect(options.action.label).toBe(p.overlayUndo);
+
+    act(() => options.action.onClick());
+    await flush();
+    expect(usePolarizationSettingsStore.getState().series).toBe(before);
+    expect(screen.queryByRole("group", { name: p.seriesGroupAria })).toBeNull();
+    expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(9);
+  });
+
+  it("10 series: compact chips that wrap, the shared k and belief once, no legend", async () => {
+    render(<PolarizationPanel {...IDS} />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: p.overlayAria }));
+    await flush();
+    const group = screen.getByRole("group", { name: p.seriesGroupAria });
+    expect(group).toHaveClass("flex-wrap");
+    const buttons = chips().getAllByRole("button", { name: /^Series / });
+    expect(buttons).toHaveLength(10);
+    for (const button of buttons) {
+      expect(button.parentElement).toHaveAttribute("data-compact", "true");
+    }
+    // Short labels on screen; the accessible names keep the full ones
+    expect(within(group).getByText("k=5 · private")).toBeInTheDocument();
+    expect(buttons[0]).toHaveTextContent(/^Esteban–Ray$/);
+    expect(buttons[0]).toHaveAccessibleName(chip("Esteban–Ray · k=5 · private"));
+    expect(toast.success).toHaveBeenCalledWith(
+      fill(p.overlayToast_other, { display: 10, k: 5, belief: "private" }),
+      expect.objectContaining({ description: undefined }),
+    );
+    const chart = screen.getByTestId("echart");
+    expect(chart).toHaveAttribute("data-lines", "10");
+    expect(chart).toHaveAttribute("data-legend", "");
+    expect(chart).toHaveAttribute("data-markers", "6");
+    expect(chart.getAttribute("data-dashes")?.split("|")).toEqual([
+      ...Array(4).fill('"solid"'),
+      ...Array(4).fill("[6,3]"),
+      "[0.5,4]",
+      "[0.5,4]",
+    ]);
+    // The tooltip identifies each series by its line sample too
+    expect(chart.getAttribute("data-tooltip")).toContain('stroke-dasharray="0.5 4"');
+    // + is disabled at the cap
+    expect(chips().getByRole("button", { name: ADD })).toBeDisabled();
+  });
+
+  it("removing a series keeps the other series' colours and line styles", async () => {
+    render(<PolarizationPanel {...IDS} />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: p.overlayAria }));
+    await flush();
+    const before = chipStyles();
+    expect(new Set(before.values()).size).toBe(10);
+    const removed = chip("EMD-pol · k=5 · private");
+    fireEvent.click(
+      chips().getByRole("button", {
+        name: fill(p.removeSeriesAria, { label: "EMD-pol · k=5 · private" }),
+      }),
+    );
+    await flush();
+    const after = chipStyles();
+    expect(after.size).toBe(9);
+    for (const [name, style] of after) expect(style).toBe(before.get(name));
+    expect(after.has(removed)).toBe(false);
+  });
+
+  it("line samples are decorative (aria-hidden): chips, values, settings and table headers", async () => {
+    render(<PolarizationPanel {...IDS} />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: ADD }));
+    await flush();
+    const samples = () => Array.from(document.querySelectorAll("svg[data-dash]"));
+    // 2 chips + 2 round values + the selected series' settings
+    expect(samples()).toHaveLength(5);
+    for (const sample of samples()) {
+      expect(sample).toHaveAttribute("aria-hidden", "true");
+      expect(sample).toHaveAttribute("focusable", "false");
+    }
+    // The values list still names each series
+    const values = within(screen.getByRole("list", { name: fill(p.valuesAria, { round: 1 }) }));
+    expect(values.getByText("BiPol · k=5 · private:")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: p.viewTable }));
+    await flush();
+    const headers = screen.getAllByRole("columnheader");
+    const sampled = headers.filter((header) => header.querySelector("svg[data-dash]") !== null);
+    expect(sampled.map((header) => header.textContent)).toEqual([
+      "BiPol · k=5 · private",
+      "BiPol · k=5 · private (2)",
+    ]);
+    for (const header of sampled) {
+      expect(header.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
   it("is loaded on demand by the feature's PolarizationPanel", async () => {

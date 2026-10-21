@@ -45,28 +45,58 @@ function paramText(
   return `${paramSymbol(name)}=${shown}`;
 }
 
-export function seriesLabel(
+/** The parts of a label: the measure, k, the belief type and the non-default parameters. */
+export interface SeriesLabelParts {
+  measure: string;
+  k: string;
+  belief: string;
+  params: string[];
+}
+
+export function seriesLabelParts(
   { measure, params, k, belief }: SeriesLabelInput,
   text: SeriesLabelText,
-): string {
-  const parts = [measure.name, `k=${k}`, text.belief(belief)];
+): SeriesLabelParts {
+  const edited: string[] = [];
   for (const spec of measure.params) {
     const value = params[spec.name] ?? null;
     if (value === spec.default) continue;
-    parts.push(paramText(spec.name, value, spec.type === "choice", text));
+    edited.push(paramText(spec.name, value, spec.type === "choice", text));
   }
+  return { measure: measure.name, k: `k=${k}`, belief: text.belief(belief), params: edited };
+}
+
+export function joinLabel(parts: readonly string[]): string {
   return parts.join(SEPARATOR);
 }
 
+export function seriesLabel(input: SeriesLabelInput, text: SeriesLabelText): string {
+  const parts = seriesLabelParts(input, text);
+  return joinLabel([parts.measure, parts.k, parts.belief, ...parts.params]);
+}
+
 /**
- * Labels made unique (the legend identifies series by name): a repeated label gets " (2)",
- * " (3)"… in order, e.g. a copy not changed yet.
+ * Labels made unique (the legend and the CSV's wide headers identify series by name): a repeated
+ * label gets " (2)", " (3)"… in order, e.g. a copy not changed yet. A suffix that would collide
+ * with another label of the list is skipped, so the result is always unique.
  */
 export function uniqueLabels(labels: readonly string[]): string[] {
-  const seen = new Map<string, number>();
+  const given = new Set(labels);
+  const used = new Set<string>();
+  const counts = new Map<string, number>();
   return labels.map((label) => {
-    const count = (seen.get(label) ?? 0) + 1;
-    seen.set(label, count);
-    return count === 1 ? label : `${label} (${count})`;
+    if (!used.has(label)) {
+      used.add(label);
+      return label;
+    }
+    let count = counts.get(label) ?? 1;
+    let candidate: string;
+    do {
+      count++;
+      candidate = `${label} (${count})`;
+    } while (used.has(candidate) || given.has(candidate));
+    counts.set(label, count);
+    used.add(candidate);
+    return candidate;
   });
 }

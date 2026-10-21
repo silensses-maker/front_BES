@@ -31,13 +31,20 @@ import {
 } from "@/shared/api/backend";
 import { FINE_BINS, FineHistogramPool } from "@/shared/lib/polarization";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
+import { polarizationCsv } from "../lib/polarization-csv";
 import { tableRounds } from "../lib/polarization-table";
 import type { SeriesLabelText } from "../lib/series-label";
 import { allMeasureEntries, allMeasureSpecs } from "./all-measures";
 import { compareSeries } from "./compared-series";
 import { PolarizationSeries } from "./polarization-series";
 import { defaultSettings, usePolarizationSettingsStore } from "./polarization-settings.store";
-import { addSeries, fromSingleSeries, updateSeries } from "./series-list";
+import {
+  addSeries,
+  fromSingleSeries,
+  MAX_SERIES,
+  overlayAllMeasures,
+  updateSeries,
+} from "./series-list";
 import type { SpecEntry } from "./series-scheduler";
 import { isPartial, measureColumns, seriesColumns } from "./table-columns";
 import { usePolarizationSeriesList } from "./use-polarization-series";
@@ -162,6 +169,53 @@ describe("table columns", () => {
     expect(new Set(columns.map((column) => column.key)).size).toBe(3);
   });
 
+  it("series mode with 10 series: their line styles, and unique labels in the wide CSV", async () => {
+    // Every measure overlaid, then nine copies of one series: both are 10 columns
+    const all = overlayAllMeasures(
+      fromSingleSeries({ measureId: "MEC", paramsByMeasure: {}, k: 5, belief: "private" }),
+      catalog.measures,
+    ).state;
+    const overlaid = seriesColumns(compareSeries(catalog.measures, all.series, TEXT, PALETTE), []);
+    expect(overlaid.map((column) => column.dash)).toEqual([
+      ...Array(4).fill("solid"),
+      ...Array(4).fill("dashed"),
+      "dotted",
+      "dotted",
+    ]);
+    expect(overlaid.map((column) => column.color)).toEqual([
+      ...PALETTE,
+      ...PALETTE,
+      "#111",
+      "#222",
+    ]);
+
+    let copies = fromSingleSeries({
+      measureId: "BiPol",
+      paramsByMeasure: {},
+      k: 5,
+      belief: "private",
+    });
+    for (let i = 1; i < MAX_SERIES; i++) copies = addSeries(copies);
+    const compared = compareSeries(catalog.measures, copies.series, TEXT, PALETTE);
+    const spec = compared[0]?.spec;
+    if (spec == null) throw new Error("BiPol is defined for k = 5");
+    const model = new PolarizationSeries(spec, fakeServer());
+    await model.sync(poolWith(2), 0);
+    // Equal specs share one series (cached: one request for all ten)
+    const columns = seriesColumns(compared, Array(MAX_SERIES).fill(model));
+    expect(new Set(columns.map((column) => column.csvLabel)).size).toBe(MAX_SERIES);
+    expect(new Set(columns.map((column) => column.label)).size).toBe(MAX_SERIES);
+    const csv = polarizationCsv("wide", columns, [0, 1], {
+      runId: "r",
+      networkId: "n",
+      fallbackPackage: null,
+    });
+    const valueHeaders = csv.headers.filter((header) => header.startsWith("BiPol"));
+    expect(valueHeaders).toHaveLength(MAX_SERIES);
+    expect(new Set(csv.headers).size).toBe(csv.headers.length);
+    expect(csv.rows).toHaveLength(2);
+  });
+
   it("all measures: one column per measure, after the compared series in the hook's list", () => {
     const specs = allMeasureSpecs(catalog.measures, 3, "public");
     const models = specs.map((item) =>
@@ -171,7 +225,9 @@ describe("table columns", () => {
     const columns = measureColumns(specs, 3, "public", [null, null, ...models], 2);
     expect(columns.map((column) => column.label)).toEqual(catalog.measures.map((m) => m.name));
     expect(columns.map((column) => column.listIndex)).toEqual(specs.map((_, i) => 2 + i));
-    expect(columns.every((column) => column.color === null && column.k === 3)).toBe(true);
+    expect(
+      columns.every((column) => column.color === null && column.dash === null && column.k === 3),
+    ).toBe(true);
     expect(columns.find((column) => column.meta.id === "Experts")).toMatchObject({
       supported: false,
       series: null,

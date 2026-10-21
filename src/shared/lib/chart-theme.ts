@@ -20,7 +20,8 @@ export interface ChartTheme {
   /**
    * Categorical palette of comparison charts (one color per compared series, in this order):
    * chart-4 (the single-series color) then chart-6, chart-7 and chart-8. It leaves out chart-1 and
-   * chart-2, which mean public and private beliefs.
+   * chart-2, which mean public and private beliefs. More series reuse these four colors with
+   * dashed and dotted lines (run-polarization's series-style.ts).
    */
   series: readonly string[];
   /** Text, axis and grid colors. */

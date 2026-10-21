@@ -30,7 +30,8 @@ import {
 } from "../lib/param-input";
 import type { ComparedSeries } from "../model/compared-series";
 import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
-import { ROW, SEGMENT, SEGMENT_BUTTON, SEGMENT_OFF, SEGMENT_ON, SWATCH } from "./control-styles";
+import { ROW, SEGMENT, SEGMENT_BUTTON, SEGMENT_OFF, SEGMENT_ON } from "./control-styles";
+import { LineSample } from "./line-sample";
 
 /**
  * The controls of one polarization series (#129): measure (grouped literature / proposed, with
@@ -313,7 +314,7 @@ export function SeriesConfigRow({
 }: {
   catalog: PolarizationCatalog;
   item: ComparedSeries;
-  /** Several series: the row is labelled with the series it configures and its colour. */
+  /** Several series: the row is labelled with the series it configures and its line sample. */
   compare: boolean;
   id?: string;
   /** Collapsed (its chip toggles it); kept in the DOM for the chip's aria-controls. */
@@ -332,9 +333,7 @@ export function SeriesConfigRow({
       className={ROW}
     >
       {leading}
-      {compare ? (
-        <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: item.color }} />
-      ) : null}
+      {compare ? <LineSample color={item.color} dash={item.dash} /> : null}
       <MeasureSelect
         catalog={catalog}
         item={item}

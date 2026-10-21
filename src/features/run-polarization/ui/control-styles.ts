@@ -7,5 +7,3 @@ export const SEGMENT_ON = "bg-accent font-semibold text-primary";
 export const SEGMENT_OFF = "text-muted-foreground";
 /** A toolbar row above the chart. */
 export const ROW = "flex flex-none flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-1.5";
-/** A series' colour dot (chips, settings, notices, values). */
-export const SWATCH = "size-2 flex-none rounded-full";

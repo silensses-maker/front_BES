@@ -9,8 +9,12 @@ import type { AxisMode } from "../lib/normalize";
 import {
   addSeries,
   fromSingleSeries,
+  type OverlayMeasure,
+  type OverlayPlan,
+  overlayAllMeasures,
   type ParamValues,
   removeSeries,
+  restoreList,
   type SeriesListState,
   selectSeries,
   updateSeries,
@@ -44,6 +48,14 @@ interface PolarizationSettingsState extends SeriesListState, ViewSettings {
   addSeries: () => void;
   /** Removes a series (never the last one). */
   removeSeries: (id: number) => void;
+  /**
+   * Replaces the series with every measure defined for the selected series' k (defaults, its k
+   * and belief type; see `overlayAllMeasures`). Returns the plan and the list it replaced, for
+   * the view's notice and its undo.
+   */
+  overlayAllMeasures: (measures: readonly OverlayMeasure[]) => OverlayResult;
+  /** Puts back a list an overlay replaced (its undo). */
+  restoreList: (previous: SeriesListState) => void;
   selectSeries: (id: number) => void;
   setMeasure: (id: number, measureId: string) => void;
   setParams: (id: number, measureId: string, params: ParamValues) => void;
@@ -55,6 +67,11 @@ interface PolarizationSettingsState extends SeriesListState, ViewSettings {
   setTableMode: (mode: TableMode) => void;
   setAllMeasuresK: (k: CategoryCount) => void;
   setAllMeasuresBelief: (belief: BeliefKind) => void;
+}
+
+/** An overlay's plan, and the list it replaced (what its undo restores). */
+export interface OverlayResult extends OverlayPlan {
+  previous: SeriesListState;
 }
 
 /** The y axis, the view and the table's settings. */
@@ -88,12 +105,24 @@ export function defaultSettings(): SeriesListState & ViewSettings {
   };
 }
 
+/** The list part of the settings. */
+function listOf({ series, selectedId, nextId }: SeriesListState): SeriesListState {
+  return { series, selectedId, nextId };
+}
+
 export const usePolarizationSettingsStore = /* #__PURE__ */ create<PolarizationSettingsState>(
-  (set) => ({
+  (set, get) => ({
     ...defaultSettings(),
 
     addSeries: () => set((state) => addSeries(state)),
     removeSeries: (id) => set((state) => removeSeries(state, id)),
+    overlayAllMeasures: (measures) => {
+      const previous = listOf(get());
+      const plan = overlayAllMeasures(previous, measures);
+      if (plan.state !== previous) set(plan.state);
+      return { ...plan, previous };
+    },
+    restoreList: (previous) => set((state) => restoreList(state, previous)),
     selectSeries: (id) => set((state) => selectSeries(state, id)),
     setMeasure: (id, measureId) =>
       set((state) => updateSeries(state, id, (s) => ({ ...s, measureId }))),

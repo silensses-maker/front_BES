@@ -1,5 +1,6 @@
 import { type AxisMode, normalizeValue, type ValueRange } from "./normalize";
 import { formatMeasureValue, formatShapeValue } from "./param-input";
+import { type LineDash, sampleShape } from "./series-style";
 
 /**
  * HTML of the polarization chart's axis tooltip (#129). Names come from the server's catalog and
@@ -7,8 +8,10 @@ import { formatMeasureValue, formatShapeValue } from "./param-input";
  */
 
 export interface TooltipRow {
-  /** Swatch colour (null = no swatch: the single-series tooltip). */
+  /** Line sample colour (null = no sample: the single-series tooltip). */
   color: string | null;
+  /** The series' line style, for its sample (solid when missing). */
+  dash?: LineDash;
   name: string;
   /** The value drawn at that round (bold). */
   value: string;
@@ -30,14 +33,28 @@ export function escapeHtml(text: string): string {
   return out;
 }
 
-function swatch(color: string): string {
-  return `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:9px;height:9px;background-color:${escapeHtml(color)}"></span>`;
+/**
+ * The series' line sample (its colour and dash, as the chart draws it), decorative: the row's
+ * name identifies the series.
+ */
+export function lineSampleHtml(color: string, dash: LineDash): string {
+  const shape = sampleShape(dash);
+  const stroke = escapeHtml(color);
+  const { x1, y1, x2, y2 } = shape.line;
+  const dasharray = shape.dasharray === null ? "" : ` stroke-dasharray="${shape.dasharray}"`;
+  return (
+    `<svg aria-hidden="true" focusable="false" width="${shape.width}" height="${shape.height}" ` +
+    `viewBox="0 0 ${shape.width} ${shape.height}" ` +
+    `style="display:inline-block;vertical-align:middle;margin:-2px 5px 0 0">` +
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${shape.strokeWidth}"` +
+    `${dasharray} stroke-linecap="${shape.cap}"/></svg>`
+  );
 }
 
 export function tooltipHtml(head: string, rows: readonly TooltipRow[]): string {
   const lines = rows.map((row) => {
     const details = row.details.map((detail) => ` · ${escapeHtml(detail)}`).join("");
-    const marker = row.color === null ? "" : swatch(row.color);
+    const marker = row.color === null ? "" : lineSampleHtml(row.color, row.dash ?? "solid");
     return `${marker}${escapeHtml(row.name)}: <b>${escapeHtml(row.value)}</b>${details}`;
   });
   return [escapeHtml(head), ...lines].join("<br/>");
@@ -47,6 +64,7 @@ export function tooltipHtml(head: string, rows: readonly TooltipRow[]): string {
 export interface TooltipSeries {
   name: string;
   color: string;
+  dash: LineDash;
   /** The real value (null = none at that round). */
   value: number | null;
   /** The package's level, as the server answered it (null = none). */
@@ -66,8 +84,8 @@ export interface TooltipFormat {
 
 /**
  * The axis tooltip of the polarization chart. One series (`compare` false): its value and level,
- * as before the comparison. Compared series: a row per series with its swatch, its value and its
- * level; in the normalized mode the row shows the normalized (shape) value and the real one.
+ * as before the comparison. Compared series: a row per series with its line sample, its value and
+ * its level; in the normalized mode the row shows the normalized (shape) value and the real one.
  */
 export function polarizationTooltip(
   head: string,
@@ -82,6 +100,7 @@ export function polarizationTooltip(
     if (normalized) {
       return {
         color: item.color,
+        dash: item.dash,
         name: item.name,
         value: formatShapeValue(normalizeValue(item.value, item.range), format.lang),
         details: [format.realValue(real), ...level],
@@ -89,6 +108,7 @@ export function polarizationTooltip(
     }
     return {
       color: view.compare ? item.color : null,
+      dash: item.dash,
       name: item.name,
       value: real,
       details: level,

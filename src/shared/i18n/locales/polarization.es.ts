@@ -66,6 +66,16 @@ const polarizationEs = {
   addSeriesLimit: "Hasta {{max}} series",
   removeSeriesAria: "Quitar la serie {{label}}",
   removeSeriesTip: "Quitar esta serie",
+  overlayAria: "Superponer todas las medidas",
+  overlayTip:
+    "Superponer todas las medidas: reemplaza las series por cada medida definida para k = {{k}}, con los parámetros por defecto del paquete y creencia {{belief}} (la k y el tipo de creencia de la serie seleccionada), hasta {{max}}. Se puede deshacer. Normalizado (forma) compara medidas con escalas distintas.",
+  overlayNone: "Ninguna medida está definida para k = {{k}}",
+  overlayToast_one: "Se superpuso {{display}} medida (k = {{k}}, {{belief}})",
+  overlayToast_other: "Se superpusieron {{display}} medidas (k = {{k}}, {{belief}})",
+  overlaySkipped_one: "Omitida, no definida para k = {{k}}: {{names}}.",
+  overlaySkipped_other: "Omitidas, no definidas para k = {{k}}: {{names}}.",
+  overlayOmitted: "Fuera del límite de {{max}} series: {{names}}.",
+  overlayUndo: "Deshacer",
   beliefShortPrivate: "privada",
   beliefShortPublic: "pública",
   axisAria: "Eje Y",
@@ -174,7 +184,7 @@ const polarizationEs = {
       "Los umbrales solo aplican a los parámetros indicados; con cualquier otro valor no se muestra nivel.",
     compareTitle: "Comparar medidas",
     compare1:
-      "La gráfica puede superponer hasta cuatro series, cada una con su propia medida, parámetros, k y tipo de creencia: + añade una copia de la serie seleccionada, para cambiar un ajuste y comparar, y × quita una. Los umbrales de nivel solo se dibujan con una sola serie; con varias, al pasar el cursor por la gráfica se listan el valor y el nivel de cada serie.",
+      "La gráfica puede superponer hasta diez series, cada una con su propia medida, parámetros, k y tipo de creencia: + añade una copia de la serie seleccionada, para cambiar un ajuste y comparar, × quita una, y Superponer todas las medidas las reemplaza por cada medida definida para la k de la serie seleccionada, con los parámetros por defecto del paquete (se puede deshacer). Las series se distinguen por color y estilo de línea: continua, y luego discontinua y punteada con algunos marcadores. Los umbrales de nivel solo se dibujan con una sola serie; con varias, al pasar el cursor por la gráfica se listan el valor y el nivel de cada serie.",
     compare2:
       "Normalizado (forma) reescala cada serie a [0, 1] según su propio mínimo y máximo en las rondas calculadas hasta ahora,",
     compare3:

@@ -9,15 +9,20 @@ import type { BeliefKind, CategoryCount } from "@/shared/lib/polarization";
 
 export type ParamValues = Record<string, PolarizationParamValue>;
 
-/** At most this many series on the chart. */
-export const MAX_SERIES = 4;
+/**
+ * At most this many series on the chart: the number of measures pol_measures has, so every
+ * measure can be overlaid at once. Their slots map to 4 colours × solid / dashed / dotted
+ * (lib/series-style.ts).
+ */
+export const MAX_SERIES = 10;
 
 export interface SeriesConfig {
   /** Stable identity (React key, selection, debounce), never reused within a session. */
   id: number;
   /**
-   * Colour slot (index of `ChartTheme.series`), kept while the series exists so removing another
-   * series does not repaint it. A series left alone takes slot 0 (the single-series colour).
+   * Style slot, 0 to MAX_SERIES − 1: its colour (`ChartTheme.series`) and line style (solid,
+   * dashed, dotted; see lib/series-style.ts). Kept while the series exists so removing another
+   * series does not restyle it. A series left alone takes slot 0 (the single-series style).
    */
   slot: number;
   measureId: string;
@@ -145,4 +150,74 @@ export function withParams(
 export function withoutParams(series: SeriesConfig, measureId: string): SeriesConfig {
   const { [measureId]: _removed, ...rest } = series.paramsByMeasure;
   return { ...series, paramsByMeasure: rest };
+}
+
+// ─── Overlay all measures ─────────────────────────────────────────────────────────────────────
+
+/** What overlaying needs of a catalog measure. */
+export interface OverlayMeasure {
+  id: string;
+  /** The k it is defined for. */
+  categories: readonly number[];
+}
+
+export interface OverlayPlan {
+  /** The new list (the same state when no measure is defined for k). */
+  state: SeriesListState;
+  /** Ids of the measures not defined for k, in catalog order. */
+  skipped: string[];
+  /** Ids of the measures defined for k left out by MAX_SERIES, in catalog order. */
+  omitted: string[];
+}
+
+/**
+ * "Overlay all measures": a list with one series per catalog measure defined for the selected
+ * series' k, in catalog order and up to MAX_SERIES, each with the package's default parameters
+ * and the selected series' k and belief type. It REPLACES the list (the view offers an undo,
+ * see `restoreList`); slots follow the catalog order (0, 1, …), ids are new, and the series of
+ * the selected series' measure stays selected (else the first). Equal specs reuse the cached
+ * series, so a measure already shown with its defaults costs no request.
+ */
+export function overlayAllMeasures(
+  state: SeriesListState,
+  measures: readonly OverlayMeasure[],
+): OverlayPlan {
+  const source = selectedSeries(state);
+  const defined = measures.filter((m) => m.categories.includes(source.k));
+  const skipped = measures.filter((m) => !m.categories.includes(source.k)).map((m) => m.id);
+  const kept = defined.slice(0, MAX_SERIES);
+  const omitted = defined.slice(MAX_SERIES).map((m) => m.id);
+  if (kept.length === 0) return { state, skipped, omitted };
+  const series = kept.map(
+    (measure, index): SeriesConfig => ({
+      id: state.nextId + index,
+      slot: kept.length === 1 ? 0 : index,
+      measureId: measure.id,
+      paramsByMeasure: {},
+      k: source.k,
+      belief: source.belief,
+    }),
+  );
+  const selected = series.find((s) => s.measureId === source.measureId) ?? series[0];
+  return {
+    state: {
+      series,
+      selectedId: (selected as SeriesConfig).id,
+      nextId: state.nextId + series.length,
+    },
+    skipped,
+    omitted,
+  };
+}
+
+/**
+ * Undo of an overlay: the list as it was (`previous`). Ids stay never reused: the next id is the
+ * highest one handed out so far.
+ */
+export function restoreList(current: SeriesListState, previous: SeriesListState): SeriesListState {
+  return {
+    series: previous.series,
+    selectedId: previous.selectedId,
+    nextId: Math.max(current.nextId, previous.nextId),
+  };
 }

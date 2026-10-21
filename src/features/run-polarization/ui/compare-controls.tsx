@@ -1,4 +1,6 @@
-import { Plus, TriangleAlert, X } from "lucide-react";
+import { Layers, Plus, TriangleAlert, X } from "lucide-react";
+import { toast } from "sonner";
+import type { PolarizationMeasureInfo } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
 import { formatNumber } from "@/shared/lib/format-number";
 import { cn } from "@/shared/lib/utils";
@@ -11,13 +13,21 @@ import type { ComparedSeries, SeriesProblem } from "../model/compared-series";
 import type { PolarizationSeries } from "../model/polarization-series";
 import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
 import { MAX_SERIES } from "../model/series-list";
-import { SEGMENT, SEGMENT_BUTTON, SEGMENT_OFF, SEGMENT_ON, SWATCH } from "./control-styles";
+import { SEGMENT, SEGMENT_BUTTON, SEGMENT_OFF, SEGMENT_ON } from "./control-styles";
+import { LineSample } from "./line-sample";
 
 /**
- * The comparison controls of the polarization view (#129): the + button, the series chips (each
- * opens its settings; × removes it), the y-axis mode, the per-series notices (unsupported k,
- * rejected parameters, a failed request with its retry) and the viewed round's values.
+ * The comparison controls of the polarization view (#129): the + and "overlay all measures"
+ * buttons, the series chips (each opens its settings; × removes it), the y-axis mode, the
+ * per-series notices (unsupported k, rejected parameters, a failed request with its retry) and
+ * the viewed round's values. Each series is identified by its line sample (colour and dash).
  */
+
+/** More series than this: compact chips (and values), so the chart keeps its height. */
+export const FULL_CHIPS_MAX = 4;
+
+/** How long the overlay's notice (with its undo) stays. */
+const OVERLAY_TOAST_MS = 10_000;
 
 export function AddSeriesButton({ count, onAdd }: { count: number; onAdd: () => void }) {
   const { t } = useTranslation();
@@ -48,12 +58,107 @@ export function AddSeriesButton({ count, onAdd }: { count: number; onAdd: () => 
   );
 }
 
+/**
+ * "Overlay all measures": replaces the series with every catalog measure defined for the
+ * selected series' k (the package's defaults, its k and belief type, in catalog order, up to
+ * MAX_SERIES). A notice says how many were overlaid and which were skipped (not defined for k,
+ * e.g. Experts outside k = 5), with an Undo that puts the previous series back.
+ */
+export function OverlayAllButton({
+  measures,
+  selected,
+  onOverlay,
+}: {
+  measures: readonly PolarizationMeasureInfo[];
+  selected: ComparedSeries;
+  /** After the overlay (e.g. folding the settings away, to leave the chart room). */
+  onOverlay?: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { k, belief } = selected.config;
+  const beliefText =
+    belief === "private"
+      ? t("polarization.beliefShortPrivate")
+      : t("polarization.beliefShortPublic");
+  const available = measures.some((m) => m.categories.includes(k));
+  const nameOf = (id: string) => measures.find((m) => m.id === id)?.name ?? id;
+
+  const overlay = () => {
+    const store = usePolarizationSettingsStore.getState();
+    const result = store.overlayAllMeasures(measures);
+    // No measure defined for k (the button is disabled then): nothing changed
+    if (result.state.series === result.previous.series) return;
+    onOverlay?.();
+    const count = result.state.series.length;
+    const notes: string[] = [];
+    if (result.skipped.length > 0) {
+      notes.push(
+        t("polarization.overlaySkipped", {
+          count: result.skipped.length,
+          k,
+          names: result.skipped.map(nameOf).join(", "),
+        }),
+      );
+    }
+    if (result.omitted.length > 0) {
+      notes.push(
+        t("polarization.overlayOmitted", {
+          max: MAX_SERIES,
+          names: result.omitted.map(nameOf).join(", "),
+        }),
+      );
+    }
+    toast.success(
+      t("polarization.overlayToast", {
+        count,
+        display: formatNumber(count, i18n.language),
+        k,
+        belief: beliefText,
+      }),
+      {
+        description: notes.length > 0 ? notes.join(" ") : undefined,
+        duration: OVERLAY_TOAST_MS,
+        action: {
+          label: t("polarization.overlayUndo"),
+          onClick: () => usePolarizationSettingsStore.getState().restoreList(result.previous),
+        },
+      },
+    );
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* The wrapper keeps the tooltip working while the button is disabled */}
+        <span className="inline-flex flex-none">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t("polarization.overlayAria")}
+            disabled={!available}
+            onClick={overlay}
+          >
+            <Layers />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        {available
+          ? t("polarization.overlayTip", { k, belief: beliefText, max: MAX_SERIES })
+          : t("polarization.overlayNone", { k })}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function SeriesChip({
   item,
   selected,
   expanded,
   problem,
   controls,
+  compact,
   onOpen,
 }: {
   item: ComparedSeries;
@@ -61,6 +166,8 @@ export function SeriesChip({
   expanded: boolean;
   problem: boolean;
   controls: string;
+  /** Many series: a lower chip with the short label (k and belief are shown once, aside). */
+  compact: boolean;
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
@@ -68,8 +175,10 @@ export function SeriesChip({
   const name = t("polarization.seriesAria", { label: item.label });
   return (
     <span
+      data-compact={compact ? "true" : undefined}
       className={cn(
-        "flex h-6 max-w-full flex-none items-center rounded-full border font-sans text-[11.5px]",
+        "flex max-w-full flex-none items-center rounded-full border font-sans",
+        compact ? "h-[22px] text-[11px]" : "h-6 text-[11.5px]",
         selected
           ? "border-primary/40 bg-accent font-semibold text-primary"
           : "border-border bg-muted text-muted-foreground",
@@ -84,10 +193,15 @@ export function SeriesChip({
             aria-controls={controls}
             aria-label={problem ? `${name}, ${t("polarization.seriesProblem")}` : name}
             onClick={onOpen}
-            className="flex h-full min-w-0 items-center gap-1.5 rounded-full pr-1 pl-2"
+            className={cn(
+              "flex h-full min-w-0 items-center rounded-full pr-1",
+              compact ? "gap-1 pl-1.5" : "gap-1.5 pl-2",
+            )}
           >
-            <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: item.color }} />
-            <span className="max-w-[220px] truncate">{item.label}</span>
+            <LineSample color={item.color} dash={item.dash} />
+            <span className={cn("truncate", compact ? "max-w-[150px]" : "max-w-[220px]")}>
+              {compact ? item.shortLabel : item.label}
+            </span>
             {problem ? <TriangleAlert aria-hidden="true" className="size-3 text-warn" /> : null}
           </button>
         </TooltipTrigger>
@@ -179,7 +293,7 @@ export function SeriesNotice({
   }
   return (
     <li className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-      <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: item.color }} />
+      <LineSample color={item.color} dash={item.dash} />
       <span className="font-medium text-foreground">{item.label}:</span>
       <span>{text}</span>
       {detail ? <span className="opacity-80">({detail})</span> : null}
@@ -192,31 +306,41 @@ export function SeriesNotice({
   );
 }
 
-/** The viewed round's value of every compared series (identified by its colour and name). */
+/** The viewed round's value of every compared series (identified by its line sample and name). */
 export function RoundValues({
   compared,
   series,
   round,
+  compact,
 }: {
   compared: readonly ComparedSeries[];
   series: ReadonlyArray<PolarizationSeries | null>;
   round: number;
+  /** Many series: tighter, smaller values. */
+  compact: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   return (
     <ul
       aria-label={t("polarization.valuesAria", { round: formatNumber(round, lang) })}
-      className="flex flex-wrap items-center gap-x-2"
+      className={cn("flex flex-wrap items-center gap-y-0.5", compact ? "gap-x-1.5" : "gap-x-2")}
     >
       {compared.map((item, index) => {
         const value = formatMeasureValue(series[index]?.valueAt(round) ?? null, lang);
         const label = t("polarization.valueOf", { label: item.label, value });
         return (
           <li key={item.config.id} title={label} className="flex items-center gap-1">
-            <span aria-hidden="true" className={SWATCH} style={{ backgroundColor: item.color }} />
+            <LineSample color={item.color} dash={item.dash} />
             <span className="sr-only">{item.label}: </span>
-            <span className="font-mono text-[12px] font-semibold text-foreground">{value}</span>
+            <span
+              className={cn(
+                "font-mono font-semibold text-foreground",
+                compact ? "text-[11px]" : "text-[12px]",
+              )}
+            >
+              {value}
+            </span>
           </li>
         );
       })}
