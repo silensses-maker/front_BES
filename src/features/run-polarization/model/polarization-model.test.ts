@@ -37,6 +37,7 @@ import { usePolarizationCatalogStore } from "./polarization-catalog.store";
 import {
   CHUNK_ROUNDS,
   LIVE_INTERVAL_MS,
+  MAX_CACHED_SERIES,
   PolarizationSeries,
   PolarizationSeriesCache,
   type SeriesSpec,
@@ -44,12 +45,14 @@ import {
   seriesKey,
 } from "./polarization-series";
 import {
-  DEFAULT_MEASURE,
+  defaultSettings,
   effectiveParams,
   selectedMeasure,
   usePolarizationSettingsStore,
 } from "./polarization-settings.store";
-import { SPEC_DEBOUNCE_MS, usePolarizationSeries } from "./use-polarization-series";
+import { MAX_SERIES, type SeriesConfig } from "./series-list";
+import type { SpecEntry } from "./series-scheduler";
+import { SPEC_DEBOUNCE_MS, usePolarizationSeriesList } from "./use-polarization-series";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -118,18 +121,23 @@ const SPEC: SeriesSpec = { measureId: "BiPol", params: {}, k: 3, belief: "privat
 
 describe("usePolarizationSettingsStore", () => {
   beforeEach(() => {
-    usePolarizationSettingsStore.setState({
-      measureId: DEFAULT_MEASURE,
-      paramsByMeasure: {},
-      k: 5,
-      belief: "private",
-    });
+    usePolarizationSettingsStore.setState(defaultSettings());
   });
 
-  it("defaults to Esteban–Ray (the package's defaults from the catalog), k = 5 and private beliefs", () => {
+  const only = () => usePolarizationSettingsStore.getState().series[0] as SeriesConfig;
+
+  it("starts with one series: Esteban–Ray (the package's defaults), k = 5, private beliefs, real values", () => {
     const state = usePolarizationSettingsStore.getState();
-    expect([state.measureId, state.k, state.belief]).toEqual(["EstebanRay", 5, "private"]);
-    expect(effectiveParams(measure("EstebanRay"), state.paramsByMeasure)).toEqual({
+    expect(state.series).toHaveLength(1);
+    expect([only().measureId, only().k, only().belief, only().slot]).toEqual([
+      "EstebanRay",
+      5,
+      "private",
+      0,
+    ]);
+    expect(state.selectedId).toBe(only().id);
+    expect(state.axisMode).toBe("values");
+    expect(effectiveParams(measure("EstebanRay"), only().paramsByMeasure)).toEqual({
       alpha: 0.8,
       K: null,
     });
@@ -139,29 +147,90 @@ describe("usePolarizationSettingsStore", () => {
 
   it("remembers parameters per measure, drops unknown names and restores defaults", () => {
     const store = usePolarizationSettingsStore.getState();
-    store.setParams("MEC", { alpha: 1 });
-    store.setParams("MEC", { beta: 2, gamma: 3 });
-    store.setMeasure("BiPol");
-    store.setK(7);
-    store.setBelief("public");
-    let state = usePolarizationSettingsStore.getState();
-    expect(effectiveParams(measure("MEC"), state.paramsByMeasure)).toEqual({ alpha: 1, beta: 2 });
-    expect([state.measureId, state.k, state.belief]).toEqual(["BiPol", 7, "public"]);
-    state.resetParams("MEC");
-    state = usePolarizationSettingsStore.getState();
-    expect(state.paramsByMeasure.MEC).toBeUndefined();
-    expect(effectiveParams(measure("MEC"), state.paramsByMeasure)).toEqual({
+    const id = store.selectedId;
+    store.setParams(id, "MEC", { alpha: 1 });
+    store.setParams(id, "MEC", { beta: 2, gamma: 3 });
+    store.setMeasure(id, "BiPol");
+    store.setK(id, 7);
+    store.setBelief(id, "public");
+    expect(effectiveParams(measure("MEC"), only().paramsByMeasure)).toEqual({ alpha: 1, beta: 2 });
+    expect([only().measureId, only().k, only().belief]).toEqual(["BiPol", 7, "public"]);
+    store.resetParams(id, "MEC");
+    expect(only().paramsByMeasure.MEC).toBeUndefined();
+    expect(effectiveParams(measure("MEC"), only().paramsByMeasure)).toEqual({
       alpha: 2,
       beta: 1.15,
     });
-    store.setParams("EstebanRay", { K: 2 });
-    store.setParams("EstebanRay", { K: null });
-    expect(
-      effectiveParams(
-        measure("EstebanRay"),
-        usePolarizationSettingsStore.getState().paramsByMeasure,
-      ),
-    ).toEqual({ alpha: 0.8, K: null });
+    store.setParams(id, "EstebanRay", { K: 2 });
+    store.setParams(id, "EstebanRay", { K: null });
+    expect(effectiveParams(measure("EstebanRay"), only().paramsByMeasure)).toEqual({
+      alpha: 0.8,
+      K: null,
+    });
+  });
+
+  it("adds a copy of the selected series, configures each series on its own and removes them", () => {
+    const store = usePolarizationSettingsStore.getState();
+    store.addSeries();
+    let state = usePolarizationSettingsStore.getState();
+    const [first, copy] = state.series as [SeriesConfig, SeriesConfig];
+    expect(state.selectedId).toBe(copy.id);
+    expect([copy.measureId, copy.k, copy.belief]).toEqual(["EstebanRay", 5, "private"]);
+
+    store.setK(copy.id, 3);
+    store.setBelief(first.id, "public");
+    store.setAxisMode("normalized");
+    state = usePolarizationSettingsStore.getState();
+    expect(state.series.map((s) => [s.k, s.belief])).toEqual([
+      [5, "public"],
+      [3, "private"],
+    ]);
+    expect(state.axisMode).toBe("normalized");
+
+    store.selectSeries(first.id);
+    expect(usePolarizationSettingsStore.getState().selectedId).toBe(first.id);
+    for (let i = 0; i <= MAX_SERIES; i++) store.addSeries();
+    expect(usePolarizationSettingsStore.getState().series).toHaveLength(MAX_SERIES);
+
+    for (const series of usePolarizationSettingsStore.getState().series) {
+      store.removeSeries(series.id);
+    }
+    state = usePolarizationSettingsStore.getState();
+    expect(state.series).toHaveLength(1); // the last one stays
+    expect(state.series[0]?.slot).toBe(0);
+    expect(state.selectedId).toBe(state.series[0]?.id);
+  });
+
+  it("overlays every measure (replacing the list) and puts the previous list back on undo", () => {
+    const store = usePolarizationSettingsStore.getState();
+    store.setK(store.selectedId, 3);
+    store.addSeries();
+    store.setBelief(usePolarizationSettingsStore.getState().selectedId, "public");
+    const before = usePolarizationSettingsStore.getState();
+    const result = store.overlayAllMeasures(catalog.measures);
+    const after = usePolarizationSettingsStore.getState();
+    expect(result.previous).toEqual({
+      series: before.series,
+      selectedId: before.selectedId,
+      nextId: before.nextId,
+    });
+    expect(result.skipped).toEqual(["Experts"]);
+    expect(after.series).toBe(result.state.series);
+    expect(after.series).toHaveLength(9);
+    expect(after.series.every((s) => s.k === 3 && s.belief === "public")).toBe(true);
+    // The rest of the settings stay
+    expect(after.axisMode).toBe(before.axisMode);
+
+    store.restoreList(result.previous);
+    const undone = usePolarizationSettingsStore.getState();
+    expect(undone.series).toBe(before.series);
+    expect(undone.selectedId).toBe(before.selectedId);
+    expect(undone.nextId).toBe(after.nextId);
+
+    // Nothing defined for k: the list stays as it is
+    const none = store.overlayAllMeasures([measure("Experts")]);
+    expect(none.state.series).toBe(undone.series);
+    expect(usePolarizationSettingsStore.getState().series).toBe(undone.series);
   });
 
   it("selects the stored measure, else the default one, else the catalog's first", () => {
@@ -228,6 +297,8 @@ describe("PolarizationSeries", () => {
     });
     const pool = poolWith(3, [2, 0, 1]);
     const series = new PolarizationSeries(SPEC, server);
+    expect(series.maxRound).toBe(-1);
+    expect(series.answeredAt(0)).toBe(false);
     expect(series.nextSyncDelay(pool, 0)).toBe(0);
     await series.sync(pool, 0);
 
@@ -256,6 +327,12 @@ describe("PolarizationSeries", () => {
     ]);
     expect(series.classification?.thresholds).toEqual([0.4525, 0.6267]);
     expect(series.packageRef).toBe("0e05564ed0b7b23de368dd19becac3a1de4ef745");
+    expect(series.packageVersion).toBe("0.1.0a2");
+    expect(series.maxRound).toBe(2);
+    expect([0, 1, 2].map((round) => series.answeredAt(round))).toEqual([true, true, true]);
+    expect(series.answeredAt(3)).toBe(false);
+    expect(series.answeredAt(-1)).toBe(false);
+    expect(series.answeredAt(1000)).toBe(false);
     expect(series.nextSyncDelay(pool, 0)).toBeNull();
   });
 
@@ -266,6 +343,8 @@ describe("PolarizationSeries", () => {
     await series.sync(pool, 0);
     expect(series.status).toBe("ready");
     expect(series.valueAt(1)).toBeNull();
+    // Answered (no value, the package's error), unlike a round not sent yet
+    expect(series.answeredAt(1)).toBe(true);
     expect(series.errorAt(1)).toContain("At least one weight must be positive");
     expect(series.points()).toEqual([
       [0, 0.5],
@@ -376,13 +455,17 @@ describe("PolarizationSeries", () => {
 });
 
 describe("PolarizationSeriesCache", () => {
-  it("returns the same series for the same spec and evicts the least recently used past 16", () => {
+  it("returns the same series for the same spec and evicts the least recently used past MAX_CACHED_SERIES", () => {
     const cache = new PolarizationSeriesCache(fakeServer());
     const first = cache.get(SPEC);
     expect(cache.get({ ...SPEC, params: {} })).toBe(first);
-    for (let i = 0; i < 16; i++) cache.get({ ...SPEC, params: { alpha: i } });
-    expect(cache.size).toBe(16);
+    for (let i = 0; i < MAX_CACHED_SERIES; i++) cache.get({ ...SPEC, params: { alpha: i } });
+    expect(cache.size).toBe(MAX_CACHED_SERIES);
     expect(cache.get(SPEC)).not.toBe(first);
+  });
+
+  it("keeps the compared series and every catalog measure of the table cached at once", () => {
+    expect(MAX_CACHED_SERIES).toBeGreaterThanOrEqual(MAX_SERIES + catalog.measures.length);
   });
 
   it("is one cache per pool (run / network)", () => {
@@ -394,7 +477,13 @@ describe("PolarizationSeriesCache", () => {
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
-describe("usePolarizationSeries", () => {
+/** The list hook with one series (what the single-series view uses). */
+function useOneSeries(spec: SeriesSpec | null) {
+  const state = usePolarizationSeriesList([{ id: 1, spec }]);
+  return { ...state, series: state.series[0] ?? null, retry: () => state.retry(0) };
+}
+
+describe("usePolarizationSeriesList", () => {
   let frames: FrameRequestCallback[] = [];
   const flushFrames = () => {
     const pending = frames;
@@ -431,7 +520,7 @@ describe("usePolarizationSeries", () => {
     act(() => {
       useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0, 0, 1, 1]));
     });
-    const { result } = renderHook(() => usePolarizationSeries(spec));
+    const { result } = renderHook(() => useOneSeries(spec));
     await settle();
     const compute = vi.mocked(simulationsApi.computePolarization);
     expect(compute).toHaveBeenCalledTimes(1);
@@ -472,7 +561,7 @@ describe("usePolarizationSeries", () => {
       k: 3,
       belief: "private",
     };
-    const { result, rerender } = renderHook(() => usePolarizationSeries(spec));
+    const { result, rerender } = renderHook(() => useOneSeries(spec));
     await settle();
     const first = result.current.series;
     expect(compute).toHaveBeenCalledTimes(1);
@@ -521,7 +610,7 @@ describe("usePolarizationSeries", () => {
       useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0, 1]));
     });
     const spec: SeriesSpec = { measureId: "BiPol", params: {}, k: 3, belief: "private" };
-    const { result } = renderHook(() => usePolarizationSeries(spec));
+    const { result } = renderHook(() => useOneSeries(spec));
     await settle();
     expect(result.current.series?.status).toBe("loading");
 
@@ -546,7 +635,7 @@ describe("usePolarizationSeries", () => {
     act(() => {
       useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0.2]));
     });
-    const { result } = renderHook(() => usePolarizationSeries(null));
+    const { result } = renderHook(() => useOneSeries(null));
     await settle();
     expect(result.current.series).toBeNull();
     expect(simulationsApi.computePolarization).not.toHaveBeenCalled();
@@ -562,7 +651,7 @@ describe("usePolarizationSeries", () => {
       useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0, 1]));
     });
     const spec: SeriesSpec = { measureId: "EMDPol", params: {}, k: 3, belief: "public" };
-    const { result } = renderHook(() => usePolarizationSeries(spec));
+    const { result } = renderHook(() => useOneSeries(spec));
     await settle();
     expect(result.current.series?.status).toBe("error");
     expect(result.current.series?.error?.kind).toBe("unavailable");
@@ -571,6 +660,151 @@ describe("usePolarizationSeries", () => {
     await settle();
     expect(result.current.series?.status).toBe("ready");
     expect(simulationsApi.computePolarization).toHaveBeenCalledTimes(2);
+  });
+
+  it("compared series share the server: one request at a time, round-robin between them", async () => {
+    const compute = vi.mocked(simulationsApi.computePolarization);
+    const server = fakeServer();
+    const releases: Array<() => void> = [];
+    compute.mockImplementation(
+      (body) =>
+        new Promise((resolve) => {
+          releases.push(() => resolve(server(body)));
+        }),
+    );
+    const release = async () => {
+      await act(async () => {
+        releases.shift()?.();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await settle();
+    };
+    act(() => {
+      useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0, 1]));
+    });
+    const a: SeriesSpec = { measureId: "BiPol", params: {}, k: 3, belief: "private" };
+    const b: SeriesSpec = { measureId: "EMDPol", params: {}, k: 5, belief: "public" };
+    const { result } = renderHook(() =>
+      usePolarizationSeriesList([
+        { id: 1, spec: a },
+        { id: 2, spec: b },
+      ]),
+    );
+    await settle();
+    expect(compute).toHaveBeenCalledTimes(1);
+    expect(compute.mock.calls[0]?.[0].measure).toBe("BiPol");
+    await release();
+    expect(compute).toHaveBeenCalledTimes(2);
+    expect(compute.mock.calls[1]?.[0].measure).toBe("EMDPol");
+    await release();
+    expect(result.current.series.map((series) => series?.status)).toEqual(["ready", "ready"]);
+
+    // A live run: both have a new round; once the interval is over, the one served longest ago
+    // goes first, then the other (never two requests at once)
+    act(() => {
+      useRoundAggregatesStore.getState().ingest(KEY, frame(1, [0, 0]));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LIVE_INTERVAL_MS);
+    });
+    await settle();
+    expect(compute).toHaveBeenCalledTimes(3);
+    expect(compute.mock.calls[2]?.[0]).toMatchObject({ measure: "BiPol", histograms: [[2, 0, 0]] });
+    await release();
+    expect(compute).toHaveBeenCalledTimes(4);
+    expect(compute.mock.calls[3]?.[0].measure).toBe("EMDPol");
+    await release();
+    expect(result.current.series[0]?.valueAt(1)).toBe(1);
+    expect(result.current.series[1]?.answered).toBe(2);
+  });
+
+  it("a failing series stops on its own: the others go on, and retry() only asks for it", async () => {
+    const compute = vi.mocked(simulationsApi.computePolarization);
+    const server = fakeServer();
+    compute.mockImplementation((body) =>
+      body.measure === "MEC"
+        ? Promise.reject({
+            isAxiosError: true,
+            response: { status: 503, data: { error: "unavailable", message: "busy" } },
+          })
+        : server(body),
+    );
+    act(() => {
+      useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0, 1]));
+    });
+    const mec: SeriesSpec = {
+      measureId: "MEC",
+      params: { alpha: 2, beta: 1.15 },
+      k: 3,
+      belief: "private",
+    };
+    const bipol: SeriesSpec = { measureId: "BiPol", params: {}, k: 3, belief: "private" };
+    const { result } = renderHook(() =>
+      usePolarizationSeriesList([
+        { id: 1, spec: mec },
+        { id: 2, spec: bipol },
+      ]),
+    );
+    await settle();
+    await settle();
+    expect(result.current.series[0]?.status).toBe("error");
+    expect(result.current.series[0]?.error?.message).toBe("busy");
+    expect(result.current.series[1]?.status).toBe("ready");
+    expect(result.current.series[1]?.valueAt(0)).toBe(0.5);
+    expect(compute).toHaveBeenCalledTimes(2);
+
+    compute.mockImplementation(server);
+    act(() => result.current.retry(0));
+    await settle();
+    expect(result.current.series[0]?.status).toBe("ready");
+    expect(compute).toHaveBeenCalledTimes(3);
+    expect(compute.mock.calls[2]?.[0].measure).toBe("MEC");
+    act(() => result.current.retry(5)); // no series there: nothing to clear
+  });
+
+  it("debounces each series on its own; a copy shares the cached series; removing applies at once", async () => {
+    const compute = vi.mocked(simulationsApi.computePolarization);
+    act(() => {
+      useRoundAggregatesStore.getState().ingest(KEY, frame(0, [0.1, 0.9]));
+    });
+    const a: SeriesSpec = { measureId: "BiPol", params: {}, k: 3, belief: "private" };
+    let entries: SpecEntry[] = [{ id: 1, spec: a }];
+    const { result, rerender } = renderHook(() => usePolarizationSeriesList(entries));
+    await settle();
+    expect(compute).toHaveBeenCalledTimes(1);
+
+    // A copy (new id, same spec): at once, the same cached series, no request
+    entries = [
+      { id: 1, spec: a },
+      { id: 2, spec: a },
+    ];
+    rerender();
+    await settle();
+    expect(result.current.series[1]).toBe(result.current.series[0]);
+    expect(compute).toHaveBeenCalledTimes(1);
+
+    // Editing the copy waits for the debounce; the first series is not touched
+    const b: SeriesSpec = { ...a, k: 5 };
+    entries = [
+      { id: 1, spec: a },
+      { id: 2, spec: b },
+    ];
+    rerender();
+    await settle();
+    expect(result.current.series[1]?.spec.k).toBe(3);
+    expect(compute).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SPEC_DEBOUNCE_MS);
+    });
+    await settle();
+    expect(result.current.series[1]?.spec.k).toBe(5);
+    expect(result.current.series[0]?.spec.k).toBe(3);
+    expect(compute).toHaveBeenCalledTimes(2);
+
+    entries = [{ id: 2, spec: b }];
+    rerender();
+    expect(result.current.series).toHaveLength(1);
+    expect(result.current.series[0]?.spec.k).toBe(5);
   });
 });
 

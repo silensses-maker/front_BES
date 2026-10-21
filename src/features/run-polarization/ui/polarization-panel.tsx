@@ -1,127 +1,82 @@
 import ReactECharts from "echarts-for-react";
-import { RotateCcw } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import type {
-  PolarizationCatalog,
-  PolarizationMeasureInfo,
-  PolarizationNumberParam,
-  PolarizationParamValue,
-} from "@/shared/api/backend";
+import { type CSSProperties, type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useSimulationStore } from "@/entities/simulation";
+import type { PolarizationCatalog } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { buildCsv, downloadCsv } from "@/shared/lib/csv";
 import { formatNumber } from "@/shared/lib/format-number";
-import { CATEGORY_COUNTS, type CategoryCount } from "@/shared/lib/polarization";
+import type { BeliefKind, CategoryCount } from "@/shared/lib/polarization";
 import { useChartTheme } from "@/shared/lib/use-chart-theme";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
 import { InfoTooltip } from "@/shared/ui/info-tooltip";
-import { Input } from "@/shared/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
-import {
-  alienationLabel,
-  formatMeasureValue,
-  formatParamValue,
-  paramSymbol,
-  parseParamInput,
-  rangeText,
-} from "../lib/param-input";
-import { polarizationOption } from "../lib/polarization-chart-option";
-import type { PolarizationErrorInfo } from "../lib/polarization-error";
+import { type AxisMode, valueRange } from "../lib/normalize";
+import { formatMeasureValue } from "../lib/param-input";
+import { type ChartSeriesInput, polarizationOption } from "../lib/polarization-chart-option";
+import { type CsvFormat, polarizationCsv, polarizationCsvFileName } from "../lib/polarization-csv";
+import { polarizationErrorKey } from "../lib/polarization-error";
+import { tableRounds } from "../lib/polarization-table";
+import { polarizationTooltip } from "../lib/polarization-tooltip";
 import { registerPolarizationStrings } from "../lib/register-strings";
-import { usePolarizationCatalogStore } from "../model/polarization-catalog.store";
+import { allMeasureEntries, allMeasureSpecs } from "../model/all-measures";
 import {
-  effectiveParams,
-  selectedMeasure,
-  usePolarizationSettingsStore,
-} from "../model/polarization-settings.store";
-import { usePolarizationSeries } from "../model/use-polarization-series";
+  type ComparedSeries,
+  compareSeries,
+  problemOf,
+  sharedSettings,
+} from "../model/compared-series";
+import { usePolarizationCatalogStore } from "../model/polarization-catalog.store";
+import type { PolarizationSeries } from "../model/polarization-series";
+import { usePolarizationSettingsStore } from "../model/polarization-settings.store";
+import { isPartial, measureColumns, seriesColumns } from "../model/table-columns";
+import { usePolarizationSeriesList } from "../model/use-polarization-series";
+import {
+  AddSeriesButton,
+  AxisModeToggle,
+  FULL_CHIPS_MAX,
+  OverlayAllButton,
+  RoundValues,
+  SeriesChip,
+  SeriesNotice,
+} from "./compare-controls";
+import { ROW } from "./control-styles";
+import { PolarizationTable } from "./polarization-table";
+import { SeriesConfigRow } from "./series-config-row";
+import {
+  AllMeasuresControls,
+  ExportMenu,
+  MeasureNotices,
+  PartialNote,
+  TableModeSwitch,
+  ViewToggle,
+} from "./table-controls";
 
-const SEGMENT = "flex flex-none gap-0.5 rounded-lg border border-border bg-muted p-0.5";
-const SEGMENT_BUTTON = "h-6 rounded-md px-2 font-sans text-[11.5px] font-medium";
-const SEGMENT_ON = "bg-accent font-semibold text-primary";
-const SEGMENT_OFF = "text-muted-foreground";
 const MESSAGE =
   "flex h-full flex-col items-center justify-center gap-2 px-6 text-center font-sans text-[12px] text-muted-foreground";
-
-function BetaBadge() {
-  const { t } = useTranslation();
-  return (
-    <span
-      title={t("polarization.betaTip")}
-      className="ml-1.5 rounded-full bg-warn/15 px-1.5 py-px font-sans text-[9.5px] font-semibold tracking-wide text-warn"
-    >
-      {t("polarization.beta")}
-    </span>
-  );
-}
-
-/** One numeric parameter field: keeps the typed text, applies it only when valid. */
-function NumberParamField({
-  measureId,
-  spec,
-  value,
-}: {
-  measureId: string;
-  spec: PolarizationNumberParam;
-  value: PolarizationParamValue;
-}) {
-  const { t } = useTranslation();
-  const setParams = usePolarizationSettingsStore((s) => s.setParams);
-  const [text, setText] = useState(formatParamValue(value));
-  const [invalid, setInvalid] = useState(false);
-
-  // Follow external changes (reset to defaults, measure switch)
-  useEffect(() => {
-    setText(formatParamValue(value));
-    setInvalid(false);
-  }, [value]);
-
-  const symbol = paramSymbol(spec.name);
-  const range = rangeText(spec);
-  const tip = spec.nullable
-    ? t("polarization.paramKTip")
-    : t("polarization.paramTip", {
-        name: symbol,
-        value: formatParamValue(spec.default),
-        range,
-      });
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <label className="flex flex-none items-center gap-1 font-sans text-[11.5px] text-muted-foreground">
-          <span className="font-mono">{symbol}</span>
-          <Input
-            type="text"
-            inputMode="decimal"
-            value={text}
-            placeholder={spec.nullable ? t("polarization.paramAuto") : undefined}
-            aria-label={t("polarization.paramAria", { name: symbol })}
-            aria-invalid={invalid}
-            onChange={(e) => {
-              setText(e.target.value);
-              const parsed = parseParamInput(spec, e.target.value);
-              setInvalid(!parsed.ok);
-              if (parsed.ok) setParams(measureId, { [spec.name]: parsed.value });
-            }}
-            className="h-[26px] w-[58px] px-1.5 font-mono text-xs"
-          />
-        </label>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs">
-        {invalid ? t("polarization.paramInvalid", { range }) : tip}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+/** The controls above the chart / table, and the chart / table (up to FULL_CHIPS_MAX series). */
+const HEADER = "flex flex-none flex-col";
+const BODY = "min-h-0 flex-1";
+/**
+ * More series: the controls scroll on their own when they would take more than the body leaves
+ * them (wrapped chips and values in the card's small height), so the chart keeps half of the
+ * view, or 110 px (the maximized card has room for all of them).
+ */
+const HEADER_SCROLL = "flex min-h-0 flex-initial flex-col overflow-y-auto pb-1";
+const BODY_FLOOR = "min-h-[min(50%,110px)] flex-1";
+/**
+ * Shadows at the header's edges while it has more to scroll, CSS only: the card-coloured covers
+ * scroll with the content and hide the fixed shadows when an end is reached.
+ */
+const SCROLL_SHADOWS: CSSProperties = {
+  background: [
+    "linear-gradient(var(--card) 30%, transparent) top / 100% 12px no-repeat local",
+    "linear-gradient(transparent, var(--card) 70%) bottom / 100% 12px no-repeat local",
+    "radial-gradient(farthest-side at 50% 0, color-mix(in oklab, var(--foreground) 18%, transparent), transparent) top / 100% 6px no-repeat scroll",
+    "radial-gradient(farthest-side at 50% 100%, color-mix(in oklab, var(--foreground) 18%, transparent), transparent) bottom / 100% 6px no-repeat scroll",
+  ].join(", "),
+};
 
 /** Message + optional retry in place of the chart. */
 function ChartMessage({
@@ -146,34 +101,41 @@ function ChartMessage({
   );
 }
 
-function useErrorText(error: PolarizationErrorInfo | null): string {
-  const { t } = useTranslation();
-  if (error?.kind === "disabled") return t("polarization.errorDisabled");
-  if (error?.kind === "unavailable") return t("polarization.errorUnavailable");
-  return t("polarization.errorGeneric");
+export interface PolarizationPanelProps {
+  /** The run and network shown (the CSV export records them and names the file after them). */
+  runId: string;
+  networkId: string;
+  /** Seeks the run to a round (a table row click); without it the rows are not clickable. */
+  onSeekRound?: (round: number) => void;
 }
 
 /**
- * "Polarización" view of the run charts card (#129): a pol_measures measure per round over the
- * k-category histogram of the private (default) or public beliefs, computed on the SERVER by the
- * real package, with its level for the viewed round when thresholds apply. The measures, their
- * parameters, defaults, ranges and supported k come from the server's catalog (loaded once per
- * session). Loaded on demand by `PolarizationPanel` (./lazy-polarization-panel.tsx).
+ * "Polarización" view of the run charts card (#129): pol_measures measures per round over the
+ * k-category histograms of the private (default) or public beliefs, computed on the SERVER by the
+ * real package. One series shows its level for the viewed round and the package's thresholds;
+ * up to MAX_SERIES series, each with its own measure, parameters, k and belief type, can be
+ * overlaid to compare them (on the real axis or normalized to their shape). The same values can
+ * be shown as a table (the compared series, or every measure with its defaults) and exported as
+ * CSV. The measures, their parameters, defaults, ranges and supported k come from the server's
+ * catalog (loaded once per session). Loaded on demand by `PolarizationPanel`
+ * (./lazy-polarization-panel.tsx).
  */
-export function PolarizationPanelView() {
+export function PolarizationPanelView(props: PolarizationPanelProps) {
   registerPolarizationStrings();
   const { t } = useTranslation();
   const status = usePolarizationCatalogStore((s) => s.status);
   const catalog = usePolarizationCatalogStore((s) => s.catalog);
   const error = usePolarizationCatalogStore((s) => s.error);
   const load = usePolarizationCatalogStore((s) => s.load);
-  const errorText = useErrorText(error);
+  const errorText = t(polarizationErrorKey(error));
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (catalog !== null && catalog.measures.length > 0) return <CatalogView catalog={catalog} />;
+  if (catalog !== null && catalog.measures.length > 0) {
+    return <CatalogView catalog={catalog} {...props} />;
+  }
   if (catalog !== null) return <ChartMessage text={errorText} />;
   if (status === "error") {
     return (
@@ -189,49 +151,119 @@ export function PolarizationPanelView() {
   return <ChartMessage text={t("polarization.catalogLoading")} />;
 }
 
-function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
+// ─── The view ─────────────────────────────────────────────────────────────────────────────────
+
+interface ChartLine extends ChartSeriesInput {
+  series: PolarizationSeries;
+}
+
+function CatalogView({
+  catalog,
+  runId,
+  networkId,
+  onSeekRound,
+}: PolarizationPanelProps & { catalog: PolarizationCatalog }) {
   const { t, i18n } = useTranslation();
-  const theme = useChartTheme();
-  const storedId = usePolarizationSettingsStore((s) => s.measureId);
-  const paramsByMeasure = usePolarizationSettingsStore((s) => s.paramsByMeasure);
-  const k = usePolarizationSettingsStore((s) => s.k);
-  const belief = usePolarizationSettingsStore((s) => s.belief);
-  const { setMeasure, setParams, resetParams, setK, setBelief } =
-    usePolarizationSettingsStore.getState();
-
-  // The catalog has at least one measure (PolarizationPanelView).
-  const meta = selectedMeasure(catalog.measures, storedId) as PolarizationMeasureInfo;
-  const params = useMemo(() => effectiveParams(meta, paramsByMeasure), [meta, paramsByMeasure]);
-  const supported = meta.categories.includes(k);
-  const spec = useMemo(
-    () => (supported ? { measureId: meta.id, params, k, belief } : null),
-    [supported, meta.id, params, k, belief],
-  );
-  const { series, seriesVersion, currentRound, retry } = usePolarizationSeries(spec);
-
   const lang = i18n.language;
+  const theme = useChartTheme();
+  const configs = usePolarizationSettingsStore((s) => s.series);
+  const selectedId = usePolarizationSettingsStore((s) => s.selectedId);
+  const axisMode = usePolarizationSettingsStore((s) => s.axisMode);
+  const view = usePolarizationSettingsStore((s) => s.view);
+  const tableMode = usePolarizationSettingsStore((s) => s.tableMode);
+  const allMeasuresK = usePolarizationSettingsStore((s) => s.allMeasuresK);
+  const allMeasuresBelief = usePolarizationSettingsStore((s) => s.allMeasuresBelief);
+  const simulationStatus = useSimulationStore((s) => s.status);
+  const { addSeries, selectSeries, setK } = usePolarizationSettingsStore.getState();
+  const [configOpen, setConfigOpen] = useState(true);
+  const configId = useId();
+  const chartVisible = view === "chart";
+  const live = simulationStatus === "running" || simulationStatus === "connecting";
+
+  const labelText = useMemo(
+    () => ({
+      lang,
+      belief: (belief: BeliefKind) =>
+        belief === "private"
+          ? t("polarization.beliefShortPrivate")
+          : t("polarization.beliefShortPublic"),
+      auto: t("polarization.paramAuto"),
+      alienations: catalog.alienations,
+    }),
+    [catalog, lang, t],
+  );
+  const compared = useMemo(
+    () => compareSeries(catalog.measures, configs, labelText, theme.series),
+    [catalog, configs, labelText, theme.series],
+  );
+  const selectedIndex = Math.max(
+    0,
+    compared.findIndex((item) => item.config.id === selectedId),
+  );
+  const selected = compared[selectedIndex] as ComparedSeries;
+
+  // The table's "all measures": requested only while that mode is shown
+  const showAll = view === "table" && tableMode === "all";
+  const measuresK: CategoryCount = allMeasuresK ?? selected.config.k;
+  const measuresBelief: BeliefKind = allMeasuresBelief ?? selected.config.belief;
+  const measureSpecs = useMemo(
+    () => (showAll ? allMeasureSpecs(catalog.measures, measuresK, measuresBelief) : []),
+    [showAll, catalog, measuresK, measuresBelief],
+  );
+
+  // One list for the chart's series and the measures: one scheduler shares the server
+  const entries = useMemo(
+    () => [
+      ...compared.map((item) => ({ id: item.config.id, spec: item.spec })),
+      ...allMeasureEntries(measureSpecs),
+    ],
+    [compared, measureSpecs],
+  );
+  const { series, seriesVersion, currentRound, recorded, retry } =
+    usePolarizationSeriesList(entries);
+
+  const compare = compared.length > 1;
+  // Many series: compact chips with short labels, the header scrolls past its share
+  const compact = compared.length > FULL_CHIPS_MAX;
+  const headerProps = compact
+    ? { className: HEADER_SCROLL, style: SCROLL_SHADOWS }
+    : { className: HEADER };
+  const body = compact ? BODY_FLOOR : BODY;
+  const mode: AxisMode = compare ? axisMode : "values";
   const levelText = (label: string) => t(`polarization.levels.${label}`, { defaultValue: label });
 
+  // The drawn lines: the series that have a model (a measure not defined for k has none)
   // biome-ignore lint/correctness/useExhaustiveDependencies: seriesVersion signals new values
-  const view = useMemo(() => {
-    const value = series?.valueAt(currentRound) ?? null;
-    return {
-      points: series?.points() ?? [],
-      value,
-      level: value !== null ? (series?.levelAt(currentRound) ?? null) : null,
-      classification: series?.classification ?? null,
-      status: series?.status ?? "idle",
-      error: series?.error ?? null,
-      hasValues: series?.hasValues ?? false,
-    };
-  }, [series, seriesVersion, currentRound]);
-  const seriesErrorText = useErrorText(view.error);
+  const lines = useMemo(
+    () =>
+      chartVisible
+        ? compared.flatMap((item, index): ChartLine[] => {
+            const model = series[index] ?? null;
+            if (model === null) return [];
+            const points = model.points();
+            return [
+              {
+                name: item.label,
+                color: item.color,
+                dash: item.dash,
+                slot: item.config.slot,
+                points,
+                range: valueRange(points),
+                series: model,
+              },
+            ];
+          })
+        : [],
+    [chartVisible, compared, series, seriesVersion],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: levelText only reads t
   const option = useMemo(() => {
-    const classification = view.classification;
+    if (!chartVisible) return null;
+    const classification = compare ? null : (lines[0]?.series.classification ?? null);
     return polarizationOption({
-      points: view.points,
+      series: lines,
+      compare,
       round: currentRound,
       thresholds:
         classification === null
@@ -240,265 +272,363 @@ function CatalogView({ catalog }: { catalog: PolarizationCatalog }) {
               value: threshold,
               label: levelText(classification.levels[i + 1] ?? ""),
             })),
-      seriesName: meta.name,
+      axisMode: mode,
       theme,
-      formatValue: (v) => v.toLocaleString(lang, { maximumFractionDigits: 3 }),
-      formatTooltip: (round, v) => {
-        const head = t("polarization.tooltipRound", { round: formatNumber(round, lang) });
-        const shown = formatMeasureValue(v, lang);
-        // The package's level of that round, as the server answered it
-        const lvl = v !== null ? (series?.levelAt(round) ?? null) : null;
-        return `${head}<br/>${meta.name}: <b>${shown}</b>${lvl ? ` · ${levelText(lvl)}` : ""}`;
+      formatValue: (v) =>
+        v.toLocaleString(lang, { maximumFractionDigits: mode === "normalized" ? 2 : 3 }),
+      formatTooltip: (round, indices) => {
+        const shown = indices.length > 0 ? indices.map((i) => lines[i] as ChartLine) : lines;
+        return polarizationTooltip(
+          t("polarization.tooltipRound", { round: formatNumber(round, lang) }),
+          shown.map((line) => {
+            const value = line.series.valueAt(round);
+            return {
+              name: compare ? line.name : selected.meta.name,
+              color: line.color,
+              dash: line.dash,
+              value,
+              level: value === null ? null : line.series.levelAt(round),
+              range: line.range,
+            };
+          }),
+          { compare, axisMode: mode },
+          {
+            lang,
+            level: levelText,
+            realValue: (value) => t("polarization.tooltipValue", { value }),
+            normalized: t("polarization.axisNormalized"),
+          },
+        );
       },
     });
-  }, [view, series, currentRound, meta.name, theme, lang, t]);
+  }, [chartVisible, lines, compare, mode, currentRound, selected.meta.name, theme, lang, t]);
 
-  /** First k the measure supports among the ones offered (Experts: 5). */
-  const firstSupportedK = CATEGORY_COUNTS.find((count) => meta.categories.includes(count)) ?? null;
-  const literature = catalog.measures.filter((m) => m.kind === "literature");
-  const proposed = catalog.measures.filter((m) => m.kind === "proposed");
+  // ── The table: its columns, the rounds computed so far, the export ────────────────────────
+  const tableColumns = useMemo(() => {
+    if (view !== "table") return [];
+    return showAll
+      ? measureColumns(measureSpecs, measuresK, measuresBelief, series, compared.length)
+      : seriesColumns(compared, series);
+  }, [view, showAll, measureSpecs, measuresK, measuresBelief, series, compared]);
+  // Rows change only when a series has answered more rounds (not on every status change)
+  const answeredKey = tableColumns.map((column) => column.series?.answered ?? 0).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: answeredKey signals new rounds
+  const rounds = useMemo(
+    () => tableRounds(tableColumns.map((column) => column.series)),
+    [tableColumns, answeredKey],
+  );
+  const partial = isPartial(tableColumns, recorded, live);
 
-  const measureItem = (item: PolarizationMeasureInfo) => {
-    const enabled = item.categories.includes(k);
-    const offered = CATEGORY_COUNTS.filter((count) => item.categories.includes(count));
-    return (
-      <SelectItem key={item.id} value={item.id} disabled={!enabled}>
-        <span className="flex items-center">
-          {item.name}
-          {item.beta && <BetaBadge />}
-          {!enabled && (
-            <span className="ml-1.5 text-[10.5px] text-muted-foreground">
-              {offered.length === 1
-                ? t("polarization.onlyCategories", { k: offered[0] })
-                : t("polarization.notForK", { k })}
-            </span>
-          )}
-        </span>
-      </SelectItem>
+  const exportCsv = (format: CsvFormat) => {
+    const csv = polarizationCsv(format, tableColumns, rounds, {
+      runId,
+      networkId,
+      fallbackPackage: { version: catalog.package.version, ref: catalog.package.commit },
+    });
+    const fileName = polarizationCsvFileName({
+      mode: tableMode,
+      format,
+      runId,
+      networkId,
+      date: new Date(),
+    });
+    downloadCsv(fileName, buildCsv(csv.headers, csv.rows));
+    toast.success(
+      t("polarization.table.exportToast", {
+        count: csv.rows.length,
+        display: formatNumber(csv.rows.length, lang),
+        file: fileName,
+      }),
     );
   };
 
-  let chart: ReactNode;
-  if (!supported) {
-    chart = (
-      <ChartMessage
-        text={t("polarization.unsupportedK", { name: meta.name, k })}
-        action={
-          firstSupportedK === null
-            ? null
-            : {
-                label: t("polarization.useCategories", { k: firstSupportedK }),
-                onClick: () => setK(firstSupportedK as CategoryCount),
-              }
-        }
-      />
+  const chartElement =
+    option === null ? null : (
+      <ReactECharts option={option} notMerge={true} style={{ width: "100%", height: "100%" }} />
     );
-  } else if (view.status === "error" && view.error?.kind === "invalid") {
-    chart = (
-      <ChartMessage
-        text={t("polarization.invalidParams", { name: meta.name })}
-        detail={view.error.message}
-      />
+  const computing = (
+    <span
+      role="status"
+      aria-label={t("polarization.computingAria")}
+      className="animate-pulse text-[11px]"
+    >
+      {t("polarization.computing")}
+    </span>
+  );
+  const roundText = (
+    <span>{t("polarization.valueAt", { round: formatNumber(currentRound, lang) })}</span>
+  );
+  // In the table view the toggle leads the table's toolbar instead
+  const viewToggle = chartVisible ? <ViewToggle /> : null;
+  const problems = compared.map((item, index) => problemOf(item, series[index] ?? null));
+  const notices = problems.some((problem) => problem !== null) ? (
+    <ul className="flex flex-none flex-col gap-0.5 px-3 pt-1 font-sans text-[11px] text-muted-foreground">
+      {compared.map((item, index) => {
+        const problem = problems[index] ?? null;
+        if (problem === null) return null;
+        return (
+          <SeriesNotice
+            key={item.config.id}
+            item={item}
+            problem={problem}
+            onRetry={() => retry(index)}
+          />
+        );
+      })}
+    </ul>
+  ) : null;
+
+  // After an overlay the settings fold away: the chart has the room, a chip shows them again
+  const overlayButton = (
+    <OverlayAllButton
+      measures={catalog.measures}
+      selected={selected}
+      onOverlay={() => setConfigOpen(false)}
+    />
+  );
+
+  let seriesHeader: ReactNode;
+  let chartBody: ReactNode;
+  if (compare) {
+    // ── Several series: chips, the selected one's settings, per-series notices ─────────────
+    const loading = compared.some((_, index) => series[index]?.status === "loading");
+    // Compact chips: the k and belief they share, once
+    const shared = compact ? sharedSettings(configs, labelText) : null;
+    const openChip = (id: number) => {
+      if (id === selected.config.id) {
+        setConfigOpen((open) => !open);
+        return;
+      }
+      selectSeries(id);
+      setConfigOpen(true);
+    };
+    chartBody = chartElement;
+    const chipGroup = (
+      <div
+        role="group"
+        aria-label={t("polarization.seriesGroupAria")}
+        // Compact: the chips wrap beside the view toggle instead of taking a row of their own
+        className={cn("flex min-w-0 flex-wrap items-center gap-1", compact && "flex-1 basis-0")}
+      >
+        {shared === null ? null : (
+          <span className="flex-none pr-0.5 font-sans text-[11px] text-muted-foreground">
+            {shared}
+          </span>
+        )}
+        {compared.map((item, index) => (
+          <SeriesChip
+            key={item.config.id}
+            item={item}
+            selected={index === selectedIndex}
+            expanded={index === selectedIndex && configOpen}
+            problem={problems[index] !== null}
+            controls={configId}
+            compact={compact}
+            onOpen={() => openChip(item.config.id)}
+          />
+        ))}
+        <AddSeriesButton
+          count={compared.length}
+          onAdd={() => {
+            addSeries();
+            setConfigOpen(true);
+          }}
+        />
+        {overlayButton}
+      </div>
     );
-  } else if (view.status === "error") {
-    chart = (
-      <ChartMessage
-        text={seriesErrorText}
-        detail={view.error?.message}
-        action={
-          view.error?.kind === "disabled"
-            ? null
-            : { label: t("polarization.retry"), onClick: retry }
-        }
-      />
+    const about = (
+      <InfoTooltip side="top" ariaLabel={t("polarization.aboutAria")}>
+        {t("polarization.aboutCompare")}
+      </InfoTooltip>
+    );
+    const roundTools = (
+      <>
+        {compact ? null : <span className="min-w-2 flex-1" />}
+        {chartVisible ? <AxisModeToggle mode={mode} /> : null}
+        {/* Compact: the values share the axis toggle's row (as tall), wrapping on their own */}
+        <span
+          className={cn(
+            "flex min-w-0 flex-wrap items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground",
+            compact && "min-h-[30px] flex-1 basis-0 justify-end",
+          )}
+        >
+          {loading ? computing : null}
+          {roundText}
+          {compact ? about : null}
+          <RoundValues compared={compared} series={series} round={currentRound} compact={compact} />
+          {compact ? null : about}
+        </span>
+      </>
+    );
+    seriesHeader = (
+      <>
+        {/* Compact: the chips on one row, the axis and the values on the next */}
+        {compact ? (
+          <>
+            <div className={cn(ROW, "items-start")}>
+              {viewToggle}
+              {chipGroup}
+            </div>
+            <div className={cn(ROW, "items-start")}>{roundTools}</div>
+          </>
+        ) : (
+          <div className={ROW}>
+            {viewToggle}
+            {chipGroup}
+            {roundTools}
+          </div>
+        )}
+        <SeriesConfigRow
+          catalog={catalog}
+          item={selected}
+          compare={true}
+          id={configId}
+          hidden={!configOpen}
+        />
+        {notices}
+      </>
     );
   } else {
-    chart = (
-      <ReactECharts option={option} notMerge={true} style={{ width: "100%", height: "100%" }} />
+    // ── One series: the view as it was before the comparison ──────────────────────────────
+    const model = series[0] ?? null;
+    const value = model?.valueAt(currentRound) ?? null;
+    const level = value === null ? null : (model?.levelAt(currentRound) ?? null);
+    const classification = model?.classification ?? null;
+    const status = model?.status ?? "idle";
+    const error = model?.error ?? null;
+
+    if (!selected.supported) {
+      const firstK = selected.firstSupportedK;
+      chartBody = (
+        <ChartMessage
+          text={t("polarization.unsupportedK", { name: selected.meta.name, k: selected.config.k })}
+          action={
+            firstK === null
+              ? null
+              : {
+                  label: t("polarization.useCategories", { k: firstK }),
+                  onClick: () => setK(selected.config.id, firstK),
+                }
+          }
+        />
+      );
+    } else if (status === "error" && error?.kind === "invalid") {
+      chartBody = (
+        <ChartMessage
+          text={t("polarization.invalidParams", { name: selected.meta.name })}
+          detail={error.message}
+        />
+      );
+    } else if (status === "error") {
+      chartBody = (
+        <ChartMessage
+          text={t(polarizationErrorKey(error))}
+          detail={error?.message}
+          action={
+            error?.kind === "disabled"
+              ? null
+              : { label: t("polarization.retry"), onClick: () => retry(0) }
+          }
+        />
+      );
+    } else {
+      chartBody = chartElement;
+    }
+
+    seriesHeader = (
+      <>
+        <SeriesConfigRow catalog={catalog} item={selected} compare={false} leading={viewToggle}>
+          <AddSeriesButton count={compared.length} onAdd={addSeries} />
+          {overlayButton}
+          <span className="min-w-2 flex-1" />
+          {/* ── Viewed-round value + level ─────────────────── */}
+          <span className="flex flex-none items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground">
+            {selected.supported && status === "loading" ? computing : null}
+            {roundText}
+            <span className="font-mono text-[12.5px] font-semibold text-foreground">
+              {formatMeasureValue(value, lang)}
+            </span>
+            {classification ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "cursor-default rounded-full px-2 py-px font-sans text-[11px] font-medium",
+                      level === null
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-primary/12 text-primary",
+                    )}
+                  >
+                    {level === null ? "—" : levelText(level)}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  {t("polarization.levelTip")}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+            <InfoTooltip side="top" ariaLabel={t("polarization.aboutAria")}>
+              {classification ? t("polarization.aboutWithLevels") : t("polarization.aboutNoLevels")}
+            </InfoTooltip>
+          </span>
+        </SeriesConfigRow>
+        {/* The chart shows a single series' problem in its place; the table lists it */}
+        {chartVisible ? null : notices}
+      </>
     );
   }
 
+  if (chartVisible) {
+    return (
+      <div className="flex h-full flex-col">
+        <div {...headerProps}>{seriesHeader}</div>
+        <div className={cn("relative", body)}>{chartBody}</div>
+      </div>
+    );
+  }
+
+  // ── The table view: its toolbar, the series' settings (series mode), the table ──────────
+  const tableLoading = tableColumns.some((column) => column.series?.status === "loading");
   return (
     <div className="flex h-full flex-col">
-      {/* ── Controls ─────────────────────────────────────────── */}
-      <div className="flex flex-none flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-1.5">
-        <Select value={meta.id} onValueChange={(next) => setMeasure(next)}>
-          <SelectTrigger
-            size="sm"
-            className="h-[26px] text-xs"
-            aria-label={t("polarization.measureLabel")}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel>{t("polarization.groupLiterature")}</SelectLabel>
-              {literature.map(measureItem)}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>{t("polarization.groupProposed")}</SelectLabel>
-              {proposed.map(measureItem)}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        {meta.params.map((paramSpec) =>
-          paramSpec.type === "choice" ? (
-            <Tooltip key={paramSpec.name}>
-              <TooltipTrigger asChild>
-                <span className="flex flex-none items-center gap-1 font-sans text-[11.5px] text-muted-foreground">
-                  <span className="font-mono">f(d)</span>
-                  <Select
-                    value={String(params[paramSpec.name] ?? paramSpec.default)}
-                    onValueChange={(next) => {
-                      if (paramSpec.options.includes(next))
-                        setParams(meta.id, { [paramSpec.name]: next });
-                    }}
-                  >
-                    <SelectTrigger
-                      size="sm"
-                      className="h-[26px] font-mono text-xs"
-                      aria-label={t("polarization.alienationAria")}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paramSpec.options.map((option) => (
-                        <SelectItem key={option} value={option} className="font-mono">
-                          {alienationLabel(catalog.alienations, option)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                {t("polarization.alienationTip")}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <NumberParamField
-              key={`${meta.id}-${paramSpec.name}`}
-              measureId={meta.id}
-              spec={paramSpec}
-              value={params[paramSpec.name] ?? null}
-            />
-          ),
-        )}
-        {meta.params.length > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={t("polarization.resetParamsAria")}
-                disabled={paramsByMeasure[meta.id] === undefined}
-                onClick={() => resetParams(meta.id)}
-              >
-                <RotateCcw />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">{t("polarization.resetParamsTip")}</TooltipContent>
-          </Tooltip>
-        )}
-
-        <span className="mx-0.5 h-[18px] w-px bg-border" aria-hidden="true" />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span role="group" aria-label={t("polarization.kAria")} className={SEGMENT}>
-              <span className="self-center px-1 font-mono text-[11px] text-muted-foreground">
-                k
-              </span>
-              {CATEGORY_COUNTS.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  aria-pressed={k === count}
-                  onClick={() => setK(count)}
-                  className={cn(SEGMENT_BUTTON, k === count ? SEGMENT_ON : SEGMENT_OFF)}
-                >
-                  {count}
-                </button>
-              ))}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            {t("polarization.kTip")}
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span role="group" aria-label={t("polarization.beliefAria")} className={SEGMENT}>
-              {(["private", "public"] as const).map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  aria-pressed={belief === kind}
-                  onClick={() => setBelief(kind)}
-                  className={cn(SEGMENT_BUTTON, belief === kind ? SEGMENT_ON : SEGMENT_OFF)}
-                >
-                  {kind === "private"
-                    ? t("polarization.beliefPrivate")
-                    : t("polarization.beliefPublic")}
-                </button>
-              ))}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            {t("polarization.beliefTip")}
-          </TooltipContent>
-        </Tooltip>
-
+      <div className={ROW}>
+        <ViewToggle />
+        <TableModeSwitch />
+        {showAll ? <AllMeasuresControls k={measuresK} belief={measuresBelief} /> : null}
         <span className="min-w-2 flex-1" />
-
-        {/* ── Viewed-round value + level ───────────────────── */}
         <span className="flex flex-none items-center gap-1.5 font-sans text-[11.5px] text-muted-foreground">
-          {supported && view.status === "loading" ? (
-            <span
-              role="status"
-              aria-label={t("polarization.computingAria")}
-              className="animate-pulse text-[11px]"
-            >
-              {t("polarization.computing")}
-            </span>
-          ) : null}
-          <span>{t("polarization.valueAt", { round: formatNumber(currentRound, lang) })}</span>
-          <span className="font-mono text-[12.5px] font-semibold text-foreground">
-            {formatMeasureValue(view.value, lang)}
+          {tableLoading ? computing : null}
+          <span>
+            {t("polarization.table.rounds", {
+              count: rounds.length,
+              display: formatNumber(rounds.length, lang),
+            })}
           </span>
-          {view.classification ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "cursor-default rounded-full px-2 py-px font-sans text-[11px] font-medium",
-                    view.level === null
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-primary/12 text-primary",
-                  )}
-                >
-                  {view.level === null ? "—" : levelText(view.level)}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                {t("polarization.levelTip")}
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
-          <InfoTooltip side="top" ariaLabel={t("polarization.aboutAria")}>
-            {view.classification
-              ? t("polarization.aboutWithLevels")
-              : t("polarization.aboutNoLevels")}
-          </InfoTooltip>
+          {partial && rounds.length > 0 ? <PartialNote live={live} /> : null}
         </span>
+        <ExportMenu
+          disabled={rounds.length === 0}
+          partial={partial}
+          live={live}
+          onExport={exportCsv}
+        />
       </div>
-
-      {/* ── Chart ────────────────────────────────────────────── */}
-      <div className="relative min-h-0 flex-1">{chart}</div>
+      <div {...headerProps}>
+        {showAll ? <MeasureNotices columns={tableColumns} onRetry={retry} /> : seriesHeader}
+      </div>
+      <div className={cn("mt-1.5 flex flex-col", body)}>
+        <PolarizationTable
+          columns={tableColumns}
+          rounds={rounds}
+          currentRound={currentRound}
+          onSeekRound={onSeekRound}
+          emptyText={
+            recorded === 0 ? t("polarization.table.emptyNoRounds") : t("polarization.table.empty")
+          }
+        />
+      </div>
     </div>
   );
 }

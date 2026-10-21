@@ -33,3 +33,10 @@ export function polarizationErrorOf(error: unknown): PolarizationErrorInfo {
   else if (status === 400 || status === 422) kind = "invalid";
   return { kind, status, message };
 }
+
+/** i18n key of the message the view shows for a failed request (`invalid` has its own). */
+export function polarizationErrorKey(error: PolarizationErrorInfo | null): string {
+  if (error?.kind === "disabled") return "polarization.errorDisabled";
+  if (error?.kind === "unavailable") return "polarization.errorUnavailable";
+  return "polarization.errorGeneric";
+}

@@ -68,6 +68,11 @@ mjx-container svg {
   --chart-3: oklch(0.78 0.188 70.08);
   --chart-4: oklch(0.63 0.265 303.9);
   --chart-5: oklch(0.65 0.245 27.325);
+  /* Series 2–4 of comparison charts, after --chart-4 (no blue or teal: they mean public / private).
+     In sRGB gamut; validated as a set for colour-vision-deficiency separation and 3:1 on the card. */
+  --chart-6: oklch(0.67 0.18 48);
+  --chart-7: oklch(0.45 0.185 348);
+  --chart-8: oklch(0.51 0.105 96);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
@@ -109,6 +114,9 @@ mjx-container svg {
   --chart-3: oklch(0.78 0.188 70.08);
   --chart-4: oklch(0.63 0.265 303.9);
   --chart-5: oklch(0.65 0.246 16.439);
+  --chart-6: oklch(0.50 0.135 48);
+  --chart-7: oklch(0.65 0.22 354);
+  --chart-8: oklch(0.65 0.13 90);
   --sidebar: oklch(0.11 0.022 265);
   --sidebar-foreground: oklch(0.96 0.008 264);
   --sidebar-primary: oklch(0.63 0.160 264);

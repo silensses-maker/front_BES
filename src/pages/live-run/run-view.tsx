@@ -385,6 +385,7 @@ export function RunView({ runId, networkId }: RunViewProps) {
     [],
   );
   // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // (the table's rows seek like the data table's; the CSV export records the run and network)
   const chartExtraTabs = useMemo(
     () =>
       PolarizationPanel !== null
@@ -394,13 +395,13 @@ export function RunView({ runId, networkId }: RunViewProps) {
               label: t("polarization.tab"),
               content: (
                 <Suspense fallback={null}>
-                  <PolarizationPanel />
+                  <PolarizationPanel runId={runId} networkId={networkId} onSeekRound={seek} />
                 </Suspense>
               ),
             },
           ]
         : undefined,
-    [t],
+    [t, runId, networkId, seek],
   );
 
   // ── Stream-error state (mockup) ────────────────────────────────────────────

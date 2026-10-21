@@ -27,6 +27,7 @@ describe("registerPolarizationStrings", () => {
       typeof value === "object" && value !== null
         ? Object.entries(value).flatMap(([k, v]) => keys(v, `${prefix}${k}.`))
         : [prefix];
-    expect(keys(polarizationEs).sort()).toEqual(keys(polarizationEn).sort());
+    const sorted = (list: string[]) => [...list].sort((a, b) => a.localeCompare(b));
+    expect(sorted(keys(polarizationEs))).toEqual(sorted(keys(polarizationEn)));
   });
 });

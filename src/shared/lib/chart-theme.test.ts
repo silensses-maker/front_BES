@@ -82,6 +82,22 @@ describe("readChartTheme", () => {
     expect(theme.key).toContain("79,107,216");
   });
 
+  it("has a comparison palette: the single-series color first, never public / private", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    resetColorProbe();
+    const theme = readChartTheme();
+    expect(theme.series).toEqual([
+      theme.polarization,
+      "rgb(234, 106, 9)",
+      "rgb(151, 7, 103)",
+      "rgb(120, 101, 0)",
+    ]);
+    expect(new Set(theme.series).size).toBe(4);
+    expect(theme.series).not.toContain(theme.public);
+    expect(theme.series).not.toContain(theme.private);
+    expect(theme.key).toContain("234,106,9");
+  });
+
   it("resolves the theme tokens of the root element", () => {
     document.documentElement.style.setProperty("--chart-1", "oklch(0.63 0.16 264)");
     document.documentElement.style.setProperty("--muted-foreground", "oklch(0.6 0.03 264)");

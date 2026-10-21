@@ -64,3 +64,9 @@ export function formatMeasureValue(value: number | null, lang: string): string {
   if (value === null || !Number.isFinite(value)) return "—";
   return value.toLocaleString(lang, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 }
+
+/** Normalized (shape) value as shown in the comparison tooltip (2 decimals, locale separators). */
+export function formatShapeValue(value: number | null, lang: string): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return value.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

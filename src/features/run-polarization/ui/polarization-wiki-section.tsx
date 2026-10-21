@@ -90,9 +90,9 @@ function MeasureCard({ meta }: { meta: MeasureDoc }) {
 
 /**
  * Wiki section "Polarization measures" (#129): binning, every pol_measures measure with its
- * formula, parameters and reference, the classification levels, and the attribution: the values
- * are computed on the server by pol_measures at the pinned commit. Rendered by the wiki page only
- * when polarization is compiled in.
+ * formula, parameters and reference, the classification levels, comparing measures (and the
+ * normalized axis), and the attribution: the values are computed on the server by pol_measures at
+ * the pinned commit. Rendered by the wiki page only when polarization is compiled in.
  */
 export function PolarizationWikiSection() {
   registerPolarizationStrings();
@@ -171,6 +171,18 @@ export function PolarizationWikiSection() {
       </Card>
       <p className="text-lg tracking-tight text-muted-foreground">
         {t("polarization.wiki.levels2")}
+      </p>
+
+      <h3 className="mt-4 font-display text-2xl font-normal tracking-tight text-foreground">
+        {t("polarization.wiki.compareTitle")}
+      </h3>
+      <p className="text-lg tracking-tight text-muted-foreground">
+        {t("polarization.wiki.compare1")}
+      </p>
+      <p className="text-lg tracking-tight text-muted-foreground">
+        {t("polarization.wiki.compare2")}{" "}
+        <Mi tex="\tilde{x}_t = \frac{x_t - \min_s x_s}{\max_s x_s - \min_s x_s}" />,{" "}
+        {t("polarization.wiki.compare3")}
       </p>
 
       <h3 className="mt-4 font-display text-2xl font-normal tracking-tight text-foreground">
