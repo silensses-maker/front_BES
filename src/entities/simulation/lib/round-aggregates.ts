@@ -28,7 +28,7 @@ export function roundStatsOf(frame: MergedFrame): RoundStats {
   return (
     frame.stats ??
     computeRoundStats(frame.publicBelief, frame.privateBelief, frame.speaking, {
-      // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+      // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
       fineHistograms: __POLARIZATION__,
     })
   );

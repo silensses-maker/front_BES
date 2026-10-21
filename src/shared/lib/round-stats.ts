@@ -1,5 +1,5 @@
-// polarization replica (#129): binning only, not the barrel (keeps the measures out of the
-// initial chunk and the frame worker). Remove with src/shared/lib/polarization.
+// polarization (#129): binning only, not the barrel (keeps the polarization barrel out of the
+// frame worker). Remove with src/shared/lib/polarization.
 import { accumulateFineHistogram, FINE_BINS } from "@/shared/lib/polarization/binning";
 
 /**
@@ -20,14 +20,14 @@ export interface RoundStats {
   /** Population variance of the private beliefs. */
   variancePrivate: number;
   /**
-   * polarization replica (#129): 210-bin histograms of each belief type, or null when the
-   * replica is compiled out or not requested.
+   * polarization (#129): 210-bin histograms of each belief type, or null when polarization is
+   * compiled out or not requested.
    */
   fine: { public: Uint32Array; private: Uint32Array } | null;
 }
 
 export interface RoundStatsOptions {
-  /** Also bin both belief types into FINE_BINS bins (polarization replica). */
+  /** Also bin both belief types into FINE_BINS bins (polarization). */
   fineHistograms: boolean;
 }
 
@@ -37,7 +37,7 @@ export function computeRoundStats(
   speaking: Uint8Array,
   { fineHistograms }: RoundStatsOptions,
 ): RoundStats {
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
   const fine =
     __POLARIZATION__ && fineHistograms
       ? { public: new Uint32Array(FINE_BINS), private: new Uint32Array(FINE_BINS) }
@@ -82,7 +82,7 @@ export function computeRoundStats(
     squaresPrivate += dPriv * dPriv;
   }
 
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
   if (__POLARIZATION__ && fine !== null) {
     accumulateFineHistogram(publicBelief, fine.public);
     accumulateFineHistogram(privateBelief, fine.private);

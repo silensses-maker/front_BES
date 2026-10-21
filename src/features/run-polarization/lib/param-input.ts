@@ -1,21 +1,29 @@
-import { type AlienationId, isInRange, type ParamSpec } from "@/shared/lib/polarization";
-
-type NumericSpec = Exclude<ParamSpec, { kind: "choice" }>;
+import type {
+  PolarizationAlienation,
+  PolarizationNumberParam,
+  PolarizationParamValue,
+} from "@/shared/api/backend";
 
 export type ParamInputResult =
   | { ok: true; value: number | null }
   | { ok: false; reason: "number" | "range" };
 
+/** Whether a number is inside a parameter's range as the server's catalog states it. */
+export function isInRange(spec: PolarizationNumberParam, value: number): boolean {
+  if (!Number.isFinite(value)) return false;
+  if (spec.minExclusive !== null && value <= spec.minExclusive) return false;
+  return spec.max === null || value <= spec.max;
+}
+
 /**
- * Parses a parameter field. Accepts a decimal comma (es), an empty optional field means "auto"
- * (null, the package default normalization), and values outside the package's range are rejected.
+ * Parses a parameter field. Accepts a decimal comma (es); an empty nullable field means "auto"
+ * (null, the package's default); values outside the catalog's range are rejected (the server
+ * would answer 422).
  */
-export function parseParamInput(spec: NumericSpec, raw: string): ParamInputResult {
+export function parseParamInput(spec: PolarizationNumberParam, raw: string): ParamInputResult {
   const text = raw.trim().replace(",", ".");
   if (text === "") {
-    return spec.kind === "optional-number"
-      ? { ok: true, value: null }
-      : { ok: false, reason: "number" };
+    return spec.nullable ? { ok: true, value: null } : { ok: false, reason: "number" };
   }
   const value = Number(text);
   if (!Number.isFinite(value)) return { ok: false, reason: "number" };
@@ -24,29 +32,31 @@ export function parseParamInput(spec: NumericSpec, raw: string): ParamInputResul
 }
 
 /** Field text for a stored value (empty = auto). */
-export function formatParamValue(value: number | null | undefined): string {
+export function formatParamValue(value: PolarizationParamValue | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-/** The range of a numeric parameter as shown to the user, e.g. "(0, 1.6]" or "> 0". */
-export function rangeText(spec: NumericSpec): string {
-  if (spec.kind === "number" && spec.max !== null) return `(${spec.minExclusive}, ${spec.max}]`;
-  return `> ${spec.minExclusive}`;
+/** The range of a numeric parameter as shown to the user, e.g. "(0, 1.6]" or "> 0" ("" = any). */
+export function rangeText(spec: PolarizationNumberParam): string {
+  if (spec.minExclusive !== null && spec.max !== null) return `(${spec.minExclusive}, ${spec.max}]`;
+  if (spec.minExclusive !== null) return `> ${spec.minExclusive}`;
+  if (spec.max !== null) return `≤ ${spec.max}`;
+  return "";
 }
 
-const ALIENATION_TEXT: Readonly<Record<AlienationId, string>> = {
-  d: "d",
-  "d^2": "d²",
-  "d^3": "d³",
-  "d+d^2": "d + d²",
-  "d+2d^2": "d + 2d²",
-  "exp(d)-1": "eᵈ − 1",
-  "exp(2d)-1": "e²ᵈ − 1",
-};
+const SYMBOLS: Readonly<Record<string, string>> = { alpha: "α", beta: "β" };
 
-/** Plain-text label of an alienation function (selects); the wiki uses `ALIENATION_TEX`. */
-export function alienationLabel(id: AlienationId): string {
-  return ALIENATION_TEXT[id];
+/** Symbol of a parameter in labels (α, β; other names as they are, e.g. K). */
+export function paramSymbol(name: string): string {
+  return SYMBOLS[name] ?? name;
+}
+
+/** Plain-text label of an alienation function f(d) from the catalog (its id when unknown). */
+export function alienationLabel(
+  alienations: readonly PolarizationAlienation[],
+  id: string,
+): string {
+  return alienations.find((a) => a.id === id)?.label ?? id;
 }
 
 /** Measure value as shown next to the chart (4 decimals, locale separators). */

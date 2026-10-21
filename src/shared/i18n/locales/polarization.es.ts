@@ -1,18 +1,21 @@
 /**
- * Textos de la réplica de polarización (#129): se fusionan en `es` como el namespace
- * `polarization` solo mientras la réplica está compilada (`__POLARIZATION__`).
+ * Textos de polarización (#129): el namespace `polarization` de `es`, que
+ * `registerPolarizationStrings` (run-polarization) añade en tiempo de ejecución cuando la vista
+ * Polarización o la sección de la wiki se muestran por primera vez (chunks diferidos: estos textos
+ * no van en el chunk inicial). La etiqueta de la pestaña (`polarization.tab`) está en es.ts.
  */
 const polarizationEs = {
-  tab: "Polarización",
   measureLabel: "Medida de polarización",
   groupLiterature: "Literatura",
   groupProposed: "Propuestas (PROMUEVA)",
   beta: "BETA",
   betaTip: "Sus autores aún la están desarrollando",
-  onlyFiveCategories: "solo k = 5",
+  onlyCategories: "solo k = {{k}}",
+  notForK: "no para k = {{k}}",
   paramAria: "Parámetro {{name}}",
   paramTip: "{{name}} · por defecto {{value}} · rango {{range}}",
-  paramKTip: "Constante de normalización K · vacío = automática, 1/(2·0,5^(2+α))",
+  paramKTip:
+    "Constante de normalización K · vacío = automática (la normalización por defecto del paquete)",
   paramAuto: "auto",
   paramInvalid: "No aplicado: rango permitido {{range}}",
   alienationAria: "Función de alienación f(d)",
@@ -37,21 +40,30 @@ const polarizationEs = {
   },
   aboutAria: "Acerca de esta medida",
   aboutWithLevels:
-    "Calculada por ronda con una réplica de pol_measures (PROMUEVA). Líneas punteadas: umbrales de nivel. Detalles en la wiki.",
+    "Calculada por ronda en el servidor con el paquete pol_measures de PROMUEVA. Líneas punteadas: umbrales de nivel. Detalles en la wiki.",
   aboutNoLevels:
-    "Calculada por ronda con una réplica de pol_measures (PROMUEVA). No hay umbrales de nivel para esta medida con estos parámetros. Detalles en la wiki.",
-  unsupportedK: "{{name}} solo está definida para 5 categorías.",
-  useFiveCategories: "Usar k = 5",
+    "Calculada por ronda en el servidor con el paquete pol_measures de PROMUEVA. Esta medida no tiene umbrales de nivel con estos parámetros. Detalles en la wiki.",
+  unsupportedK: "{{name}} no está definida para k = {{k}}.",
+  useCategories: "Usar k = {{k}}",
   invalidParams: "Estos parámetros no son válidos para {{name}}.",
+  catalogLoading: "Cargando las medidas de polarización…",
+  computing: "Calculando…",
+  computingAria: "Calculando la medida en el servidor",
+  errorDisabled: "Las medidas de polarización no están disponibles en este servidor.",
+  errorUnavailable:
+    "El servidor no pudo calcular las medidas de polarización en este momento. Inténtalo de nuevo en unos segundos.",
+  errorGeneric: "No se pudieron cargar las medidas de polarización.",
+  retry: "Reintentar",
   wiki: {
     title: "Medidas de polarización",
     intro:
-      "La gráfica Polarización de una corrida mide, ronda a ronda, qué tan polarizadas están las creencias de los agentes. Las medidas vienen de pol_measures, el paquete de medidas de polarización de PROMUEVA, que SiLEnSeSS reproduce en el navegador.",
+      "La gráfica Polarización de una corrida mide, ronda a ronda, qué tan polarizadas están las creencias de los agentes. Las medidas las calcula en el servidor el propio pol_measures, el paquete de medidas de polarización de PROMUEVA: SiLEnSeSS solo construye los histogramas.",
     binningTitle: "De las creencias a un histograma",
     binning1: "Toda medida recibe un histograma de opiniones: k categorías en las posiciones",
     binning2: "Una creencia",
     binning3: "cae en la categoría",
-    binning4: ", y cada categoría pesa la fracción de agentes que contiene,",
+    binning4:
+      ", y cada categoría pesa la fracción de agentes que contiene (el servidor normaliza los conteos),",
     binning5:
       "Por defecto k es 5 (también están 3, 7 y 10). Las medidas usan por defecto las creencias privadas (lo que los agentes piensan) o las públicas (lo que expresan).",
     literatureTitle: "Medidas de la literatura",
@@ -94,7 +106,7 @@ const polarizationEs = {
       "Los umbrales solo aplican a los parámetros indicados; con cualquier otro valor no se muestra nivel.",
     sourceTitle: "Fuente",
     source1:
-      "Réplica de pol_measures en el commit {{commit}}, de {{author}}; BiPol implementada por {{bipol}}. Usada con permiso de sus autores. Cada medida se verifica contra valores calculados por el paquete original.",
+      "Los valores los calcula en el servidor el paquete pol_measures de PROMUEVA, de {{author}}; BiPol implementada por {{bipol}}; artículo de MEC {{paper}}. Usado con permiso de sus autores; la autoprueba del servidor verifica cada medida contra el paquete llamado directamente. Versión usada:",
     sourceLink: "repositorio de pol_measures",
   },
 } as const;

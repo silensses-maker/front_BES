@@ -20,7 +20,7 @@ describe("WikiPage (#129 sections)", () => {
     typesetMath.mockClear();
   });
 
-  it("documents variance over time and, with the replica compiled in, the polarization measures", () => {
+  it("documents variance over time and, with polarization compiled in, the polarization measures", () => {
     const { container } = render(<WikiPage />);
     expect(
       screen.getByRole("heading", { level: 2, name: en.wiki.variance.title }),

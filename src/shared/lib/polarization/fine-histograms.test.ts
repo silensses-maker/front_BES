@@ -23,16 +23,16 @@ describe("FineHistogramPool", () => {
     expect(pool.fine(2, "public")).toBeNull();
   });
 
-  it("returns k-category weights and the agent count", () => {
+  it("returns k-category counts and the agent count", () => {
     const pool = new FineHistogramPool();
     pool.record(0, histogram({ 0: 2, 209: 2 }), histogram({ 105: 4 }));
     const out = new Float64Array(5);
 
-    expect(pool.categoryWeights(0, "public", 5, out)).toBe(4);
-    expect(Array.from(out)).toEqual([0.5, 0, 0, 0, 0.5]);
-    expect(pool.categoryWeights(0, "private", 5, out)).toBe(4);
-    expect(Array.from(out)).toEqual([0, 0, 1, 0, 0]);
-    expect(pool.categoryWeights(9, "private", 5, out)).toBe(0);
+    expect(pool.categoryCounts(0, "public", 5, out)).toBe(4);
+    expect(Array.from(out)).toEqual([2, 0, 0, 0, 2]);
+    expect(pool.categoryCounts(0, "private", 5, out)).toBe(4);
+    expect(Array.from(out)).toEqual([0, 0, 4, 0, 0]);
+    expect(pool.categoryCounts(9, "private", 5, out)).toBe(0);
     expect(Array.from(out)).toEqual([0, 0, 0, 0, 0]);
   });
 

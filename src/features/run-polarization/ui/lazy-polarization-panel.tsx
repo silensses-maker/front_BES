@@ -5,10 +5,10 @@ let LazyView: LazyExoticComponent<ComponentType> | null = null;
 const Nothing: ComponentType = () => null;
 
 /**
- * The run charts' Polarization view, loaded on first render: the view (ECharts, the measures) is
- * its own async chunk. The lazy component is created on first use, not at module load, so this
- * module stays side-effect free; the `import()` sits behind `__POLARIZATION__` so a build with the
- * replica disabled does not even emit the chunk.
+ * The run charts' Polarization view, loaded on first render: the view (ECharts, the catalog and
+ * series models) is its own async chunk. The lazy component is created on first use, not at module
+ * load, so this module stays side-effect free; the `import()` sits behind `__POLARIZATION__` so a
+ * build with polarization disabled does not even emit the chunk.
  */
 export function PolarizationPanel() {
   LazyView ??= lazy(() =>

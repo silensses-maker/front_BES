@@ -19,12 +19,12 @@ let merger: PartitionMerger | null = null;
 
 /**
  * Posts a completed round with its statistics computed here, off the main thread: the
- * round-aggregates store only copies them (#129). The fine histograms (polarization replica)
+ * round-aggregates store only copies them (#129). The fine histograms (polarization)
  * travel as transferables too.
  */
 function emitMerged(merged: MergedFrame): void {
   const stats = computeRoundStats(merged.publicBelief, merged.privateBelief, merged.speaking, {
-    // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+    // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
     fineHistograms: __POLARIZATION__,
   });
   const transfer: Transferable[] = [

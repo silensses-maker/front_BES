@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+// polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
 import { PolarizationWikiSection } from "@/features/run-polarization";
 import { useTranslation } from "@/shared/i18n";
 import { clearMath, typesetMath } from "@/shared/lib/load-mathjax";
@@ -404,7 +404,7 @@ export function WikiPage() {
         </p>
       </section>
 
-      {/* polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization */}
+      {/* polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization */}
       {__POLARIZATION__ && (
         <>
           <Separator className="my-12" />

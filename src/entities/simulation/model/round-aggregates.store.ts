@@ -1,6 +1,6 @@
 import { create } from "zustand";
-// polarization replica (#129): the histogram store only, not the barrel — the measures stay out
-// of the initial chunk (this store is created at startup). Remove with src/shared/lib/polarization.
+// polarization (#129): the histogram store only, not the barrel (this store is created at
+// startup). Remove with src/shared/lib/polarization.
 import { FineHistogramPool } from "@/shared/lib/polarization/fine-histograms";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import {
@@ -41,8 +41,9 @@ interface RoundAggregatesState {
   /** agentIndex → [round, publicBelief][] (append order, not guaranteed sorted). */
   series: Map<number, Array<[number, number]>>;
   /**
-   * polarization replica (#129): 210-bin histograms per round and belief type (null when the
-   * replica is compiled out). Mutable like the other buffers; a new pool per key.
+   * polarization (#129): 210-bin histograms per round and belief type, the source of the
+   * k-category counts sent to the server's pol_measures (null when polarization is compiled
+   * out). Mutable like the other buffers; a new pool per key.
    */
   fineHistograms: FineHistogramPool | null;
 
@@ -58,7 +59,7 @@ const emptyBuffers = () => ({
   aggregates: [] as Array<RoundAggregate | undefined>,
   sampledIndices: [] as number[],
   series: new Map<number, Array<[number, number]>>(),
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
   fineHistograms: __POLARIZATION__ ? new FineHistogramPool() : null,
 });
 
@@ -76,7 +77,7 @@ export const useRoundAggregatesStore = create<RoundAggregatesState>((set, get) =
 
     const stats = roundStatsOf(frame);
     current.aggregates[frame.round] = toRoundAggregate(stats);
-    // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+    // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
     if (__POLARIZATION__ && stats.fine !== null) {
       current.fineHistograms?.record(frame.round, stats.fine.public, stats.fine.private);
     }

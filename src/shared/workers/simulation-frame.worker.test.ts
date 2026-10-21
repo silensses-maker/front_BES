@@ -125,7 +125,7 @@ describe("simulation-frame.worker", () => {
       expect(merged.stats.meanPublic).toBe(0.5);
       expect(merged.stats.participation).toBe(1);
       expect(merged.stats.variancePublic).toBe(0);
-      // 0.5 · 210 = 105: both agents in fine bin 105 (polarization replica, on under test)
+      // 0.5 · 210 = 105: both agents in fine bin 105 (polarization, on under test)
       expect(merged.stats.fine?.public[105]).toBe(2);
       expect(merged.stats.fine?.private[105]).toBe(2);
       // Transferable list carries the three belief buffers and the two fine histograms.

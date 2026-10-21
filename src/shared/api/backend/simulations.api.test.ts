@@ -336,6 +336,38 @@ describe("simulationsApi", () => {
     });
   });
 
+  describe("polarization (#129)", () => {
+    it("GETs the pol_measures catalog", async () => {
+      const catalog = {
+        measures: [{ id: "MEC" }],
+        alienations: [],
+        package: { commit: "0e05564" },
+      };
+      vi.mocked(backendClient.get).mockResolvedValue({ data: catalog });
+
+      await expect(simulationsApi.getPolarizationMeasures()).resolves.toEqual(catalog);
+      expect(backendClient.get).toHaveBeenCalledWith("/simulations/polarization/measures");
+    });
+
+    it("POSTs the measure, its parameters, k and the histograms", async () => {
+      const result = { values: [0.5], levels: ["low"], classification: null, unique: 1 };
+      vi.mocked(backendClient.post).mockResolvedValue({ data: result });
+      const body = { measure: "MEC", params: { alpha: 2 }, k: 3, histograms: [[1, 0, 1]] };
+
+      await expect(simulationsApi.computePolarization(body)).resolves.toEqual(result);
+      expect(backendClient.post).toHaveBeenCalledWith("/simulations/polarization", body);
+    });
+
+    it("propagates the server's errors (503 worker unavailable, 404 disabled)", async () => {
+      vi.mocked(backendClient.post).mockRejectedValue(new Error("unavailable"));
+      await expect(
+        simulationsApi.computePolarization({ measure: "MEC", k: 3, histograms: [[1, 1, 1]] }),
+      ).rejects.toThrow("unavailable");
+      vi.mocked(backendClient.get).mockRejectedValue(new Error("not found"));
+      await expect(simulationsApi.getPolarizationMeasures()).rejects.toThrow("not found");
+    });
+  });
+
   describe("cancel", () => {
     it("returns RunCancelledResponse when successful", async () => {
       vi.mocked(backendClient.delete).mockResolvedValue({ data: mockRunCancelledResponse });

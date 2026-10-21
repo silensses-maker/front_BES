@@ -1,43 +1,18 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "@/shared/i18n";
-// Metadata modules only (not the barrel): the wiki does not download the measure implementations.
-import { ALIENATION_TEX } from "@/shared/lib/polarization/alienation";
-import {
-  LITERATURE_MEASURES,
-  MEASURES,
-  type MeasureId,
-  type ParamSpec,
-  PROPOSED_MEASURES,
-  REFERENCES,
-} from "@/shared/lib/polarization/registry";
 import { POL_MEASURES_SOURCE } from "@/shared/lib/polarization/source";
-import { THRESHOLDS } from "@/shared/lib/polarization/thresholds";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Mb, Mi } from "@/shared/ui/math";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
-
-/** Formula of each measure as the replica computes it (pol_measures @ 0e05564). */
-const FORMULAS: Readonly<Record<MeasureId, string>> = {
-  EstebanRay:
-    "\\mathrm{ER}_{\\alpha}(\\pi) = K \\sum_{i=1}^{k}\\sum_{j=1}^{k} \\pi_i^{1+\\alpha}\\,\\pi_j\\,|x_i - x_j|, \\qquad K = \\frac{1}{2\\cdot 0.5^{2+\\alpha}}",
-  GeneralizedER:
-    "\\mathrm{ER}_{\\alpha,f}(\\pi) = K \\sum_{i}\\sum_{j} \\pi_i^{1+\\alpha}\\,\\pi_j\\,f(|x_i - x_j|), \\qquad K = \\frac{1}{2\\cdot 0.5^{2+\\alpha}\\, f(x_k - x_1)}",
-  EMDPol:
-    "\\mathrm{EMD}_{\\mathrm{pol}}(\\pi) = 0.5 - \\mathrm{EMD}(\\pi, \\pi^{*}), \\qquad \\pi^{*} = \\tfrac12\\,\\delta_{x_1} + \\tfrac12\\,\\delta_{x_k}",
-  Experts:
-    "\\mathrm{Experts}(\\pi) = \\frac{2.14\\,\\pi_2\\pi_4 + 2.70\\,(\\pi_1\\pi_4 + \\pi_2\\pi_5) + 3.96\\,\\pi_1\\pi_5}{100 \\cdot 0.0099\\,\\left(\\sum_i \\pi_i\\right)^{2}}",
-  ShannonPol:
-    "\\mathrm{Shannon}_{\\mathrm{pol}}(\\pi) = -\\sum_{i} \\pi_i \\log_2\\!\\left(1 - \\frac{|x_i - \\mu|}{x_k - x_1}\\right), \\qquad \\mu = \\sum_i \\pi_i x_i",
-  VanDerEijkPol:
-    "\\mathrm{Eijk}_{\\mathrm{pol}}(\\pi) = 1 - \\frac{1 + A}{2}, \\qquad A = \\sum_{\\ell} w_\\ell\\, U_\\ell \\left(1 - \\frac{S_\\ell - 1}{k - 1}\\right)",
-  MEC: "\\mathrm{MEC}_{\\alpha,\\beta}(\\pi) = \\min_{y \\in [0,1]} \\sum_{i} \\pi_i^{\\alpha}\\,|x_i - y|^{\\beta}",
-  MECNormalized:
-    "\\mathrm{MEC}^{*}_{\\alpha,\\beta}(\\pi) = \\left(\\frac{\\mathrm{MEC}_{\\alpha,\\beta}(\\pi)}{\\mathrm{MEC}_{\\alpha,\\beta}(\\pi^{*})}\\right)^{1/\\beta}",
-  GeneralizedMEC:
-    "\\mathrm{MEC}_{\\alpha,f}(\\pi) = \\min_{y \\in [0,1]} \\sum_{i} \\pi_i^{\\alpha}\\, f(|x_i - y|)",
-  BiPol:
-    "\\mathrm{BiPol}(\\pi) = 4\\,\\pi(L)\\,\\pi(R)\\,(\\mu_R - \\mu_L), \\qquad L = \\{x_i < \\mu\\},\\ R = \\{x_i \\ge \\mu\\}",
-};
+// Documentation only (the wiki is public: it cannot read the server's authenticated catalog).
+import {
+  LEVEL_DOCS,
+  LITERATURE_DOCS,
+  type MeasureDoc,
+  PROPOSED_DOCS,
+  REFERENCES,
+} from "../lib/measure-docs";
+import { registerPolarizationStrings } from "../lib/register-strings";
 
 /** External link (new tab) following the about page's pattern. */
 function ExternalTextLink({ href, children }: { href: string; children: ReactNode }) {
@@ -55,22 +30,9 @@ function ExternalTextLink({ href, children }: { href: string; children: ReactNod
   );
 }
 
-function paramTex(spec: ParamSpec): string {
-  if (spec.kind === "choice") {
-    const options = spec.options.map((id) => ALIENATION_TEX[id]).join(",\\ ");
-    return `f(d) = ${ALIENATION_TEX[spec.defaultValue]}\\quad (${options})`;
-  }
-  if (spec.kind === "optional-number") return "";
-  const range =
-    spec.max === null
-      ? `${spec.tex} > ${spec.minExclusive}`
-      : `${spec.tex} \\in (${spec.minExclusive}, ${spec.max}]`;
-  return `${spec.tex} = ${spec.defaultValue}\\quad (${range})`;
-}
-
-function MeasureCard({ id }: { id: MeasureId }) {
+function MeasureCard({ meta }: { meta: MeasureDoc }) {
   const { t } = useTranslation();
-  const meta = MEASURES[id];
+  const id = meta.id;
   return (
     <Card className="overflow-x-auto">
       <CardHeader>
@@ -86,25 +48,25 @@ function MeasureCard({ id }: { id: MeasureId }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <p className="text-center text-base text-foreground md:text-lg">
-          <Mb tex={FORMULAS[id]} />
+          <Mb tex={meta.formula} />
         </p>
         <p className="text-sm text-muted-foreground">
           <strong className="text-foreground">{t("polarization.wiki.params")}:</strong>{" "}
           {meta.params.length === 0
             ? t("polarization.wiki.noParams")
-            : meta.params.map((spec, i) => (
-                <span key={spec.key}>
+            : meta.params.map((param, i) => (
+                <span key={"tex" in param ? param.tex : "K"}>
                   {i > 0 && " · "}
-                  {spec.kind === "optional-number" ? (
+                  {"tex" in param ? (
+                    <Mi tex={param.tex} />
+                  ) : (
                     <>
                       <Mi tex="K" /> {t("polarization.wiki.kAuto")}
                     </>
-                  ) : (
-                    <Mi tex={paramTex(spec)} />
                   )}
                 </span>
               ))}
-          {meta.exactCategories !== null && <> · {t("polarization.wiki.onlyFive")}</>}
+          {meta.onlyFive && <> · {t("polarization.wiki.onlyFive")}</>}
           {meta.credit !== null && <> · {t("polarization.wiki.credit", { name: meta.credit })}</>}
         </p>
         {meta.references.length > 0 && (
@@ -126,25 +88,15 @@ function MeasureCard({ id }: { id: MeasureId }) {
   );
 }
 
-function thresholdsOf(id: "EstebanRay" | "BiPol" | "MECNormalized"): readonly number[] {
-  const entry = THRESHOLDS[id];
-  if (entry === undefined) return [];
-  const methods = "params" in entry ? entry.sets.default : entry;
-  return methods?.kmeans?.[3] ?? [];
-}
-
 /**
  * Wiki section "Polarization measures" (#129): binning, every pol_measures measure with its
- * formula, parameters and reference, the classification levels, and the attribution of the
- * replica. Rendered by the wiki page only when the replica is compiled in.
+ * formula, parameters and reference, the classification levels, and the attribution: the values
+ * are computed on the server by pol_measures at the pinned commit. Rendered by the wiki page only
+ * when polarization is compiled in.
  */
 export function PolarizationWikiSection() {
+  registerPolarizationStrings();
   const { t } = useTranslation();
-  const rows = [
-    { id: "EstebanRay", params: "\\alpha = 0.8" },
-    { id: "BiPol", params: "" },
-    { id: "MECNormalized", params: "\\alpha = 2,\\ \\beta = 1.15" },
-  ] as const;
 
   return (
     <section id="polarization" className="flex flex-col gap-4">
@@ -169,8 +121,8 @@ export function PolarizationWikiSection() {
       <h3 className="mt-4 font-display text-2xl font-normal tracking-tight text-foreground">
         {t("polarization.wiki.literatureTitle")}
       </h3>
-      {LITERATURE_MEASURES.map((id) => (
-        <MeasureCard key={id} id={id} />
+      {LITERATURE_DOCS.map((meta) => (
+        <MeasureCard key={meta.id} meta={meta} />
       ))}
 
       <h3 className="mt-4 font-display text-2xl font-normal tracking-tight text-foreground">
@@ -179,8 +131,8 @@ export function PolarizationWikiSection() {
       <p className="text-lg tracking-tight text-muted-foreground">
         {t("polarization.wiki.proposedIntro")}
       </p>
-      {PROPOSED_MEASURES.map((id) => (
-        <MeasureCard key={id} id={id} />
+      {PROPOSED_DOCS.map((meta) => (
+        <MeasureCard key={meta.id} meta={meta} />
       ))}
 
       <h3 className="mt-4 font-display text-2xl font-normal tracking-tight text-foreground">
@@ -199,24 +151,21 @@ export function PolarizationWikiSection() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(({ id, params }) => {
-              const [lowMedium, mediumHigh] = thresholdsOf(id);
-              return (
-                <TableRow key={id}>
-                  <TableCell>
-                    {MEASURES[id].name}
-                    {params !== "" && (
-                      <>
-                        {" "}
-                        (<Mi tex={params} />)
-                      </>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono">{lowMedium}</TableCell>
-                  <TableCell className="font-mono">{mediumHigh}</TableCell>
-                </TableRow>
-              );
-            })}
+            {LEVEL_DOCS.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {row.name}
+                  {row.paramsTex !== "" && (
+                    <>
+                      {" "}
+                      (<Mi tex={row.paramsTex} />)
+                    </>
+                  )}
+                </TableCell>
+                <TableCell className="font-mono">{row.lowMedium}</TableCell>
+                <TableCell className="font-mono">{row.mediumHigh}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </Card>
@@ -229,9 +178,9 @@ export function PolarizationWikiSection() {
       </h3>
       <p className="text-lg tracking-tight text-muted-foreground">
         {t("polarization.wiki.source1", {
-          commit: POL_MEASURES_SOURCE.shortCommit,
           author: POL_MEASURES_SOURCE.author,
           bipol: POL_MEASURES_SOURCE.bipolCredit,
+          paper: POL_MEASURES_SOURCE.paper,
         })}{" "}
         <ExternalTextLink
           href={`${POL_MEASURES_SOURCE.repository}/tree/${POL_MEASURES_SOURCE.commit}`}

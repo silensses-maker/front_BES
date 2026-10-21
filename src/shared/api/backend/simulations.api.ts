@@ -14,6 +14,9 @@ import type {
   GeneratedRunRequest,
   NetworkListResponse,
   PaginationParams,
+  PolarizationCatalog,
+  PolarizationRequest,
+  PolarizationResult,
   ResultsParams,
   ResultsResponse,
   RunCancelledResponse,
@@ -28,6 +31,37 @@ export interface TopologyFullOptions {
   /** Progress of this download (pages, then assembly). */
   onProgress?: (progress: TopologyLoadProgress) => void;
 }
+
+/** pol_measures on the server (#129): GET /simulations/polarization/measures, POST …/polarization. */
+const polarizationEndpoints = {
+  /**
+   * The pol_measures catalog of the server (#129): measures, parameters with the package's
+   * defaults and ranges, supported k, thresholds, f(d) options, limits and versions. 404 when the
+   * server has polarization disabled (APP_POLARIZATION=false), 503 when its worker is unavailable.
+   */
+  async getPolarizationMeasures(): Promise<PolarizationCatalog> {
+    const { data } = await backendClient.get<PolarizationCatalog>(
+      "/simulations/polarization/measures",
+    );
+    return data;
+  },
+
+  /**
+   * One measure over a series of k-category histograms (one per round), computed on the server by
+   * pol_measures (#129). At most `catalog.limits.maxRounds` histograms per call. Errors: 400
+   * `invalid_body`, 422 `invalid_measure`, 404 (disabled), 503 `unavailable`.
+   */
+  async computePolarization(body: PolarizationRequest): Promise<PolarizationResult> {
+    const { data } = await backendClient.post<PolarizationResult>(
+      "/simulations/polarization",
+      body,
+    );
+    return data;
+  },
+};
+
+/** What a build without polarization has instead (nothing; no code calls it there). */
+const compiledOut = {} as typeof polarizationEndpoints;
 
 export const simulationsApi = {
   async startGenerated(body: GeneratedRunRequest): Promise<SimCreated> {
@@ -210,4 +244,8 @@ export const simulationsApi = {
     if (response.status === 404) return null;
     return response.data;
   },
+
+  // polarization (#129): only the run-polarization feature calls these; a build with
+  // PUBLIC_ENABLE_POLARIZATION=false folds the spread to `{}` and drops them.
+  ...(__POLARIZATION__ ? polarizationEndpoints : compiledOut),
 };

@@ -14,8 +14,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(APP_VERSION),
     __BENCHMARK__: "false",
     __BENCH_BUILD__: "null",
-    // polarization replica (#129): always compiled in under test, so its tests and the integration
-    // points run whatever the build default is (the flag-off build is checked on dist/ instead).
+    // polarization (#129): always compiled in under test, so its tests and the integration points
+    // run whatever the build default is (the flag-off build is checked on dist/ instead).
     __POLARIZATION__: "true",
   },
   test: {

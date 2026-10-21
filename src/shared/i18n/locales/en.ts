@@ -1,6 +1,3 @@
-// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
-import polarizationEn from "./polarization.en";
-
 const en = {
   common: {
     save: "Save",
@@ -1082,8 +1079,11 @@ const en = {
       debug: "Debug",
     },
   },
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
-  ...(__POLARIZATION__ ? { polarization: polarizationEn } : {}),
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // Only the run charts' tab label lives here; the rest of the namespace (polarization.en.ts) is
+  // registered by the Polarization view and the wiki section, which are lazy chunks, so it stays
+  // out of the initial chunk.
+  ...(__POLARIZATION__ ? { polarization: { tab: "Polarization" } } : {}),
 } as const;
 
 export default en;

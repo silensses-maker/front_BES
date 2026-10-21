@@ -287,6 +287,108 @@ export interface ResultsParams {
   limit?: number;
 }
 
+// ─── Polarization (#129: pol_measures on the server) ────────────────────────────
+
+export type PolarizationMeasureKind = "literature" | "proposed";
+
+/** A finite number in (minExclusive, max]; `nullable` ones accept null (the package's default). */
+export interface PolarizationNumberParam {
+  name: string;
+  type: "number";
+  default: number | null;
+  nullable: boolean;
+  minExclusive: number | null;
+  /** Inclusive upper bound, null = none. */
+  max: number | null;
+}
+
+/** One of `options` (the f(d) of GeneralizedER / GeneralizedMEC: ids of `alienations`). */
+export interface PolarizationChoiceParam {
+  name: string;
+  type: "choice";
+  default: string;
+  options: string[];
+}
+
+export type PolarizationParam = PolarizationNumberParam | PolarizationChoiceParam;
+
+/** Level thresholds (kmeans, 3 levels) that apply to a parameter set the package calibrated. */
+export interface PolarizationClassification {
+  method: string;
+  paramSet: string;
+  params: Record<string, number>;
+  /** levels[i] below thresholds[i], otherwise the last level. */
+  levels: string[];
+  thresholds: number[];
+}
+
+export interface PolarizationMeasureInfo {
+  /** The package's class name, e.g. "EstebanRay". */
+  id: string;
+  /** Display name (proper name, untranslated). */
+  name: string;
+  kind: PolarizationMeasureKind;
+  /** Still being developed upstream (MECNormalized). */
+  beta: boolean;
+  params: PolarizationParam[];
+  /** The k (2–10) the measure is defined for. */
+  categories: number[];
+  hasThresholds: boolean;
+  /** Thresholds for the DEFAULT parameters, or null. */
+  classification: PolarizationClassification | null;
+}
+
+export interface PolarizationAlienation {
+  id: string;
+  /** Plain-text label, e.g. "eᵈ − 1". */
+  label: string;
+  tex: string;
+}
+
+export interface PolarizationPackageInfo {
+  name: string;
+  version: string;
+  commit: string;
+  url: string | null;
+}
+
+/** Shape returned by GET /simulations/polarization/measures */
+export interface PolarizationCatalog {
+  measures: PolarizationMeasureInfo[];
+  alienations: PolarizationAlienation[];
+  classification: { method: string; levels: number };
+  limits: { minCategories: number; maxCategories: number; maxRounds: number; maxBodyBytes: number };
+  package: PolarizationPackageInfo;
+  versions?: { numpy: string; scipy: string; python: string };
+}
+
+export type PolarizationParamValue = number | string | null;
+
+/** Body of POST /simulations/polarization */
+export interface PolarizationRequest {
+  /** A catalog id. */
+  measure: string;
+  /** Missing parameters take the package's default. */
+  params?: Record<string, PolarizationParamValue>;
+  /** 2–10 categories at x_j = j / (k − 1). */
+  k: number;
+  /** One histogram of k counts (or fractions) per round; at most `limits.maxRounds`. */
+  histograms: number[][];
+}
+
+/** Shape returned by POST /simulations/polarization: one entry per histogram, in order. */
+export interface PolarizationResult {
+  values: Array<number | null>;
+  levels: Array<string | null>;
+  /** Only when some round failed: the package's exception, or null. */
+  errors?: Array<string | null>;
+  /** Thresholds that apply to the REQUESTED parameters, or null. */
+  classification: PolarizationClassification | null;
+  /** Distinct histograms computed. */
+  unique: number;
+  package: { ref: string; version: string };
+}
+
 // ─── Pagination params ────────────────────────────────────────────────────────
 
 export interface PaginationParams {

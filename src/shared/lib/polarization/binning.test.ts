@@ -3,13 +3,11 @@ import {
   accumulateFineHistogram,
   CATEGORY_COUNTS,
   categoryIndex,
-  categoryPositions,
   DEFAULT_CATEGORY_COUNT,
   FINE_BINS,
   fineBinIndex,
   isCategoryCount,
   rebinCounts,
-  toWeights,
 } from "./binning";
 
 /** Deterministic float32 beliefs in [0, 1] (LCG), as the frames deliver them. */
@@ -102,22 +100,7 @@ describe("accumulateFineHistogram + rebinCounts", () => {
   });
 });
 
-describe("categoryPositions / toWeights", () => {
-  it("uses the package's equally spaced positions j/(k−1)", () => {
-    expect(Array.from(categoryPositions(5))).toEqual([0, 0.25, 0.5, 0.75, 1]);
-    expect(Array.from(categoryPositions(3))).toEqual([0, 0.5, 1]);
-    expect(categoryPositions(10)[9]).toBe(1);
-  });
-
-  it("turns counts into fractions and returns the total", () => {
-    const counts = Float64Array.from([1, 3, 0, 4]);
-    expect(toWeights(counts)).toBe(8);
-    expect(Array.from(counts)).toEqual([0.125, 0.375, 0, 0.5]);
-    const empty = new Float64Array(3);
-    expect(toWeights(empty)).toBe(0);
-    expect(Array.from(empty)).toEqual([0, 0, 0]);
-  });
-
+describe("category counts", () => {
   it("knows the supported category counts", () => {
     expect(DEFAULT_CATEGORY_COUNT).toBe(5);
     expect(CATEGORY_COUNTS).toEqual([3, 5, 7, 10]);

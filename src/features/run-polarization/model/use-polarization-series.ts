@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRoundAggregatesStore, useSimulationStore } from "@/entities/simulation";
 import { useFrameCoalesced } from "@/shared/lib/frame-coalescer";
+import type { FineHistogramPool } from "@/shared/lib/polarization";
 import {
-  type FineHistogramPool,
   type PolarizationSeries,
   type SeriesSpec,
   seriesCacheFor,
   seriesKey,
-} from "@/shared/lib/polarization";
+} from "./polarization-series";
 
-/** Time budget per animation frame for computing new rounds (keeps long runs responsive). */
-const FRAME_BUDGET_MS = 8;
+/** Parameter edits wait this long before a new series is requested (typing α 1 → 1.2 → 1.25). */
+export const SPEC_DEBOUNCE_MS = 300;
 
 interface Inputs {
   version: number;
@@ -31,44 +31,103 @@ function readInputs(): Inputs {
   };
 }
 
+/**
+ * `spec`, but a CHANGED spec only once it has been stable for SPEC_DEBOUNCE_MS (the first spec,
+ * and going back to none, apply at once).
+ */
+function useDebouncedSpec(spec: SeriesSpec | null): SeriesSpec | null {
+  const key = spec === null ? null : seriesKey(spec);
+  const [debounced, setDebounced] = useState(spec);
+  const debouncedKey = debounced === null ? null : seriesKey(debounced);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key identifies the spec
+  useEffect(() => {
+    if (key === debouncedKey) return;
+    if (key === null || debouncedKey === null) {
+      setDebounced(spec);
+      return;
+    }
+    const timer = setTimeout(() => setDebounced(spec), SPEC_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [key, debouncedKey]);
+
+  return debounced;
+}
+
 export interface PolarizationSeriesState {
   series: PolarizationSeries | null;
-  /** Changes whenever the series gains values (re-render signal). */
+  /** Changes whenever the series changes (re-render signal). */
   seriesVersion: number;
   currentRound: number;
+  /** Clears the series' error and requests again. */
+  retry: () => void;
 }
 
 /**
- * The memoized series for (measure, params, k, belief) over the run's fine histograms. New rounds
- * are computed incrementally — at most once per animation frame (coalesced store updates), within
- * a time budget, continuing on the next frame when a long run is still being caught up.
+ * The server-computed series for (measure, params, k, belief) over the run's fine histograms
+ * (`spec` null = none, e.g. while the catalog loads). New rounds are sent incrementally as they
+ * arrive (see PolarizationSeries for the chunking and the live interval); a changed spec is
+ * debounced; series are cached per run / network, so going back to a spec costs no request.
  */
-export function usePolarizationSeries(spec: SeriesSpec): PolarizationSeriesState {
+export function usePolarizationSeries(spec: SeriesSpec | null): PolarizationSeriesState {
   const { version, pool, currentRound } = useFrameCoalesced(SUBSCRIBES, readInputs);
-  const key = seriesKey(spec);
+  const debounced = useDebouncedSpec(spec);
+  const key = debounced === null ? null : seriesKey(debounced);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the key identifies the spec
   const series = useMemo(
-    () => (pool === null ? null : seriesCacheFor(pool).get(spec)),
+    () => (pool === null || debounced === null ? null : seriesCacheFor(pool).get(debounced)),
     [pool, key],
   );
   const [seriesVersion, setSeriesVersion] = useState(0);
+  const [retries, setRetries] = useState(0);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version signals new rounds in the pool
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version (new rounds) and retries re-run it
   useEffect(() => {
     if (series === null || pool === null) return;
-    let handle: number | null = null;
-    const step = () => {
-      handle = null;
-      const { done, changed } = series.update(pool, FRAME_BUDGET_MS);
-      if (changed) setSeriesVersion((v) => v + 1);
-      if (!done) handle = requestAnimationFrame(step);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const changed = () => {
+      if (!cancelled) setSeriesVersion(series.version);
     };
-    step();
+    const tick = () => {
+      timer = null;
+      if (cancelled) return;
+      const pending = series.pending;
+      if (pending !== null) {
+        void pending.then(() => {
+          changed();
+          tick();
+        });
+        return;
+      }
+      const delay = series.nextSyncDelay(pool, performance.now());
+      if (delay === null) {
+        changed();
+        return;
+      }
+      if (delay > 0) {
+        timer = setTimeout(tick, delay);
+        return;
+      }
+      const request = series.sync(pool);
+      changed();
+      void request.then(() => {
+        changed();
+        tick();
+      });
+    };
+    tick();
     return () => {
-      if (handle !== null) cancelAnimationFrame(handle);
+      cancelled = true;
+      if (timer !== null) clearTimeout(timer);
     };
-  }, [series, pool, version]);
+  }, [series, pool, version, retries]);
 
-  return { series, seriesVersion, currentRound };
+  const retry = useCallback(() => {
+    series?.retry();
+    setRetries((n) => n + 1);
+  }, [series]);
+
+  return { series, seriesVersion, currentRound, retry };
 }

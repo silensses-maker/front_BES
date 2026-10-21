@@ -1,6 +1,3 @@
-// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
-import polarizationEs from "./polarization.es";
-
 const es = {
   common: {
     save: "Guardar",
@@ -1096,8 +1093,10 @@ const es = {
       debug: "Depuración",
     },
   },
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
-  ...(__POLARIZATION__ ? { polarization: polarizationEs } : {}),
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // Solo la etiqueta de la pestaña; el resto del namespace (polarization.es.ts) lo registran la
+  // vista Polarización y la sección de la wiki (chunks diferidos), fuera del chunk inicial.
+  ...(__POLARIZATION__ ? { polarization: { tab: "Polarización" } } : {}),
 } as const;
 
 export default es;

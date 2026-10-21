@@ -1,5 +1,6 @@
 /**
- * Polarization replica (#129) — compact per-round store of the 210-bin fine histograms.
+ * Polarization (#129) — compact per-round store of the 210-bin fine histograms, from which the
+ * k-category counts sent to the backend's pol_measures worker are rebinned.
  *
  * One contiguous typed array holds [round][belief][bin] (belief 0 = public, 1 = private), grown by
  * doubling. Counts are Uint16 (840 B per round) and switch to Uint32 the first time a bin exceeds
@@ -7,7 +8,7 @@
  * once; `log` keeps the arrival order so consumers can process only what is new.
  */
 
-import { FINE_BINS, rebinCounts, toWeights } from "./binning";
+import { FINE_BINS, rebinCounts } from "./binning";
 
 export type BeliefKind = "public" | "private";
 
@@ -78,10 +79,10 @@ export class FineHistogramPool {
   }
 
   /**
-   * Fills `out` (length k) with the round's k-category weights. Returns the agent count of the
-   * round (0 = absent or empty; `out` then holds zeros).
+   * Fills `out` (length k) with the round's k-category agent counts. Returns the agent count of
+   * the round (0 = absent or empty; `out` then holds zeros).
    */
-  categoryWeights(round: number, belief: BeliefKind, k: number, out: Float64Array): number {
+  categoryCounts(round: number, belief: BeliefKind, k: number, out: Float64Array): number {
     const fine = this.fine(round, belief);
     if (fine === null) {
       out.fill(0);
@@ -89,7 +90,9 @@ export class FineHistogramPool {
     }
     for (let f = 0; f < FINE_BINS; f++) this.scratch[f] = fine[f] as number;
     rebinCounts(this.scratch, k, out);
-    return toWeights(out);
+    let total = 0;
+    for (const count of out) total += count;
+    return total;
   }
 
   private ensureRound(round: number): void {

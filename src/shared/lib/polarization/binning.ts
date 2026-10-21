@@ -1,12 +1,12 @@
 /**
- * Polarization replica (#129) — discretization of continuous agent beliefs into the opinion
- * histograms the measures take. (Not part of pol_measures, which receives histograms.)
+ * Polarization (#129) — discretization of continuous agent beliefs into the opinion histograms the
+ * backend's pol_measures worker measures (the package receives histograms; the binning is ours).
  *
- * Positions: k equally spaced category values in [0, 1], x_j = j/(k − 1) — the package's examples
- * (`x = [0, .25, .5, .75, 1]` for k = 5). Bins: a belief b ∈ [0, 1] falls in category
- * min(k − 1, ⌊b·k⌋), i.e. k equal-width intervals [j/k, (j+1)/k) with b = 1 in the last one.
- * Weights: the fraction of agents in each category (sums to 1, matching the package's
- * `normalize_weights=False` default).
+ * Categories: k equally spaced positions in [0, 1], x_j = j/(k − 1) (the backend sends them to the
+ * package; the package's examples use `x = [0, .25, .5, .75, 1]` for k = 5). Bins: a belief
+ * b ∈ [0, 1] falls in category min(k − 1, ⌊b·k⌋), i.e. k equal-width intervals [j/k, (j+1)/k) with
+ * b = 1 in the last one. The client sends the agent COUNT of each category; the backend normalizes
+ * them to fractions (the package's `normalize_weights=True`).
  *
  * Per round only ONE fine histogram of FINE_BINS = 210 bins is kept per belief type. 210 is the
  * LCM of 3, 5, 7 and 10, so every supported k is an exact sum of 210/k consecutive fine bins:
@@ -49,13 +49,6 @@ export function accumulateFineHistogram(beliefs: ArrayLike<number>, out: Uint32A
   }
 }
 
-/** Category values j/(k − 1), j = 0…k−1. */
-export function categoryPositions(k: number): Float64Array {
-  const out = new Float64Array(k);
-  for (let j = 0; j < k; j++) out[j] = j / (k - 1);
-  return out;
-}
-
 /** k-category counts from a fine histogram: sums of 210/k consecutive fine bins. */
 export function rebinCounts(
   fine: ArrayLike<number>,
@@ -71,12 +64,4 @@ export function rebinCounts(
     out[j] = sum;
   }
   return out;
-}
-
-/** Category weights (fractions) in place: counts / Σcounts. Returns Σcounts (0 = empty). */
-export function toWeights(counts: Float64Array): number {
-  let total = 0;
-  for (const c of counts) total += c;
-  if (total > 0) for (let j = 0; j < counts.length; j++) counts[j] = (counts[j] as number) / total;
-  return total;
 }

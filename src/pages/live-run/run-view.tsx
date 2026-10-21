@@ -55,7 +55,7 @@ const BenchHud = __BENCHMARK__
     )
   : null;
 
-// polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+// polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
 // Loaded when the Polarization tab first renders, so the run view's chunks carry none of it.
 const PolarizationPanel = __POLARIZATION__
   ? lazy(() =>
@@ -384,7 +384,7 @@ export function RunView({ runId, networkId }: RunViewProps) {
     () => setMaxPanel((current) => (current === "chart" ? "none" : "chart")),
     [],
   );
-  // polarization replica (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
   const chartExtraTabs = useMemo(
     () =>
       PolarizationPanel !== null
