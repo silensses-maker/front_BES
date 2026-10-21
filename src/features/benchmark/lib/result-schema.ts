@@ -137,11 +137,15 @@ export interface LoadTimings {
   generateMs: number | null;
   /** Real run: `getTopologyFull` from start to resolve (all pages, JSON parse included). */
   fetchMs: number | null;
-  /** Real run: fetch start → last topology byte (Resource Timing). */
+  /**
+   * Real run: fetch start → last topology byte (Resource Timing; since #128 the topology worker's
+   * entries, relayed to the page by the probe).
+   */
   networkMs: number | null;
   /**
    * Synthetic: JSON.parse of the serialized topology (stands in for the HTTP response parse).
-   * Real run: axios JSON parse of the topology pages of this network.
+   * Real run: JSON parse of the topology pages of this network — in the topology worker since
+   * #128, so off the main thread.
    */
   parseMs: number | null;
   /** `topologyToData`. */

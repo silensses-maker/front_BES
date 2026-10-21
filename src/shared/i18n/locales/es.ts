@@ -236,6 +236,13 @@ const es = {
       publicOpinionDesc_1: "Usado en modelos",
       publicOpinionDesc_2: ". La opinión más reciente expresada públicamente por el agente",
     },
+    variance: {
+      title: "Varianza en el tiempo",
+      p1: "La gráfica Varianza de una corrida muestra, en cada ronda, qué tan dispersas están las creencias alrededor de su media, calculado sobre todos los agentes:",
+      p2_1: "Se dibuja como la desviación estándar",
+      p2_2: "(en unidades de creencia, a lo sumo 0,5) o como la varianza",
+      p2_3: ", para las creencias públicas (continua) y privadas (discontinua). Una curva que cae hacia 0 indica que las opiniones convergen. No es la dispersión (máx − mín) de la banda de la línea de tiempo.",
+    },
     conclusion: {
       title: "Por qué esto importa para SiLEnSeSS",
       p1_1: "Al modelar no solo",
@@ -447,8 +454,6 @@ const es = {
   },
   simulation: {
     errorStream: "La conexión con la simulación falló. Por favor intenta de nuevo.",
-    errorRateLimited: "Demasiadas solicitudes. Espera antes de reconectar.",
-    errorForbidden: "No tienes permiso para acceder a esta simulación.",
     errorCancel: "No se pudo cancelar la simulación.",
     statusIdle: "Inactivo",
     statusConnecting: "Conectando...",
@@ -462,6 +467,11 @@ const es = {
     cancelSuccess: "Simulación cancelada.",
     canvas: {
       loadingNetwork: "Cargando red…",
+      loadingNetworkPages: "Cargando red… {{done}} / {{total}} páginas",
+      loadProgressLabel: "Progreso de la descarga de la red",
+      loadFailedTitle: "No se pudo cargar la red",
+      loadFailedBody:
+        "Una parte de la red no se pudo descargar tras varios intentos. Para no mostrar una red incompleta, no se muestra nada.",
       preparingData: "Preparando datos…",
       computingLayout: "Calculando layout…",
       windowsClusterWarning: "El agrupamiento puede ser inestable en Windows",
@@ -552,18 +562,6 @@ const es = {
     edgeCountLabel: "{{count}} aristas",
     biasMismatchHint:
       "El total de sesgos ({{bias}}) debe ser igual al máximo de aristas ({{maxEdges}}).",
-    strategyDegroot: "DeGroot",
-    strategyMajority: "Mayoría",
-    strategyThreshold: "Umbral",
-    strategyConfidence: "Confianza",
-    effectDegroot: "DeGroot",
-    effectMemory: "Memoria",
-    effectMemoryless: "Sin memoria",
-    biasNone: "Ninguno",
-    biasConfirmation: "Confirmación",
-    biasBackfire: "Efecto rebote",
-    biasAuthority: "Autoridad",
-    biasInsular: "Insular",
     reviewTitle: "Revisar configuración",
     agentTypesCount: "Total de agentes",
     reviewAgentDistribution: "Distribución de agentes",
@@ -913,6 +911,12 @@ const es = {
     tabDistribution: "Distribución",
     tabPublicPrivate: "Pública vs. privada",
     tabParticipation: "Participación",
+    tabVariance: "Varianza",
+    dispersionModeAria: "Mostrar la desviación estándar o la varianza",
+    dispersionStd: "Desv. estándar σ",
+    dispersionVariance: "Varianza σ²",
+    dispersionTip:
+      "Dispersión de las creencias alrededor de su media en cada ronda, sobre todos los agentes: σ² = (1/n) Σ (bᵢ − μ)². Pública (continua) y privada (discontinua).",
     sampleNote: "Mostrando 50 de {{total}} agentes · muestreo uniforme · color = creencia inicial",
     divergenceNote: "El único lugar donde vive la divergencia público-privado — ahora a un clic.",
     distributionTitle: "Creencia pública · ronda {{round}}",
@@ -1089,6 +1093,10 @@ const es = {
       debug: "Depuración",
     },
   },
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // Solo la etiqueta de la pestaña; el resto del namespace (polarization.es.ts) lo registran la
+  // vista Polarización y la sección de la wiki (chunks diferidos), fuera del chunk inicial.
+  ...(__POLARIZATION__ ? { polarization: { tab: "Polarización" } } : {}),
 } as const;
 
 export default es;

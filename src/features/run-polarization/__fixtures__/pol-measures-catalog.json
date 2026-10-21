@@ -1,0 +1,402 @@
+{
+  "measures": [
+    {
+      "id": "EstebanRay",
+      "name": "Esteban–Ray",
+      "kind": "literature",
+      "beta": false,
+      "params": [
+        {
+          "name": "alpha",
+          "type": "number",
+          "default": 0.8,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": 1.6
+        },
+        {
+          "name": "K",
+          "type": "number",
+          "default": null,
+          "nullable": true,
+          "minExclusive": 0.0,
+          "max": null
+        }
+      ],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": true,
+      "classification": {
+        "method": "kmeans",
+        "paramSet": "default",
+        "params": {
+          "alpha": 0.8
+        },
+        "levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "thresholds": [
+          0.3791,
+          0.5141
+        ]
+      }
+    },
+    {
+      "id": "GeneralizedER",
+      "name": "Generalized ER",
+      "kind": "literature",
+      "beta": false,
+      "params": [
+        {
+          "name": "alpha",
+          "type": "number",
+          "default": 0.8,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        },
+        {
+          "name": "alienation",
+          "type": "choice",
+          "default": "d",
+          "options": [
+            "d",
+            "d^2",
+            "d^3",
+            "d+d^2",
+            "d+2d^2",
+            "exp(d)-1",
+            "exp(2d)-1"
+          ]
+        },
+        {
+          "name": "K",
+          "type": "number",
+          "default": null,
+          "nullable": true,
+          "minExclusive": 0.0,
+          "max": null
+        }
+      ],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "EMDPol",
+      "name": "EMD-pol",
+      "kind": "literature",
+      "beta": false,
+      "params": [],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "Experts",
+      "name": "Experts",
+      "kind": "literature",
+      "beta": false,
+      "params": [],
+      "categories": [
+        5
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "ShannonPol",
+      "name": "Shannon-pol",
+      "kind": "literature",
+      "beta": false,
+      "params": [],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "VanDerEijkPol",
+      "name": "Van der Eijk-pol",
+      "kind": "literature",
+      "beta": false,
+      "params": [],
+      "categories": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "MEC",
+      "name": "MEC",
+      "kind": "proposed",
+      "beta": false,
+      "params": [
+        {
+          "name": "alpha",
+          "type": "number",
+          "default": 2,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        },
+        {
+          "name": "beta",
+          "type": "number",
+          "default": 1.15,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        }
+      ],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "MECNormalized",
+      "name": "MEC normalized",
+      "kind": "proposed",
+      "beta": true,
+      "params": [
+        {
+          "name": "alpha",
+          "type": "number",
+          "default": 2,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        },
+        {
+          "name": "beta",
+          "type": "number",
+          "default": 1.15,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        }
+      ],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": true,
+      "classification": {
+        "method": "kmeans",
+        "paramSet": "default",
+        "params": {
+          "alpha": 2.0,
+          "beta": 1.15
+        },
+        "levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "thresholds": [
+          0.2233,
+          0.3801
+        ]
+      }
+    },
+    {
+      "id": "GeneralizedMEC",
+      "name": "Generalized MEC",
+      "kind": "proposed",
+      "beta": false,
+      "params": [
+        {
+          "name": "alpha",
+          "type": "number",
+          "default": 2.0,
+          "nullable": false,
+          "minExclusive": 0.0,
+          "max": null
+        },
+        {
+          "name": "alienation",
+          "type": "choice",
+          "default": "d",
+          "options": [
+            "d",
+            "d^2",
+            "d^3",
+            "d+d^2",
+            "d+2d^2",
+            "exp(d)-1",
+            "exp(2d)-1"
+          ]
+        }
+      ],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": false,
+      "classification": null
+    },
+    {
+      "id": "BiPol",
+      "name": "BiPol",
+      "kind": "proposed",
+      "beta": false,
+      "params": [],
+      "categories": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "hasThresholds": true,
+      "classification": {
+        "method": "kmeans",
+        "paramSet": "default",
+        "params": {},
+        "levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "thresholds": [
+          0.4525,
+          0.6267
+        ]
+      }
+    }
+  ],
+  "alienations": [
+    {
+      "id": "d",
+      "label": "d",
+      "tex": "d"
+    },
+    {
+      "id": "d^2",
+      "label": "d²",
+      "tex": "d^{2}"
+    },
+    {
+      "id": "d^3",
+      "label": "d³",
+      "tex": "d^{3}"
+    },
+    {
+      "id": "d+d^2",
+      "label": "d + d²",
+      "tex": "d + d^{2}"
+    },
+    {
+      "id": "d+2d^2",
+      "label": "d + 2d²",
+      "tex": "d + 2d^{2}"
+    },
+    {
+      "id": "exp(d)-1",
+      "label": "eᵈ − 1",
+      "tex": "e^{d} - 1"
+    },
+    {
+      "id": "exp(2d)-1",
+      "label": "e²ᵈ − 1",
+      "tex": "e^{2d} - 1"
+    }
+  ],
+  "classification": {
+    "method": "kmeans",
+    "levels": 3
+  },
+  "limits": {
+    "minCategories": 2,
+    "maxCategories": 10,
+    "maxRounds": 20000,
+    "maxBodyBytes": 8388608
+  },
+  "package": {
+    "name": "measures",
+    "version": "0.1.0a2",
+    "commit": "0e05564ed0b7b23de368dd19becac3a1de4ef745",
+    "url": "https://github.com/Ulvenforst/pol_measures.git"
+  },
+  "versions": {
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "python": "3.12.3"
+  }
+}

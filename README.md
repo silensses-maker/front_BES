@@ -180,6 +180,69 @@ Replaces ESLint + Prettier (~100x faster). Key rules:
 
 ---
 
+## Polarization measures
+
+The run view's **Polarization** chart shows, round by round, a polarization measure of the agents'
+beliefs computed **on the server by the real Python package**
+[pol_measures](https://github.com/ulvenforst/pol_measures) (PROMUEVA; package author Juan Camilo
+Narváez Tascón, BiPol implemented by Carlos Pinzón; MEC paper
+[arXiv:2606.13997](https://arxiv.org/abs/2606.13997)), pinned to a commit in the backend image
+(currently [`0e05564`](https://github.com/ulvenforst/pol_measures/tree/0e05564ed0b7b23de368dd19becac3a1de4ef745)).
+pol_measures is GPL-3.0 upstream and is used with its authors' permission (members of PROMUEVA);
+the backend installs it unmodified. Nothing is computed in the browser: the client only builds the
+histograms.
+
+- Per round, the aggregates pipeline keeps one 210-bin histogram per belief type (210 = LCM of 3, 5,
+  7 and 10; `src/shared/lib/polarization/`), so any k is an exact rebinning.
+- `GET /simulations/polarization/measures` gives the catalog (measures, parameters with the
+  package's defaults and ranges, the k each supports — Experts only 5 —, thresholds, the f(d)
+  options, limits, versions); it is fetched once per session (`run-polarization/model/polarization-catalog.store.ts`).
+- `POST /simulations/polarization` gets the k-category agent counts of each round and answers one
+  value, level and error per round (`run-polarization/model/polarization-series.ts`). Requests are
+  debounced while parameters are edited, results are cached per run / network, measure, parameters,
+  k and belief type, and a live run only sends its new rounds, at most every 2 s (5000 rounds per
+  request while catching up).
+- If the server answers 404 (polarization disabled, or an older backend) or 503 (worker down,
+  timed out or busy), the chart says so; there is no client fallback.
+
+The wiki's *Polarization measures* section documents the measures (formulas, parameters, levels,
+references) from `src/features/run-polarization/lib/measure-docs.ts`: the wiki is public, so it
+cannot read the authenticated catalog. Variance and standard deviation over time are not part of
+this feature: they stay when it is disabled.
+
+**Disable it** on either side:
+
+- frontend, at build time (on by default; only the exact value `false` turns it off):
+
+  ```bash
+  PUBLIC_ENABLE_POLARIZATION=false bun run build
+  ```
+
+  A disabled build computes no fine histograms, shows no Polarization tab or wiki section, and the
+  bundler drops the code (`__POLARIZATION__` is a build-time literal, like `__BENCHMARK__`). The
+  default lives in `rsbuild.config.ts`, not in an `.env` file.
+- backend: `APP_POLARIZATION=false` (default enabled, in code). Both endpoints then answer 404 and
+  Python is never started; the chart shows "not available on this server".
+
+**Remove it** from the frontend: delete `src/shared/lib/polarization/`, `src/features/run-polarization/`,
+`src/shared/i18n/locales/polarization.en.ts` and `polarization.es.ts`, and the integration points,
+each marked with the comment `polarization (#129)` (`grep -rn "polarization (#129)" src rsbuild.config.ts vitest.config.ts`):
+the build flag (`rsbuild.config.ts`, `vitest.config.ts`, `src/shared/config/build-flags.d.ts`), the
+per-round histogram hook (`src/shared/lib/round-stats.ts`, `src/shared/workers/simulation-frame.worker.ts`,
+`src/entities/simulation/lib/round-aggregates.ts`, `src/entities/simulation/model/round-aggregates.store.ts`),
+the run charts tab (`src/pages/live-run/run-view.tsx`), the wiki section (`src/pages/wiki/wiki-page.tsx`)
+and the `polarization` namespace merge in `src/shared/i18n/locales/en.ts` and `es.ts`. The API
+methods `simulationsApi.getPolarizationMeasures` / `computePolarization` and their types
+(`src/shared/api/backend`) follow the backend's OpenAPI.
+
+**Bump pol_measures**: it is pinned in ONE place, `ARG POL_MEASURES_REF` at the top of the backend's
+`Dockerfile` (see the backend README, "Polarization measures": build, run the worker self-test in
+the image). The chart's info tooltip shows the commit the server reports. Then update
+`POL_MEASURES_SOURCE.commit` (`src/shared/lib/polarization/source.ts`, the wiki's attribution and
+link) and review `measure-docs.ts` (formulas, defaults, thresholds) against the new commit.
+
+---
+
 ## Versioning
 
 Follows Semantic Versioning with pre-release tags:

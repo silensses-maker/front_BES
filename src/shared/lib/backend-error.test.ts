@@ -101,7 +101,6 @@ describe("getBackendErrorCode", () => {
       "not_found",
       "invalid_body",
       "usage_limit_exceeded",
-      "rate_limited",
       "conflict",
     ];
 

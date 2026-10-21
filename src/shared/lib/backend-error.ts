@@ -30,7 +30,6 @@ const BACKEND_ERROR_CODES: ReadonlySet<BackendErrorCode> = new Set([
   "not_found",
   "invalid_body",
   "usage_limit_exceeded",
-  "rate_limited",
   "conflict",
 ]);
 

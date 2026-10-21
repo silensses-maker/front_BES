@@ -34,8 +34,8 @@ describe("buildAgentComposition", () => {
     const entries = buildAgentComposition(makeGen());
 
     expect(entries).toEqual([
-      { labelKey: "simulationConfig.strategyDegroot", count: 157, pct: 87.2 },
-      { labelKey: "simulationConfig.strategyThreshold", count: 23, pct: 12.8 },
+      { labelKey: "enums.silenceStrategy.degroot", count: 157, pct: 87.2 },
+      { labelKey: "enums.silenceStrategy.threshold", count: 23, pct: 12.8 },
     ]);
   });
 
@@ -49,9 +49,7 @@ describe("buildAgentComposition", () => {
       }),
     );
 
-    expect(entries).toEqual([
-      { labelKey: "simulationConfig.strategyDegroot", count: 10, pct: 100 },
-    ]);
+    expect(entries).toEqual([{ labelKey: "enums.silenceStrategy.degroot", count: 10, pct: 100 }]);
   });
 
   it("handles an empty row list", () => {
@@ -63,7 +61,7 @@ describe("buildAgentComposition", () => {
       makeGen({ agentTypes: [{ id: "a0", count: 0, silenceStrategy: 1, silenceEffect: 0 }] }),
     );
 
-    expect(entries).toEqual([{ labelKey: "simulationConfig.strategyMajority", count: 0, pct: 0 }]);
+    expect(entries).toEqual([{ labelKey: "enums.silenceStrategy.majority", count: 0, pct: 0 }]);
   });
 });
 
@@ -79,8 +77,8 @@ describe("buildBiasComposition", () => {
     );
 
     expect(entries).toEqual([
-      { labelKey: "simulationConfig.biasNone", count: 30, pct: 30 },
-      { labelKey: "simulationConfig.biasInsular", count: 70, pct: 70 },
+      { labelKey: "enums.cognitiveBias.degroot", count: 30, pct: 30 },
+      { labelKey: "enums.cognitiveBias.insular", count: 70, pct: 70 },
     ]);
   });
 });

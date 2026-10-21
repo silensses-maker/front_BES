@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { simulationsApi } from "@/shared/api/backend";
+import type { TopologyLoadProgress } from "@/shared/workers/topology-transfer";
+import { TopologyLoadError } from "@/shared/workers/topology-transfer";
 import {
+  getTopologyLoadStatus,
   loadTopology,
   releaseTopologies,
   resetTopologyLoader,
+  subscribeTopologyLoad,
   TOPOLOGY_CACHE_LIMIT,
 } from "./topology-loader";
 
@@ -35,12 +39,17 @@ interface Download {
   networkId: string;
   resolve: (topology: TopologyResponse | null) => void;
   reject: (error: unknown) => void;
+  /** The `onProgress` the loader passed to `getTopologyFull`. */
+  progress: (progress: TopologyLoadProgress) => void;
 }
 
 /** Every `getTopologyFull` call stays pending until the test settles it. */
 let downloads: Download[] = [];
 
 const download = vi.mocked(simulationsApi.getTopologyFull);
+
+/** The options the loader passes to every download: its progress fan-out. */
+const WITH_PROGRESS = expect.objectContaining({ onProgress: expect.any(Function) });
 
 /** Lets the loader's promise callbacks run. */
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -49,9 +58,10 @@ beforeEach(() => {
   resetTopologyLoader();
   downloads = [];
   download.mockImplementation(
-    (runId, networkId) =>
+    (runId, networkId, options) =>
       new Promise<TopologyResponse | null>((resolve, reject) => {
-        downloads.push({ runId, networkId, resolve, reject });
+        const progress = options?.onProgress ?? (() => {});
+        downloads.push({ runId, networkId, resolve, reject, progress });
       }),
   );
 });
@@ -74,7 +84,7 @@ describe("loadTopology — concurrent loads", () => {
       loadTopology(RUN, "net-1"),
     ];
     expect(download).toHaveBeenCalledTimes(1);
-    expect(download).toHaveBeenCalledWith(RUN, "net-1");
+    expect(download).toHaveBeenCalledWith(RUN, "net-1", WITH_PROGRESS);
 
     const topology = topologyOf(RUN, "net-1");
     downloads[0]?.resolve(topology);
@@ -101,8 +111,8 @@ describe("loadTopology — concurrent loads", () => {
     void loadTopology(OTHER_RUN, "net-1");
 
     expect(download).toHaveBeenCalledTimes(2);
-    expect(download).toHaveBeenNthCalledWith(1, RUN, "net-1");
-    expect(download).toHaveBeenNthCalledWith(2, OTHER_RUN, "net-1");
+    expect(download).toHaveBeenNthCalledWith(1, RUN, "net-1", WITH_PROGRESS);
+    expect(download).toHaveBeenNthCalledWith(2, OTHER_RUN, "net-1", WITH_PROGRESS);
   });
 });
 
@@ -154,7 +164,7 @@ describe("loadTopology — reuse of a completed download", () => {
 
     void loadTopology(RUN, "net-2");
     expect(download).toHaveBeenCalledTimes(4);
-    expect(download).toHaveBeenLastCalledWith(RUN, "net-2");
+    expect(download).toHaveBeenLastCalledWith(RUN, "net-2", WITH_PROGRESS);
   });
 
   it("neither counts nor evicts running downloads", async () => {
@@ -300,5 +310,169 @@ describe("releaseTopologies", () => {
     // The run is viewed again: the completed download is kept
     expect(await loadTopology(RUN, "net-1")).toBe(topology);
     expect(download).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Progress (#128) ─────────────────────────────────────────────────────────
+
+const page = (pagesDone: number, pagesTotal: number | null = 15): TopologyLoadProgress => ({
+  stage: "download",
+  pagesDone,
+  pagesTotal,
+});
+
+describe("loadTopology — progress shared by every consumer of a download (#128)", () => {
+  it("delivers the same progress events to every joined consumer", async () => {
+    const prefetch: TopologyLoadProgress[] = [];
+    const wsHandler: TopologyLoadProgress[] = [];
+    const selector: TopologyLoadProgress[] = [];
+    const loads = [
+      loadTopology(RUN, "net-1", { onProgress: (p) => prefetch.push(p) }),
+      loadTopology(RUN, "net-1", { onProgress: (p) => wsHandler.push(p) }),
+    ];
+    downloads[0]?.progress(page(0, null));
+    downloads[0]?.progress(page(1));
+    // A late joiner first gets where the download is, then the rest
+    loads.push(loadTopology(RUN, "net-1", { onProgress: (p) => selector.push(p) }));
+    downloads[0]?.progress(page(2));
+    downloads[0]?.progress({ stage: "assemble" });
+    downloads[0]?.resolve(topologyOf(RUN, "net-1"));
+    await Promise.all(loads);
+
+    expect(download).toHaveBeenCalledTimes(1);
+    const all = [page(0, null), page(1), page(2), { stage: "assemble" }];
+    expect(prefetch).toEqual(all);
+    expect(wsHandler).toEqual(all);
+    expect(selector).toEqual([page(1), page(2), { stage: "assemble" }]);
+  });
+
+  it("a joiner that retries follows the progress of its own attempt", async () => {
+    const owner: TopologyLoadProgress[] = [];
+    const joiner: TopologyLoadProgress[] = [];
+    void loadTopology(RUN, "net-1", { onProgress: (p) => owner.push(p) }).catch(() => {});
+    const joined = loadTopology(RUN, "net-1", { onProgress: (p) => joiner.push(p) });
+    downloads[0]?.progress(page(3));
+    downloads[0]?.reject(
+      new TopologyLoadError({ kind: "http", status: 503, attempts: 4, message: "503" }),
+    );
+    await flush();
+
+    downloads[1]?.progress(page(1, 4));
+    downloads[1]?.resolve(topologyOf(RUN, "net-1"));
+    await joined;
+    expect(owner).toEqual([page(3)]);
+    expect(joiner).toEqual([page(3), page(1, 4)]);
+  });
+
+  it("drops the consumers when the download settles, and a reuse reports no progress", async () => {
+    const seen: TopologyLoadProgress[] = [];
+    const first = loadTopology(RUN, "net-1", { onProgress: (p) => seen.push(p) });
+    downloads[0]?.resolve(topologyOf(RUN, "net-1"));
+    await first;
+    downloads[0]?.progress(page(9));
+    await loadTopology(RUN, "net-1", { onProgress: (p) => seen.push(p) });
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("topology load status (#128)", () => {
+  it("goes idle → loading (with its progress) → ready, notifying the observers", async () => {
+    const changes = vi.fn();
+    subscribeTopologyLoad(RUN, "net-1", changes);
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "idle" });
+
+    const pending = loadTopology(RUN, "net-1");
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "loading", progress: null });
+    downloads[0]?.progress(page(4));
+    const loading = getTopologyLoadStatus(RUN, "net-1");
+    expect(loading).toEqual({ phase: "loading", progress: page(4) });
+    // Same object until something changes (useSyncExternalStore snapshot)
+    expect(getTopologyLoadStatus(RUN, "net-1")).toBe(loading);
+
+    downloads[0]?.resolve(topologyOf(RUN, "net-1"));
+    await pending;
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "ready" });
+    expect(changes).toHaveBeenCalledTimes(3);
+  });
+
+  it("a failed download leaves a failed status and nothing kept; the next load downloads again", async () => {
+    const error = new TopologyLoadError({ kind: "http", status: 500, attempts: 4, message: "500" });
+    const first = loadTopology(RUN, "net-1");
+    downloads[0]?.progress(page(7));
+    downloads[0]?.reject(error);
+    await expect(first).rejects.toBe(error);
+
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "failed", error });
+    // Failures are not reused: a retry is a new download, and the status follows it
+    const retry = loadTopology(RUN, "net-1");
+    expect(download).toHaveBeenCalledTimes(2);
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "loading", progress: null });
+    downloads[1]?.resolve(topologyOf(RUN, "net-1"));
+    await retry;
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "ready" });
+  });
+
+  it("reports the status of a download whoever started it (the WS handler, not the view)", async () => {
+    const changes = vi.fn();
+    subscribeTopologyLoad(RUN, "net-2", changes);
+    void loadTopology(RUN, "net-2");
+    downloads[0]?.progress(page(2, 3));
+    expect(getTopologyLoadStatus(RUN, "net-2")).toEqual({ phase: "loading", progress: page(2, 3) });
+    expect(changes).toHaveBeenCalledTimes(2);
+  });
+
+  it("is idle again after a 202, after leaving the run and for another run", async () => {
+    const notReady = loadTopology(RUN, "net-1");
+    downloads[0]?.resolve(null);
+    await notReady;
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "idle" });
+
+    const failing = loadTopology(RUN, "net-1");
+    downloads[1]?.reject(new Error("offline"));
+    await failing.catch(() => {});
+    await loadCompleted(RUN, "net-2");
+    const changes = vi.fn();
+    subscribeTopologyLoad(RUN, "net-1", changes);
+    releaseTopologies(RUN);
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "idle" });
+    expect(getTopologyLoadStatus(RUN, "net-2")).toEqual({ phase: "idle" });
+    expect(changes).toHaveBeenCalledOnce();
+
+    void loadTopology(RUN, "net-3");
+    void loadTopology(OTHER_RUN, "net-3");
+    expect(getTopologyLoadStatus(RUN, "net-3")).toEqual({ phase: "idle" });
+    expect(getTopologyLoadStatus(OTHER_RUN, "net-3")).toEqual({ phase: "loading", progress: null });
+  });
+
+  it("does not record a failure for a run that was left", async () => {
+    const pending = loadTopology(RUN, "net-1");
+    releaseTopologies(RUN);
+    downloads[0]?.reject(new Error("gone"));
+    await pending.catch(() => {});
+    void loadTopology(RUN, "net-9");
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "idle" });
+  });
+
+  it("notifies the observers of a run that is replaced, and stops after unsubscribing", async () => {
+    const changes = vi.fn();
+    const unsubscribe = subscribeTopologyLoad(RUN, "net-1", changes);
+    void loadTopology(RUN, "net-1");
+    void loadTopology(OTHER_RUN, "net-1");
+    expect(changes).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+    downloads[1]?.progress(page(1));
+    void loadTopology(RUN, "net-1");
+    expect(changes).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifies when a completed topology is evicted", async () => {
+    await loadCompleted(RUN, "net-1");
+    const changes = vi.fn();
+    subscribeTopologyLoad(RUN, "net-1", changes);
+    await loadCompleted(RUN, "net-2");
+    await loadCompleted(RUN, "net-3");
+    expect(getTopologyLoadStatus(RUN, "net-1")).toEqual({ phase: "idle" });
+    expect(changes).toHaveBeenCalledOnce();
   });
 });

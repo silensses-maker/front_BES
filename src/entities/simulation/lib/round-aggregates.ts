@@ -1,3 +1,4 @@
+import { computeRoundStats, type RoundStats } from "@/shared/lib/round-stats";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 
 export interface RoundAggregate {
@@ -7,6 +8,10 @@ export interface RoundAggregate {
   spread: number;
   /** Fraction of agents speaking this round, 0..1. */
   participation: number;
+  /** Population variance of the public beliefs (σ² = (1/n) Σ (bᵢ − μ)², exact). */
+  variancePublic: number;
+  /** Population variance of the private beliefs. */
+  variancePrivate: number;
 }
 
 /** Max agent series kept for the evolution chart (mockup: 50, uniform sample). */
@@ -15,31 +20,33 @@ export const MAX_SAMPLED_AGENTS = 50;
 /** Per-agent series length that triggers thinning (memory cap for long runs). */
 export const MAX_SERIES_POINTS = 1200;
 
-export function computeRoundAggregate(frame: MergedFrame): RoundAggregate {
-  const len = frame.publicBelief.length;
-  if (len === 0) {
-    return { meanPublic: 0, meanPrivate: 0, spread: 0, participation: 0 };
-  }
-  let sumPublic = 0;
-  let sumPrivate = 0;
-  let speaking = 0;
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < len; i++) {
-    const pub = frame.publicBelief[i] ?? 0;
-    const priv = frame.privateBelief[i] ?? 0;
-    sumPublic += pub;
-    sumPrivate += priv;
-    speaking += frame.speaking[i] ?? 0;
-    if (priv < min) min = priv;
-    if (priv > max) max = priv;
-  }
+/**
+ * Statistics of a frame: the ones the frame worker attached (live / REST fallback), or computed
+ * here for frames merged on the main thread (cold-load sweep).
+ */
+export function roundStatsOf(frame: MergedFrame): RoundStats {
+  return (
+    frame.stats ??
+    computeRoundStats(frame.publicBelief, frame.privateBelief, frame.speaking, {
+      // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+      fineHistograms: __POLARIZATION__,
+    })
+  );
+}
+
+export function toRoundAggregate(stats: RoundStats): RoundAggregate {
   return {
-    meanPublic: sumPublic / len,
-    meanPrivate: sumPrivate / len,
-    spread: max - min,
-    participation: speaking / len,
+    meanPublic: stats.meanPublic,
+    meanPrivate: stats.meanPrivate,
+    spread: stats.spread,
+    participation: stats.participation,
+    variancePublic: stats.variancePublic,
+    variancePrivate: stats.variancePrivate,
   };
+}
+
+export function computeRoundAggregate(frame: MergedFrame): RoundAggregate {
+  return toRoundAggregate(roundStatsOf(frame));
 }
 
 /** Uniform sample of agent indices: 0, step, 2·step… (≤ maxSeries entries). */

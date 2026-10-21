@@ -1,6 +1,11 @@
 import { X } from "lucide-react";
 import { useSimulationStore } from "@/entities/simulation";
 import { useTranslation } from "@/shared/i18n";
+import {
+  cognitiveBiasLabel,
+  silenceEffectLabel,
+  silenceStrategyLabel,
+} from "@/shared/i18n/enum-labels";
 import { interpolateOpinion } from "@/shared/lib/opinion-palette";
 import { cn } from "@/shared/lib/utils";
 import { Card } from "@/shared/ui/card";
@@ -95,27 +100,6 @@ export function NodeInspectorCard() {
 
   const agentNameMap = new Map(topology.agents.map((a) => [a.index, a.name ?? String(a.index)]));
 
-  const strategyLabel: Record<number, string> = {
-    0: t("enums.silenceStrategy.degroot"),
-    1: t("enums.silenceStrategy.majority"),
-    2: t("enums.silenceStrategy.threshold"),
-    3: t("enums.silenceStrategy.confidence"),
-  };
-
-  const effectLabel: Record<number, string> = {
-    0: t("enums.silenceEffect.degroot"),
-    1: t("enums.silenceEffect.memory"),
-    2: t("enums.silenceEffect.memoryless"),
-  };
-
-  const biasLabel: Record<number, string> = {
-    0: t("simulationConfig.biasNone"),
-    1: t("simulationConfig.biasConfirmation"),
-    2: t("simulationConfig.biasBackfire"),
-    3: t("simulationConfig.biasAuthority"),
-    4: t("simulationConfig.biasInsular"),
-  };
-
   // Viewed-round state (guarded against a stale frame from another network)
   const frame =
     latestFrame !== null && latestFrame.networkId === topology.networkId ? latestFrame : null;
@@ -155,10 +139,10 @@ export function NodeInspectorCard() {
       {/* Badges: estrategia / efecto / estado (mockup pills) */}
       <div className="flex flex-wrap gap-1.5">
         <span className="rounded-full bg-accent px-2 py-0.5 font-sans text-[10.5px] font-medium text-primary">
-          {strategyLabel[agent.silenceStrategy] ?? String(agent.silenceStrategy)}
+          {silenceStrategyLabel(t, agent.silenceStrategy)}
         </span>
         <span className="rounded-full bg-accent px-2 py-0.5 font-sans text-[10.5px] font-medium text-primary">
-          {effectLabel[agent.silenceEffect] ?? String(agent.silenceEffect)}
+          {silenceEffectLabel(t, agent.silenceEffect)}
         </span>
         {speaking !== null && (
           <span
@@ -228,7 +212,7 @@ export function NodeInspectorCard() {
                   label={neighborLabel}
                   influence={e.influence}
                   bias={e.bias}
-                  biasLabel={biasLabel[e.bias] ?? String(e.bias)}
+                  biasLabel={cognitiveBiasLabel(t, e.bias)}
                   isSelf={isSelf}
                 />
               );
@@ -251,7 +235,7 @@ export function NodeInspectorCard() {
                 label={`← ${agentNameMap.get(e.source) ?? String(e.source)}`}
                 influence={e.influence}
                 bias={e.bias}
-                biasLabel={biasLabel[e.bias] ?? String(e.bias)}
+                biasLabel={cognitiveBiasLabel(t, e.bias)}
               />
             ))}
           </div>

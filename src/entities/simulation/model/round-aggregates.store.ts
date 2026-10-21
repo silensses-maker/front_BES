@@ -1,11 +1,15 @@
 import { create } from "zustand";
+// polarization (#129): the histogram store only, not the barrel (this store is created at
+// startup). Remove with src/shared/lib/polarization.
+import { FineHistogramPool } from "@/shared/lib/polarization/fine-histograms";
 import type { MergedFrame } from "@/shared/workers/simulation-frame-merger";
 import {
-  computeRoundAggregate,
   MAX_SERIES_POINTS,
   type RoundAggregate,
+  roundStatsOf,
   sampleAgentIndices,
   thinSeries,
+  toRoundAggregate,
 } from "../lib/round-aggregates";
 
 /**
@@ -36,6 +40,12 @@ interface RoundAggregatesState {
   sampledIndices: number[];
   /** agentIndex → [round, publicBelief][] (append order, not guaranteed sorted). */
   series: Map<number, Array<[number, number]>>;
+  /**
+   * polarization (#129): 210-bin histograms per round and belief type, the source of the
+   * k-category counts sent to the server's pol_measures (null when polarization is compiled
+   * out). Mutable like the other buffers; a new pool per key.
+   */
+  fineHistograms: FineHistogramPool | null;
 
   ingest: (key: string, frame: MergedFrame) => void;
   setSweepDone: (key: string) => void;
@@ -49,6 +59,8 @@ const emptyBuffers = () => ({
   aggregates: [] as Array<RoundAggregate | undefined>,
   sampledIndices: [] as number[],
   series: new Map<number, Array<[number, number]>>(),
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  fineHistograms: __POLARIZATION__ ? new FineHistogramPool() : null,
 });
 
 export const useRoundAggregatesStore = create<RoundAggregatesState>((set, get) => ({
@@ -63,7 +75,12 @@ export const useRoundAggregatesStore = create<RoundAggregatesState>((set, get) =
     const current = get();
     if (current.aggregates[frame.round] !== undefined) return; // idempotent
 
-    current.aggregates[frame.round] = computeRoundAggregate(frame);
+    const stats = roundStatsOf(frame);
+    current.aggregates[frame.round] = toRoundAggregate(stats);
+    // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+    if (__POLARIZATION__ && stats.fine !== null) {
+      current.fineHistograms?.record(frame.round, stats.fine.public, stats.fine.private);
+    }
 
     let sampled = current.sampledIndices;
     if (sampled.length === 0 && frame.publicBelief.length > 0) {

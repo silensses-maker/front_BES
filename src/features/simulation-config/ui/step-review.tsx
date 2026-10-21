@@ -1,5 +1,10 @@
 import { useRef } from "react";
 import { useTranslation } from "@/shared/i18n";
+import {
+  cognitiveBiasLabel,
+  silenceEffectLabel,
+  silenceStrategyLabel,
+} from "@/shared/i18n/enum-labels";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { fixedStrategyHintKey } from "../lib/fixed-strategy-hint";
@@ -12,27 +17,6 @@ import type {
   SimConfigValidationErrors,
   SimFormValues,
 } from "../types/simulation-config.types";
-
-const STRATEGY_KEYS: Record<0 | 1 | 2 | 3, string> = {
-  0: "simulationConfig.strategyDegroot",
-  1: "simulationConfig.strategyMajority",
-  2: "simulationConfig.strategyThreshold",
-  3: "simulationConfig.strategyConfidence",
-};
-
-const EFFECT_KEYS: Record<0 | 1 | 2, string> = {
-  0: "simulationConfig.effectDegroot",
-  1: "simulationConfig.effectMemory",
-  2: "simulationConfig.effectMemoryless",
-};
-
-const BIAS_KEYS: Record<0 | 1 | 2 | 3 | 4, string> = {
-  0: "simulationConfig.biasNone",
-  1: "simulationConfig.biasConfirmation",
-  2: "simulationConfig.biasBackfire",
-  3: "simulationConfig.biasAuthority",
-  4: "simulationConfig.biasInsular",
-};
 
 interface StepReviewProps {
   values: SimFormValues;
@@ -226,12 +210,8 @@ export function StepReview({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {gen.agentTypes.map((row) => {
-                    const strategyLabel = t(
-                      STRATEGY_KEYS[row.silenceStrategy] as Parameters<typeof t>[0],
-                    );
-                    const effectLabel = t(
-                      EFFECT_KEYS[row.silenceEffect] as Parameters<typeof t>[0],
-                    );
+                    const strategyLabel = silenceStrategyLabel(t, row.silenceStrategy);
+                    const effectLabel = silenceEffectLabel(t, row.silenceEffect);
                     // Fixed by the simulator (#120) — shown read-only, never user input.
                     const fixedHintKey = fixedStrategyHintKey(row.silenceStrategy);
 
@@ -281,9 +261,7 @@ export function StepReview({
                 <tbody className="divide-y divide-border">
                   {gen.biasTypes.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-4 py-1.5">
-                        {t(BIAS_KEYS[row.cognitiveBias] as Parameters<typeof t>[0])}
-                      </td>
+                      <td className="px-4 py-1.5">{cognitiveBiasLabel(t, row.cognitiveBias)}</td>
                       <td className="px-4 py-1.5 text-right font-mono tabular-nums">
                         {fmt(row.count)}
                       </td>
@@ -324,16 +302,10 @@ export function StepReview({
                     <tr key={agent.name}>
                       <td className="px-4 py-1.5 font-medium">{agent.name}</td>
                       <td className="px-2 py-1.5 text-muted-foreground">
-                        {t(
-                          STRATEGY_KEYS[agent.silenceStrategy as 0 | 1 | 2 | 3] as Parameters<
-                            typeof t
-                          >[0],
-                        )}
+                        {silenceStrategyLabel(t, agent.silenceStrategy)}
                       </td>
                       <td className="px-2 py-1.5 text-muted-foreground">
-                        {t(
-                          EFFECT_KEYS[agent.silenceEffect as 0 | 1 | 2] as Parameters<typeof t>[0],
-                        )}
+                        {silenceEffectLabel(t, agent.silenceEffect)}
                       </td>
                     </tr>
                   ))}
@@ -377,7 +349,7 @@ export function StepReview({
                       <td className="px-2 py-1.5">{edge.target}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{edge.influence}</td>
                       <td className="px-2 py-1.5 text-muted-foreground">
-                        {t(BIAS_KEYS[edge.bias as 0 | 1 | 2 | 3 | 4] as Parameters<typeof t>[0])}
+                        {cognitiveBiasLabel(t, edge.bias)}
                       </td>
                     </tr>
                   ))}

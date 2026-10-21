@@ -29,7 +29,10 @@ export type BenchProbeName =
    * detail: runId, networkId).
    */
   | "topology-fetch-reuse"
-  /** One topology page was parsed by axios (detail: runId, networkId, durationMs). */
+  /**
+   * One topology page was parsed (detail: runId, networkId, durationMs): by axios for a single
+   * `getTopology` page, in the topology worker for the pages of a full download (#128).
+   */
   | "topology-parse"
   /** The canvas started `topologyToData` for a topology (detail: network, agents, edges). */
   | "canvas-prepare-start"
@@ -137,18 +140,29 @@ export interface BenchCanvasHandle {
 /** Events kept for late subscribers (the lazily loaded HUD mounts after the fetch started). */
 export const BENCH_PROBE_HISTORY_LIMIT = 256;
 
+/** A Resource Timing entry the main thread cannot see itself (main-thread clock). */
+export interface BenchResourceEntry {
+  name: string;
+  startTime: number;
+  responseEnd: number;
+}
+
+/** Relayed resource entries kept (the topology pages of a few downloads). */
+export const BENCH_RESOURCE_LIMIT = 256;
+
 interface ProbeState {
   listeners: Set<BenchProbeListener>;
   history: BenchProbeEvent[];
   canvas: BenchCanvasHandle | null;
   nextCallId: number;
+  resources: BenchResourceEntry[];
 }
 
 let state: ProbeState | null = null;
 
 function probeState(): ProbeState {
   if (state === null) {
-    state = { listeners: new Set(), history: [], canvas: null, nextCallId: 1 };
+    state = { listeners: new Set(), history: [], canvas: null, nextCallId: 1, resources: [] };
   }
   return state;
 }
@@ -195,6 +209,24 @@ export function nextBenchCallId(): number {
   return s.nextCallId++;
 }
 
+/**
+ * Records Resource Timing entries made off the main thread — the topology worker's pages (#128):
+ * a worker keeps its own performance timeline, so `performance.getEntriesByType("resource")` on
+ * the page would miss them and the HUD's network time would be blank.
+ */
+export function recordBenchResources(entries: readonly BenchResourceEntry[]): void {
+  const s = probeState();
+  s.resources.push(...entries);
+  if (s.resources.length > BENCH_RESOURCE_LIMIT) {
+    s.resources.splice(0, s.resources.length - BENCH_RESOURCE_LIMIT);
+  }
+}
+
+/** Entries recorded by {@link recordBenchResources}, oldest first. */
+export function getBenchResources(): readonly BenchResourceEntry[] {
+  return probeState().resources;
+}
+
 /** Registers the mounted canvas; the returned function unregisters it (if still current). */
 export function registerBenchCanvas(handle: BenchCanvasHandle): () => void {
   const s = probeState();
@@ -208,7 +240,7 @@ export function getBenchCanvas(): BenchCanvasHandle | null {
   return probeState().canvas;
 }
 
-/** Test helper: drops listeners, history and the canvas handle. */
+/** Test helper: drops listeners, history, relayed resources and the canvas handle. */
 export function resetBenchProbe(): void {
   state = null;
 }

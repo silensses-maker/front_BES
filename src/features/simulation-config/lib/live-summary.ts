@@ -1,3 +1,4 @@
+import { cognitiveBiasLabelKey, silenceStrategyLabelKey } from "@/shared/i18n/enum-labels";
 import type {
   GeneratedSimFormValues,
   SimConfigValidationErrors,
@@ -18,24 +19,9 @@ export interface CompositionEntry {
   pct: number;
 }
 
-const STRATEGY_LABEL_KEYS: Record<number, string> = {
-  0: "simulationConfig.strategyDegroot",
-  1: "simulationConfig.strategyMajority",
-  2: "simulationConfig.strategyThreshold",
-  3: "simulationConfig.strategyConfidence",
-};
-
-const BIAS_LABEL_KEYS: Record<number, string> = {
-  0: "simulationConfig.biasNone",
-  1: "simulationConfig.biasConfirmation",
-  2: "simulationConfig.biasBackfire",
-  3: "simulationConfig.biasAuthority",
-  4: "simulationConfig.biasInsular",
-};
-
 function buildComposition(
   rows: Array<{ group: number; count: number }>,
-  labelKeys: Record<number, string>,
+  labelKeyOf: (code: number) => string | undefined,
 ): CompositionEntry[] {
   const grouped = new Map<number, number>();
   for (const row of rows) {
@@ -43,7 +29,7 @@ function buildComposition(
   }
   const total = [...grouped.values()].reduce((sum, n) => sum + n, 0) || 1;
   return [...grouped.entries()].map(([group, count]) => ({
-    labelKey: labelKeys[group] ?? String(group),
+    labelKey: labelKeyOf(group) ?? String(group),
     count,
     pct: Number(((count / total) * 100).toFixed(1)),
   }));
@@ -53,7 +39,7 @@ function buildComposition(
 export function buildAgentComposition(gen: GeneratedSimFormValues): CompositionEntry[] {
   return buildComposition(
     gen.agentTypes.map((r) => ({ group: r.silenceStrategy, count: r.count })),
-    STRATEGY_LABEL_KEYS,
+    silenceStrategyLabelKey,
   );
 }
 
@@ -61,7 +47,7 @@ export function buildAgentComposition(gen: GeneratedSimFormValues): CompositionE
 export function buildBiasComposition(gen: GeneratedSimFormValues): CompositionEntry[] {
   return buildComposition(
     gen.biasTypes.map((r) => ({ group: r.cognitiveBias, count: r.count })),
-    BIAS_LABEL_KEYS,
+    cognitiveBiasLabelKey,
   );
 }
 

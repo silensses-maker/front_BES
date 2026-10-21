@@ -16,6 +16,16 @@ declare const __APP_VERSION__: string;
  */
 declare const __BENCHMARK__: boolean;
 
+/**
+ * polarization (#129): src/shared/lib/polarization + src/features/run-polarization (the values
+ * are computed on the server by pol_measures). ON unless the build sets
+ * PUBLIC_ENABLE_POLARIZATION=false (the default lives in rsbuild.config.ts, not in a .env file).
+ * Guard every integration point with it so a disabled build computes no fine histograms, shows no
+ * polarization UI or wiki section, and drops the code as dead code. Vitest always compiles it in
+ * (vitest.config.ts), so its tests run whatever the default.
+ */
+declare const __POLARIZATION__: boolean;
+
 /** Build metadata of a benchmark build; `null` in every other build. */
 declare const __BENCH_BUILD__: {
   appVersion: string;

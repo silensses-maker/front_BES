@@ -1,12 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { SimulationWsClient } from "@/entities/simulation";
-import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
+import {
+  createSimulationWsClient,
+  loadTopology,
+  useSimulationStore,
+  useTopologyLoadStatus,
+} from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
+
+/**
+ * Loads the network's topology into the store (shared load, #140) unless one arrived meanwhile.
+ * A caller that stops waiting (`isCancelled`) only ignores the result.
+ */
+function prefetchTopology(runId: string, networkId: string, isCancelled: () => boolean): void {
+  loadTopology(runId, networkId)
+    .then((topo) => {
+      if (isCancelled() || topo === null) return;
+      const store = useSimulationStore.getState();
+      if (store.topology === null) store.setTopology(topo);
+    })
+    .catch((err: unknown) => {
+      if (isCancelled()) return;
+      // The failure is visible: the loader's status turns `failed` and the canvas shows its
+      // error state with a retry (#128).
+      logger.error("useSimulationStream.getTopology", err);
+    });
+}
 
 /**
  * Connects the WebSocket stream for a given run.
@@ -21,6 +44,8 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
   const { t } = useTranslation();
   const manager = useSimulationWsManager();
   const clientRef = useRef<SimulationWsClient | null>(null);
+  // The current mount's lifetime: a retry after unmount (or a run change) does nothing.
+  const lifetimeRef = useRef<{ cancelled: boolean } | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
   const status = useSimulationStore((s) => s.status);
@@ -39,6 +64,9 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
   // start prepareCosmographData with the old topology on every navigation.
   const topology = storeRunId === runId ? storeTopology : null;
 
+  // Topology download status of the watched network, whichever load runs it (#128).
+  const topologyLoad = useTopologyLoadStatus(runId, networkId);
+
   useEffect(() => {
     reset();
     clientRef.current = createSimulationWsClient(runId, networkId, manager);
@@ -49,13 +77,7 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
         await clientRef.current?.connect();
       } catch (err) {
         logger.error("useSimulationStream", err);
-        if (isErrorCode(err, "rate_limited")) {
-          toast.error(t("simulation.errorRateLimited"));
-        } else if (isErrorCode(err, "forbidden")) {
-          toast.error(t("simulation.errorForbidden"));
-        } else {
-          toast.error(t("simulation.errorStream"));
-        }
+        toast.error(t("simulation.errorStream"));
       } finally {
         setIsConnecting(false);
       }
@@ -70,24 +92,14 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
     // starting its own, and the selector's download of the same network is
     // reused. Cancelling only ignores the result — the download keeps serving
     // the other callers.
-    let topologyCancelled = false;
+    const lifetime = { cancelled: false };
+    lifetimeRef.current = lifetime;
     if (networkId !== null) {
-      loadTopology(runId, networkId)
-        .then((topo) => {
-          if (topologyCancelled || topo === null) return;
-          const current = useSimulationStore.getState().topology;
-          if (current === null) {
-            useSimulationStore.getState().setTopology(topo);
-          }
-        })
-        .catch((err: unknown) => {
-          if (topologyCancelled) return;
-          logger.error("useSimulationStream.getTopology", err);
-        });
+      prefetchTopology(runId, networkId, () => lifetime.cancelled);
     }
 
     return () => {
-      topologyCancelled = true;
+      lifetime.cancelled = true;
       clientRef.current?.disconnect();
       clientRef.current = null;
       reset();
@@ -121,5 +133,15 @@ export function useSimulationStream(runId: string, networkId: string | null = nu
       });
   }, [status, currentRound, finalRound, storeNetworkId, topology, runId]);
 
-  return { status, topology, currentRound, error, isConnecting };
+  /**
+   * Retry action of the topology error state (#128): loads the network again — joining the
+   * download of another caller if one runs meanwhile.
+   */
+  const retryTopology = useCallback(() => {
+    const lifetime = lifetimeRef.current;
+    if (networkId === null || lifetime === null || lifetime.cancelled) return;
+    prefetchTopology(runId, networkId, () => lifetime.cancelled);
+  }, [runId, networkId]);
+
+  return { status, topology, currentRound, error, isConnecting, topologyLoad, retryTopology };
 }

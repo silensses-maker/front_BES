@@ -1,10 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSimulationWsClient, loadTopology, useSimulationStore } from "@/entities/simulation";
+import {
+  createSimulationWsClient,
+  loadTopology,
+  useSimulationStore,
+  useTopologyLoadStatus,
+} from "@/entities/simulation";
 import { simulationsApi } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
-import { isErrorCode } from "@/shared/lib/backend-error";
 import { logger } from "@/shared/lib/logger";
 import { useSimulationStream } from "./use-simulation-stream";
 
@@ -38,6 +42,7 @@ vi.mock("@/entities/simulation", () => {
     createSimulationWsClient: vi.fn(),
     loadTopology: vi.fn(),
     useSimulationStore: useSimulationStoreMock,
+    useTopologyLoadStatus: vi.fn(),
   };
 });
 
@@ -49,10 +54,6 @@ vi.mock("@/shared/api/backend", () => ({
 
 vi.mock("@/shared/i18n", () => ({
   useTranslation: vi.fn(),
-}));
-
-vi.mock("@/shared/lib/backend-error", () => ({
-  isErrorCode: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/logger", () => ({
@@ -119,10 +120,10 @@ describe("useSimulationStream", () => {
       setTopology: mockSetTopology,
     });
     vi.mocked(loadTopology).mockResolvedValue(null);
+    vi.mocked(useTopologyLoadStatus).mockReturnValue({ phase: "idle" });
     vi.mocked(useTranslation).mockReturnValue({
       t: (key: string) => key,
     } as unknown as ReturnType<typeof useTranslation>);
-    vi.mocked(isErrorCode).mockReturnValue(false);
   });
 
   describe("initialization", () => {
@@ -165,11 +166,10 @@ describe("useSimulationStream", () => {
     });
   });
 
-  describe("connect() failure — rate_limited", () => {
+  describe("connect() failure", () => {
     it("logs the error with logger.error", async () => {
-      const connectError = new Error("rate limited");
+      const connectError = new Error("worker failed");
       mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "rate_limited");
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123"));
@@ -178,54 +178,24 @@ describe("useSimulationStream", () => {
       expect(logger.error).toHaveBeenCalledWith("useSimulationStream", connectError);
     });
 
-    it("calls toast.error with simulation.errorRateLimited translation key", async () => {
-      const connectError = new Error("rate limited");
-      mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "rate_limited");
-
-      await act(async () => {
-        renderHook(() => useSimulationStream("run-123"));
-      });
-
-      expect(toast.error).toHaveBeenCalledWith("simulation.errorRateLimited");
-    });
-
-    it("sets isConnecting to false after error", async () => {
-      mockClient.connect.mockRejectedValue(new Error("rate limited"));
-      vi.mocked(isErrorCode).mockReturnValue(true);
-
-      const { result } = renderHook(() => useSimulationStream("run-123"));
-
-      await act(async () => {});
-
-      expect(result.current.isConnecting).toBe(false);
-    });
-  });
-
-  describe("connect() failure — forbidden", () => {
-    it("calls toast.error with simulation.errorForbidden translation key", async () => {
-      const connectError = new Error("forbidden");
-      mockClient.connect.mockRejectedValue(connectError);
-      vi.mocked(isErrorCode).mockImplementation((_err, code) => code === "forbidden");
-
-      await act(async () => {
-        renderHook(() => useSimulationStream("run-123"));
-      });
-
-      expect(toast.error).toHaveBeenCalledWith("simulation.errorForbidden");
-    });
-  });
-
-  describe("connect() failure — generic error", () => {
-    it("calls toast.error with simulation.errorStream when no specific code matches", async () => {
+    it("calls toast.error with simulation.errorStream", async () => {
       mockClient.connect.mockRejectedValue(new Error("unknown error"));
-      vi.mocked(isErrorCode).mockReturnValue(false);
 
       await act(async () => {
         renderHook(() => useSimulationStream("run-123"));
       });
 
       expect(toast.error).toHaveBeenCalledWith("simulation.errorStream");
+    });
+
+    it("sets isConnecting to false after error", async () => {
+      mockClient.connect.mockRejectedValue(new Error("worker failed"));
+
+      const { result } = renderHook(() => useSimulationStream("run-123"));
+
+      await act(async () => {});
+
+      expect(result.current.isConnecting).toBe(false);
     });
   });
 
@@ -320,6 +290,62 @@ describe("useSimulationStream", () => {
       });
 
       expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("exposes the download status of the watched network (#128)", async () => {
+      const loading = {
+        phase: "loading",
+        progress: { stage: "download", pagesDone: 4, pagesTotal: 15 },
+      } as const;
+      vi.mocked(useTopologyLoadStatus).mockReturnValue(loading);
+
+      const { result } = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+
+      expect(useTopologyLoadStatus).toHaveBeenCalledWith("run-123", "net-1");
+      expect(result.current.topologyLoad).toBe(loading);
+    });
+
+    it("never stores a topology when the download fails (#128)", async () => {
+      vi.mocked(loadTopology).mockRejectedValue(new Error("page 7 failed after 4 attempts"));
+
+      await act(async () => {
+        renderHook(() => useSimulationStream("run-123", "net-1"));
+      });
+
+      expect(mockSetTopology).not.toHaveBeenCalled();
+    });
+
+    it("retryTopology loads the network again and stores the topology (#128)", async () => {
+      vi.mocked(loadTopology)
+        .mockRejectedValueOnce(new Error("503"))
+        .mockResolvedValue(topo as never);
+
+      const { result } = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+      expect(mockSetTopology).not.toHaveBeenCalled();
+
+      await act(async () => {
+        result.current.retryTopology();
+      });
+
+      expect(loadTopology).toHaveBeenCalledTimes(2);
+      expect(loadTopology).toHaveBeenLastCalledWith("run-123", "net-1");
+      expect(mockSetTopology).toHaveBeenCalledWith(topo);
+    });
+
+    it("retryTopology does nothing after unmount or while waiting for a network", async () => {
+      const waiting = renderHook(() => useSimulationStream("run-123"));
+      await act(async () => {});
+      act(() => waiting.result.current.retryTopology());
+      expect(loadTopology).not.toHaveBeenCalled();
+
+      const viewer = renderHook(() => useSimulationStream("run-123", "net-1"));
+      await act(async () => {});
+      const { retryTopology } = viewer.result.current;
+      act(() => viewer.unmount());
+      act(() => retryTopology());
+      expect(loadTopology).toHaveBeenCalledTimes(1);
     });
 
     it("does not log a topology fetch error once the component has unmounted", async () => {

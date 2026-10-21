@@ -2,18 +2,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
-vi.mock("./auth-interceptor", () => ({}));
+vi.mock("./auth-interceptor", () => ({ currentIdToken: vi.fn() }));
 
 vi.mock("./client", () => ({
   backendClient: {
     post: vi.fn(),
     get: vi.fn(),
     delete: vi.fn(),
+    defaults: { baseURL: "/api" },
   },
+}));
+
+vi.mock("@/shared/workers/topology-fetch.client", () => ({
+  fetchTopologyInWorker: vi.fn(),
 }));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+import { fetchTopologyInWorker } from "@/shared/workers/topology-fetch.client";
+import { TopologyLoadError } from "@/shared/workers/topology-transfer";
+import { currentIdToken } from "./auth-interceptor";
 import { backendClient } from "./client";
 import { simulationsApi } from "./simulations.api";
 import type {
@@ -29,7 +37,6 @@ import type {
   SimulationListResponse,
   TopologyParams,
   TopologyResponse,
-  WsTicketResponse,
 } from "./types/backend.types";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -38,8 +45,6 @@ const mockSimCreated: SimCreated = {
   runId: "run-001",
   status: "running",
   networkCount: 3,
-  channelId: "chan-001",
-  wsTicket: "ticket-abc",
   wsUrl: "ws://localhost:9000/ws",
 };
 
@@ -92,10 +97,6 @@ const mockResultsResponse: ResultsResponse = {
   offset: 0,
   limit: 100,
   agents: [],
-};
-
-const mockWsTicketResponse: WsTicketResponse = {
-  wsTicket: "ticket-xyz",
 };
 
 const mockGeneratedRunRequest: GeneratedRunRequest = {
@@ -335,6 +336,38 @@ describe("simulationsApi", () => {
     });
   });
 
+  describe("polarization (#129)", () => {
+    it("GETs the pol_measures catalog", async () => {
+      const catalog = {
+        measures: [{ id: "MEC" }],
+        alienations: [],
+        package: { commit: "0e05564" },
+      };
+      vi.mocked(backendClient.get).mockResolvedValue({ data: catalog });
+
+      await expect(simulationsApi.getPolarizationMeasures()).resolves.toEqual(catalog);
+      expect(backendClient.get).toHaveBeenCalledWith("/simulations/polarization/measures");
+    });
+
+    it("POSTs the measure, its parameters, k and the histograms", async () => {
+      const result = { values: [0.5], levels: ["low"], classification: null, unique: 1 };
+      vi.mocked(backendClient.post).mockResolvedValue({ data: result });
+      const body = { measure: "MEC", params: { alpha: 2 }, k: 3, histograms: [[1, 0, 1]] };
+
+      await expect(simulationsApi.computePolarization(body)).resolves.toEqual(result);
+      expect(backendClient.post).toHaveBeenCalledWith("/simulations/polarization", body);
+    });
+
+    it("propagates the server's errors (503 worker unavailable, 404 disabled)", async () => {
+      vi.mocked(backendClient.post).mockRejectedValue(new Error("unavailable"));
+      await expect(
+        simulationsApi.computePolarization({ measure: "MEC", k: 3, histograms: [[1, 1, 1]] }),
+      ).rejects.toThrow("unavailable");
+      vi.mocked(backendClient.get).mockRejectedValue(new Error("not found"));
+      await expect(simulationsApi.getPolarizationMeasures()).rejects.toThrow("not found");
+    });
+  });
+
   describe("cancel", () => {
     it("returns RunCancelledResponse when successful", async () => {
       vi.mocked(backendClient.delete).mockResolvedValue({ data: mockRunCancelledResponse });
@@ -409,6 +442,47 @@ describe("simulationsApi", () => {
     });
   });
 
+  describe("getTopologyFull (#128: topology worker)", () => {
+    it("downloads in the worker with an absolute base URL, a fresh token and the progress", async () => {
+      vi.mocked(fetchTopologyInWorker).mockResolvedValue(mockTopologyResponse);
+      const onProgress = vi.fn();
+
+      const result = await simulationsApi.getTopologyFull("run-001", "net-001", { onProgress });
+
+      expect(result).toBe(mockTopologyResponse);
+      expect(fetchTopologyInWorker).toHaveBeenCalledWith(
+        expect.objectContaining({
+          baseUrl: new URL("/api", window.location.href).href,
+          runId: "run-001",
+          networkId: "net-001",
+          getToken: currentIdToken,
+          onProgress,
+          // bench probes are compiled out of normal builds
+          onPage: undefined,
+          onResources: undefined,
+        }),
+      );
+    });
+
+    it("resolves null when the topology is not ready (202)", async () => {
+      vi.mocked(fetchTopologyInWorker).mockResolvedValue(null);
+      await expect(simulationsApi.getTopologyFull("run-001", "net-001")).resolves.toBeNull();
+    });
+
+    it("rejects when a page still fails after its retries — never a partial topology", async () => {
+      const error = new TopologyLoadError({
+        kind: "http",
+        status: 503,
+        attempts: 4,
+        message: "topology page answered 503",
+      });
+      vi.mocked(fetchTopologyInWorker).mockRejectedValue(error);
+
+      await expect(simulationsApi.getTopologyFull("run-001", "net-001")).rejects.toBe(error);
+      expect(backendClient.get).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getResults", () => {
     it("returns ResultsResponse when status 200", async () => {
       const params: ResultsParams = { offset: 0, limit: 50 };
@@ -443,26 +517,6 @@ describe("simulationsApi", () => {
 
       await expect(simulationsApi.getResults("run-001", "net-001")).rejects.toThrow(
         "internal error",
-      );
-    });
-  });
-
-  describe("getWsTicket", () => {
-    it("returns WsTicketResponse when request succeeds", async () => {
-      vi.mocked(backendClient.post).mockResolvedValue({ data: mockWsTicketResponse });
-
-      const result = await simulationsApi.getWsTicket("run-001");
-
-      expect(result).toEqual(mockWsTicketResponse);
-      expect(backendClient.post).toHaveBeenCalledWith("/simulations/run-001/ws-ticket");
-    });
-
-    it("propagates error if request fails", async () => {
-      const error = new Error("ticket generation failed");
-      vi.mocked(backendClient.post).mockRejectedValue(error);
-
-      await expect(simulationsApi.getWsTicket("run-001")).rejects.toThrow(
-        "ticket generation failed",
       );
     });
   });

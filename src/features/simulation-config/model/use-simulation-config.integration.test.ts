@@ -58,8 +58,6 @@ const mockSimCreated: SimCreated = {
   runId: "run-integration",
   status: "running",
   networkCount: 1,
-  channelId: "ch-1",
-  wsTicket: "ticket-1",
   wsUrl: "ws://localhost",
 };
 

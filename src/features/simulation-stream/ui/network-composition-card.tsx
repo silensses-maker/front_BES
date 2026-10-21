@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
 import { formatNumber } from "@/shared/lib/format-number";
 import { cn } from "@/shared/lib/utils";
 import { Card } from "@/shared/ui/card";
@@ -56,29 +57,8 @@ function CompositionBlock({
 export function NetworkCompositionCard({ topology }: { topology: TopologyResponse }) {
   const { t } = useTranslation();
 
-  const strategyLabel = useCallback(
-    (value: number): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceStrategy.degroot"),
-        1: t("enums.silenceStrategy.majority"),
-        2: t("enums.silenceStrategy.threshold"),
-        3: t("enums.silenceStrategy.confidence"),
-      };
-      return map[value] ?? String(value);
-    },
-    [t],
-  );
-  const effectLabel = useCallback(
-    (value: number): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceEffect.degroot"),
-        1: t("enums.silenceEffect.memory"),
-        2: t("enums.silenceEffect.memoryless"),
-      };
-      return map[value] ?? String(value);
-    },
-    [t],
-  );
+  const strategyLabel = useCallback((value: number) => silenceStrategyLabel(t, value), [t]);
+  const effectLabel = useCallback((value: number) => silenceEffectLabel(t, value), [t]);
 
   return (
     <Card className="gap-2.5 rounded-[10px] px-3.5 py-3">

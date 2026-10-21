@@ -232,6 +232,13 @@ const en = {
       publicOpinionDesc_1: "Used in",
       publicOpinionDesc_2: "models. The most recent opinion publicly expressed by agent",
     },
+    variance: {
+      title: "Variance over time",
+      p1: "The Variance chart of a run shows, for each round, how spread out the beliefs are around their mean, computed over every agent:",
+      p2_1: "It is drawn as the standard deviation",
+      p2_2: "(in belief units, at most 0.5) or as the variance",
+      p2_3: ", for public (solid) and private (dashed) beliefs. A curve falling toward 0 means the opinions are converging. It is not the spread (max − min) of the timeline band.",
+    },
     conclusion: {
       title: "Why This Matters for SiLEnSeSS",
       p1_1: "By modeling not just",
@@ -443,8 +450,6 @@ const en = {
   },
   simulation: {
     errorStream: "Connection to the simulation failed. Please try again.",
-    errorRateLimited: "Too many requests. Please wait before reconnecting.",
-    errorForbidden: "You do not have permission to access this simulation.",
     errorCancel: "Failed to cancel simulation.",
     statusIdle: "Idle",
     statusConnecting: "Connecting...",
@@ -458,6 +463,11 @@ const en = {
     cancelSuccess: "Simulation cancelled.",
     canvas: {
       loadingNetwork: "Loading network…",
+      loadingNetworkPages: "Loading network… {{done}} / {{total}} pages",
+      loadProgressLabel: "Network download progress",
+      loadFailedTitle: "The network could not be loaded",
+      loadFailedBody:
+        "Part of the network could not be downloaded after several attempts. Rather than show an incomplete network, nothing is shown.",
       preparingData: "Preparing data…",
       computingLayout: "Computing layout…",
       windowsClusterWarning: "Clustering may be unstable on Windows",
@@ -546,18 +556,6 @@ const en = {
     agentCountLabel: "{{count}} agents",
     edgeCountLabel: "{{count}} edges",
     biasMismatchHint: "Bias total ({{bias}}) must equal max edges ({{maxEdges}}).",
-    strategyDegroot: "DeGroot",
-    strategyMajority: "Majority",
-    strategyThreshold: "Threshold",
-    strategyConfidence: "Confidence",
-    effectDegroot: "DeGroot",
-    effectMemory: "Memory",
-    effectMemoryless: "Memoryless",
-    biasNone: "None",
-    biasConfirmation: "Confirmation",
-    biasBackfire: "Backfire",
-    biasAuthority: "Authority",
-    biasInsular: "Insular",
     reviewTitle: "Review configuration",
     agentTypesCount: "Total agents",
     reviewAgentDistribution: "Agent distribution",
@@ -899,6 +897,12 @@ const en = {
     tabDistribution: "Distribution",
     tabPublicPrivate: "Public vs. private",
     tabParticipation: "Participation",
+    tabVariance: "Variance",
+    dispersionModeAria: "Show the standard deviation or the variance",
+    dispersionStd: "Std. dev. σ",
+    dispersionVariance: "Variance σ²",
+    dispersionTip:
+      "Spread of the beliefs around their mean in each round, over every agent: σ² = (1/n) Σ (bᵢ − μ)². Public (solid) and private (dashed).",
     sampleNote: "Showing 50 of {{total}} agents · uniform sampling · color = initial belief",
     divergenceNote:
       "The only place where the public-private divergence lives — now one click away.",
@@ -1075,6 +1079,11 @@ const en = {
       debug: "Debug",
     },
   },
+  // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
+  // Only the run charts' tab label lives here; the rest of the namespace (polarization.en.ts) is
+  // registered by the Polarization view and the wiki section, which are lazy chunks, so it stays
+  // out of the initial chunk.
+  ...(__POLARIZATION__ ? { polarization: { tab: "Polarization" } } : {}),
 } as const;
 
 export default en;

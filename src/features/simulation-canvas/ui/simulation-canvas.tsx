@@ -8,11 +8,13 @@ import { Cosmograph, prepareCosmographData } from "@cosmograph/react";
 import { Maximize, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import type { SimulationStatus } from "@/entities/simulation";
+import type { SimulationStatus, TopologyLoadStatus } from "@/entities/simulation";
 import { useSimulationStore } from "@/entities/simulation";
 import type { TopologyResponse } from "@/shared/api/backend";
 import { useTranslation } from "@/shared/i18n";
+import { silenceEffectLabel, silenceStrategyLabel } from "@/shared/i18n/enum-labels";
 import { benchProbe } from "@/shared/lib/bench-probe";
+import { formatNumber } from "@/shared/lib/format-number";
 import { logger } from "@/shared/lib/logger";
 import {
   interpolateDivergence,
@@ -20,7 +22,9 @@ import {
   OPINION_PALETTE,
 } from "@/shared/lib/opinion-palette";
 import { Button } from "@/shared/ui/button";
+import { Progress } from "@/shared/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { type TopologyLoadView, topologyLoadView } from "../lib/topology-load-view";
 import { topologyToData } from "../lib/topology-to-data";
 import { useBenchCanvasProbe } from "../model/use-bench-canvas-probe";
 import { CanvasLegend } from "./canvas-legend";
@@ -101,6 +105,95 @@ export interface SimulationCanvasProps {
   playbackActive?: boolean;
   /** Reports whether any grouping is active — the page delays play with it. */
   onClusterActiveChange?: (active: boolean) => void;
+  /**
+   * Download status of the topology (#128): progress while it loads, error state with
+   * `onRetryLoad` when it failed. Only used while `topology` is null.
+   */
+  loadStatus?: TopologyLoadStatus;
+  /** Retry action of the load error state. */
+  onRetryLoad?: () => void;
+}
+
+// ─── Topology load states (#128) ──────────────────────────────────────────────
+
+/** Download progress: an accessible status line plus a progress bar. */
+function TopologyLoadProgressPanel({
+  view,
+}: {
+  view: Exclude<TopologyLoadView, { kind: "failed" } | null>;
+}) {
+  const { t, i18n } = useTranslation();
+  const fmt = (n: number) => formatNumber(n, i18n.language);
+  const label =
+    view.kind === "assembling"
+      ? t("simulation.canvas.preparingData")
+      : view.pagesTotal === null
+        ? t("simulation.canvas.loadingNetwork")
+        : t("simulation.canvas.loadingNetworkPages", {
+            done: fmt(view.pagesDone),
+            total: fmt(view.pagesTotal),
+          });
+  const percent = view.kind === "assembling" ? 100 : view.percent;
+  return (
+    <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
+      <div className="flex w-60 flex-col items-center gap-2.5">
+        <div role="status" aria-live="polite" className="flex items-center gap-2">
+          <div
+            aria-hidden="true"
+            className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          />
+          <p className="font-sans text-sm text-muted-foreground">{label}</p>
+        </div>
+        {percent !== null && (
+          // The shared Progress draws `value` but does not hand it to Radix's root, so the
+          // ARIA value is set here.
+          <Progress
+            value={percent}
+            aria-label={t("simulation.canvas.loadProgressLabel")}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            className="h-1.5"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The topology could not be downloaded: nothing partial is shown, a retry is offered. Same
+ * layout as the run view's stream-error state (mockup: "!" badge, title, body, primary retry).
+ */
+function TopologyLoadFailedPanel({ onRetry }: { onRetry?: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
+      <div role="alert" className="max-w-95 px-4 text-center">
+        <div
+          aria-hidden="true"
+          className="mx-auto mb-3.5 flex size-12 items-center justify-center rounded-full bg-destructive/12 text-xl text-destructive"
+        >
+          !
+        </div>
+        <p className="mb-1 font-sans text-base font-semibold text-foreground">
+          {t("simulation.canvas.loadFailedTitle")}
+        </p>
+        <p className="mb-4 font-sans text-[13px] text-muted-foreground">
+          {t("simulation.canvas.loadFailedBody")}
+        </p>
+        {onRetry !== undefined ? (
+          <Button type="button" onClick={onRetry}>
+            {t("simulation.retry")}
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -110,6 +203,8 @@ export function SimulationCanvas({
   topology,
   playbackActive = false,
   onClusterActiveChange,
+  loadStatus,
+  onRetryLoad,
 }: SimulationCanvasProps) {
   const { t } = useTranslation();
 
@@ -117,16 +212,8 @@ export function SimulationCanvas({
   // useCallback keeps the reference stable so Cosmograph's isEqual guard
   // doesn't trigger a re-upload on every parent render; only re-creates
   // when the locale changes (t reference changes).
-  const silenceStrategyLabel = useCallback(
-    (value: unknown): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceStrategy.degroot"),
-        1: t("enums.silenceStrategy.majority"),
-        2: t("enums.silenceStrategy.threshold"),
-        3: t("enums.silenceStrategy.confidence"),
-      };
-      return map[value as number] ?? String(value);
-    },
+  const labelForStrategy = useCallback(
+    (value: unknown): string => silenceStrategyLabel(t, value as number),
     [t],
   );
 
@@ -173,10 +260,10 @@ export function SimulationCanvas({
       (a, b) => a - b,
     );
     return present.map((strategy) => ({
-      label: silenceStrategyLabel(strategy),
+      label: labelForStrategy(strategy),
       color: STRATEGY_COLORS[strategy % STRATEGY_COLORS.length] ?? "#888888",
     }));
-  }, [topology, silenceStrategyLabel]);
+  }, [topology, labelForStrategy]);
 
   // Reads by the `agentIndex` column value (Cosmograph passes the column value
   // reliably; the optional 2nd `index` arg is not dependable). Without a frame
@@ -338,15 +425,8 @@ export function SimulationCanvas({
     [frame, initialBeliefByIndex, beliefLabel],
   );
 
-  const silenceEffectLabel = useCallback(
-    (value: unknown): string => {
-      const map: Record<number, string> = {
-        0: t("enums.silenceEffect.degroot"),
-        1: t("enums.silenceEffect.memory"),
-        2: t("enums.silenceEffect.memoryless"),
-      };
-      return map[value as number] ?? String(value);
-    },
+  const labelForEffect = useCallback(
+    (value: unknown): string => silenceEffectLabel(t, value as number),
     [t],
   );
 
@@ -507,6 +587,25 @@ export function SimulationCanvas({
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
+  if (status === "error") {
+    return (
+      <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
+        <div className="flex flex-col items-center gap-3">
+          <p className="font-sans text-sm text-destructive">{t("simulation.errorStream")}</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Topology download (#128): its progress, or its error state, takes the place of the
+  // connection / end-of-run messages while no topology is on screen.
+  const loadView = topologyLoadView(loadStatus, topology !== null);
+  if (loadView?.kind === "failed") return <TopologyLoadFailedPanel onRetry={onRetryLoad} />;
+  if (loadView !== null) return <TopologyLoadProgressPanel view={loadView} />;
+
   // Non-running status branches — rendered when topology isn't the concern.
   // Guard is gated on prepResult === null so that a mid-run WS reconnect
   // (which transiently sets status="connecting") does not unmount Cosmograph
@@ -518,19 +617,6 @@ export function SimulationCanvas({
         <p className="font-sans text-sm text-muted-foreground">
           {t("simulation.statusConnecting")}
         </p>
-      </div>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
-        <div className="flex flex-col items-center gap-3">
-          <p className="font-sans text-sm text-destructive">{t("simulation.errorStream")}</p>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/board/experiments">{t("simulation.backToBoard")}</Link>
-          </Button>
-        </div>
       </div>
     );
   }
@@ -605,7 +691,11 @@ export function SimulationCanvas({
   if (phase === "preparing") {
     return (
       <div className="relative flex h-full w-full items-center justify-center bg-muted/20">
-        <p className="font-sans text-sm text-muted-foreground animate-pulse">
+        <p
+          role="status"
+          aria-live="polite"
+          className="font-sans text-sm text-muted-foreground animate-pulse"
+        >
           {t("simulation.canvas.preparingData")}
         </p>
       </div>
@@ -633,9 +723,9 @@ export function SimulationCanvas({
         {...(clusterMode !== null && {
           pointClusterByFn:
             clusterMode === "strategy"
-              ? silenceStrategyLabel
+              ? labelForStrategy
               : clusterMode === "effect"
-                ? silenceEffectLabel
+                ? labelForEffect
                 : liveBeliefLabel,
         })}
         // "Colorear por" (#99 repaint mechanism): per-agent color from the

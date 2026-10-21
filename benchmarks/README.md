@@ -186,7 +186,8 @@ large per-agent term in `repaint` (and not in `idle`) points at the per-point JS
 Open any run in the run view of a bench build and press **Shift+H** (or the "FPS HUD" button):
 live FPS (current, mean, 1% low, median and p5 over 5 s), slow/dropped frames, JS heap,
 agents/edges (and the inferred density), the load timings of the network (topology fetch, its
-network part from Resource Timing, JSON parse, `topologyToData`, `prepareCosmographData`, mount,
+network part from Resource Timing, JSON parse — both measured in the topology worker since #128
+and relayed to the page —, `topologyToData`, `prepareCosmographData`, mount,
 upload until the first frame with the data, layout until freeze; "topology fetches" counts the
 actual downloads of the network — 2 means a concurrent duplicate ran — and "shared loads" the
 loads served without one, by the download in flight or a completed one (#140); a network opened

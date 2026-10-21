@@ -37,7 +37,42 @@ describe("computeRoundAggregate", () => {
 
   it("returns zeros for an empty frame", () => {
     const agg = computeRoundAggregate(makeFrame(0, [], [], []));
-    expect(agg).toEqual({ meanPublic: 0, meanPrivate: 0, spread: 0, participation: 0 });
+    expect(agg).toEqual({
+      meanPublic: 0,
+      meanPrivate: 0,
+      spread: 0,
+      participation: 0,
+      variancePublic: 0,
+      variancePrivate: 0,
+    });
+  });
+
+  it("computes the exact population variance of each belief type", () => {
+    const agg = computeRoundAggregate(makeFrame(0, [0, 0.5, 1], [0.25, 0.25, 0.25], [1, 1, 1]));
+    // public: mean 0.5, deviations 0.5² + 0 + 0.5² over 3
+    expect(agg.variancePublic).toBeCloseTo(0.5 / 3, 12);
+    expect(agg.variancePrivate).toBe(0);
+  });
+
+  it("uses the statistics the frame worker attached instead of recomputing them", () => {
+    const frame = makeFrame(1, [0, 1], [0, 1], [0, 0]);
+    frame.stats = {
+      meanPublic: 0.11,
+      meanPrivate: 0.22,
+      spread: 0.33,
+      participation: 0.44,
+      variancePublic: 0.55,
+      variancePrivate: 0.66,
+      fine: null,
+    };
+    expect(computeRoundAggregate(frame)).toEqual({
+      meanPublic: 0.11,
+      meanPrivate: 0.22,
+      spread: 0.33,
+      participation: 0.44,
+      variancePublic: 0.55,
+      variancePrivate: 0.66,
+    });
   });
 });
 
