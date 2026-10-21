@@ -125,6 +125,44 @@ describe("computeRepaintBreakdown", () => {
         longTaskMs: null,
       }).longTaskMsPerSecond,
     ).toBeNull();
+    // no repaint reported (files of the harness before #142)
+    expect(b.repaintPath).toBeNull();
+    expect(b.directRepaints).toBe(0);
+    expect(b.bufferBuildMs?.median).toBeNull();
+  });
+
+  it("summarizes the direct repaints and the rounds the cap skipped (#142)", () => {
+    const events = [
+      ev("canvas-repaint", 1_010, { round: 3, repaintPath: "direct", buildMs: 1, pushMs: 3 }),
+      ev("canvas-repaint", 1_110, { round: 4, repaintPath: "direct", buildMs: 3, pushMs: 5 }),
+      ev("canvas-repaint-skipped", 1_150, { round: 5 }),
+      ev("canvas-repaint", 2_500, { round: 9, repaintPath: "direct", buildMs: 99, pushMs: 99 }),
+    ];
+    const b = computeRepaintBreakdown({
+      rounds: [],
+      events,
+      windowStart: 1_000,
+      windowEnd: 2_000,
+      frameMs: 16,
+      longTaskMs: 0,
+    });
+    expect(b.repaintPath).toBe("direct");
+    expect(b.directRepaints).toBe(2);
+    expect(b.bufferBuildMs?.median).toBe(2);
+    expect(b.bufferPushMs?.mean).toBe(4);
+    expect(b.skippedRounds).toBe(1);
+    expect(b.cosmographUpdates).toBe(0);
+  });
+
+  it("tells the fallback and a mixed window apart", () => {
+    const fallback = [ev("canvas-repaint", 1_010, { round: 3, repaintPath: "fallback" })];
+    const window = { rounds: [], windowStart: 1_000, windowEnd: 2_000, frameMs: 16, longTaskMs: 0 };
+    expect(computeRepaintBreakdown({ ...window, events: fallback }).repaintPath).toBe("fallback");
+    const mixed = [
+      ...fallback,
+      ev("canvas-repaint", 1_020, { round: 4, repaintPath: "direct", buildMs: 1, pushMs: 1 }),
+    ];
+    expect(computeRepaintBreakdown({ ...window, events: mixed }).repaintPath).toBe("mixed");
   });
 });
 

@@ -74,6 +74,13 @@ export interface PhaseAggregate {
   rbUpdateP95Ms: number | null;
   rbSyncMs: number | null;
   rbLongTaskMsPerS: number | null;
+  /** #142: repaint path of the repetitions ("direct", "fallback", "mixed"), null when not recorded. */
+  rbPath: string | null;
+  /** #142: direct repaint medians: buffer build and push to cosmos.gl. */
+  rbBuildMs: number | null;
+  rbPushMs: number | null;
+  /** #142: rounds the adaptive cap skipped on the canvas (median over repetitions). */
+  rbSkipped: number | null;
   /** v2 layout lead (upload / cluster update) medians. */
   leadMs: number | null;
   leadLongTaskMs: number | null;
@@ -200,6 +207,13 @@ const num = (v: unknown): number | null => (typeof v === "number" && Number.isFi
 function medianOf(values: Array<unknown>): number | null {
   const nums = values.map(num).filter((v): v is number => v !== null);
   return nums.length > 0 ? median(nums) : null;
+}
+
+/** The common value of the repetitions, "mixed" when they differ, null when none is recorded. */
+function commonOf(values: Array<unknown>): string | null {
+  const distinct = new Set(values.filter((v) => v !== null && v !== undefined).map(String));
+  if (distinct.size === 0) return null;
+  return distinct.size === 1 ? ([...distinct][0] as string) : "mixed";
 }
 
 function maxOf(values: Array<unknown>): number | null {
@@ -489,6 +503,10 @@ export function aggregateResults(
       rbUpdateP95Ms: m("rb_cosmograph_update_ms_p95"),
       rbSyncMs: m("rb_cosmograph_sync_ms_median"),
       rbLongTaskMsPerS: m("rb_long_task_ms_per_s"),
+      rbPath: commonOf(group.map((r) => r.rb_repaint_path)),
+      rbBuildMs: m("rb_buffer_build_ms_median"),
+      rbPushMs: m("rb_buffer_push_ms_median"),
+      rbSkipped: m("rb_skipped_rounds"),
       leadMs: m("lead_ms"),
       leadLongTaskMs: m("lead_long_task_ms"),
       pass: !comparable || fpsMean === null ? null : fpsMean > options.threshold,
@@ -643,7 +661,10 @@ function renderVariants(out: string[], phases: readonly PhaseAggregate[], t: num
 
 function renderRepaintBreakdown(out: string[], phases: readonly PhaseAggregate[]): void {
   const repaint = phases.filter(
-    (p) => p.phase === "repaint" && p.canvasVariant === "baseline" && p.rbUpdateMs !== null,
+    (p) =>
+      p.phase === "repaint" &&
+      p.canvasVariant === "baseline" &&
+      (p.rbUpdateMs !== null || p.rbBuildMs !== null),
   );
   if (repaint.length === 0) return;
   const idleOf = (p: PhaseAggregate) =>
@@ -657,11 +678,14 @@ function renderRepaintBreakdown(out: string[], phases: readonly PhaseAggregate[]
     );
   out.push("### Repaint breakdown (per round, medians)", "");
   out.push(
-    "Per round the playback pushes one frame to the store; the canvas re-renders and hands Cosmograph " +
-      "new colour/size functions; Cosmograph's `setConfig` re-queries the point table from DuckDB-WASM, " +
-      "recomputes every colour and size in JS and uploads them. *Idle frame* is the same network with " +
-      "nothing changing (the drawing cost); the difference to the repaint frame is what the per-round " +
-      "update adds.",
+    "Per round the playback pushes one frame to the store and the canvas re-renders. On the *direct* " +
+      "path (#142) the canvas fills the colour and size buffers from palette tables and pushes them to " +
+      "cosmos.gl (*Build*, *Push*); Cosmograph's config does not change. On the *fallback* path it hands " +
+      "Cosmograph new colour/size functions, and Cosmograph's `setConfig` re-queries the point table " +
+      "from DuckDB-WASM, recomputes every colour and size in JS and uploads them (*Cosmograph update*). " +
+      "*Skipped* counts the rounds the adaptive repaint cap left off the canvas. *Idle frame* is the " +
+      "same network with nothing changing (the drawing cost); the difference to the repaint frame is " +
+      "what the per-round update adds.",
     "",
   );
   out.push(
@@ -676,6 +700,10 @@ function renderRepaintBreakdown(out: string[], phases: readonly PhaseAggregate[]
         "Idle frame (ms)",
         "Merge (ms)",
         "Store → commit (ms)",
+        "Path",
+        "Build (ms)",
+        "Push (ms)",
+        "Skipped",
         "Cosmograph update (ms)",
         "update p95",
         "sync part (ms)",
@@ -691,6 +719,10 @@ function renderRepaintBreakdown(out: string[], phases: readonly PhaseAggregate[]
         fmt(idleOf(p)?.frameMsMean ?? null),
         fmt(p.rbMergeMs, 2),
         fmt(p.rbCommitMs),
+        p.rbPath ?? "–",
+        fmt(p.rbBuildMs, 2),
+        fmt(p.rbPushMs, 2),
+        int(p.rbSkipped),
         fmt(p.rbUpdateMs),
         fmt(p.rbUpdateP95Ms),
         fmt(p.rbSyncMs),
@@ -944,6 +976,10 @@ export const SUMMARY_COLUMNS = [
   "rb_cosmograph_update_ms",
   "rb_cosmograph_update_p95_ms",
   "rb_cosmograph_sync_ms",
+  "rb_repaint_path",
+  "rb_buffer_build_ms",
+  "rb_buffer_push_ms",
+  "rb_skipped_rounds",
   "rb_long_task_ms_per_s",
   "lead_ms",
   "lead_long_task_ms",
@@ -1022,6 +1058,10 @@ export function summaryCsv(report: AggregateReport): string {
       rb_cosmograph_update_ms: r2(p.rbUpdateMs),
       rb_cosmograph_update_p95_ms: r2(p.rbUpdateP95Ms),
       rb_cosmograph_sync_ms: r2(p.rbSyncMs),
+      rb_repaint_path: p.rbPath,
+      rb_buffer_build_ms: r2(p.rbBuildMs),
+      rb_buffer_push_ms: r2(p.rbPushMs),
+      rb_skipped_rounds: p.rbSkipped,
       rb_long_task_ms_per_s: r2(p.rbLongTaskMsPerS),
       lead_ms: r2(p.leadMs),
       lead_long_task_ms: r2(p.leadLongTaskMs),

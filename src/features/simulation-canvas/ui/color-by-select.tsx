@@ -1,8 +1,8 @@
 import { useTranslation } from "@/shared/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import type { ColorBy } from "../lib/point-colors";
 
-/** Node coloring modes (mockup "Colorear por"). Round 0 shows the initial state. */
-export type ColorBy = "pub" | "priv" | "div" | "estr";
+export type { ColorBy } from "../lib/point-colors";
 
 interface ColorBySelectProps {
   value: ColorBy;

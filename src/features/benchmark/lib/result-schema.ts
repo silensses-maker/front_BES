@@ -13,6 +13,9 @@ import type { GpuMemoryEstimate } from "./gpu-estimate";
  *   `repaint.breakdown` (per-round timings of the repaint path);
  * - load timings: `uploadMs` and the long tasks of the upload;
  * - scenarios: `canvasRenderer` (GPU the canvas actually used), `timeline`, `variantLoads`.
+ * Later additions to version 2, optional as well: the direct-repaint fields of the repaint
+ * breakdown (#142: `repaintPath`, `directRepaints`, `bufferBuildMs`, `bufferPushMs`,
+ * `skippedRounds`).
  * In version 1 files the `layout` / `cluster-layout` windows started at the canvas' layout
  * commit, before the data upload: they are not comparable with version 2 (see the report).
  *
@@ -88,6 +91,20 @@ export interface RepaintBreakdown {
   cosmographSyncMs: DistributionStat;
   /** `pointColorUpdated` events (colour buffers recomputed and uploaded). */
   colorUpdates: number;
+  /**
+   * #142 (optional, absent in older files): how the canvas repainted the rounds of the window —
+   * `direct` (colour/size buffers pushed to cosmos.gl), `fallback` (new Cosmograph callbacks and
+   * the setConfig update above), `mixed`, or null when no repaint was reported.
+   */
+  repaintPath?: "direct" | "fallback" | "mixed" | null;
+  /** #142: direct repaints in the window. */
+  directRepaints?: number;
+  /** #142: direct repaint, colour/size buffer build (LUT colours + sizes, point order). */
+  bufferBuildMs?: DistributionStat;
+  /** #142: direct repaint, push of the buffers to cosmos.gl (set + GPU upload). */
+  bufferPushMs?: DistributionStat;
+  /** #142: rounds the adaptive repaint cap skipped on the canvas (the store still advanced). */
+  skippedRounds?: number;
   /** Mean frame time of the window. */
   frameMs: number | null;
   /** Long-task time per second of window (main thread blocked > 50 ms at a time). */

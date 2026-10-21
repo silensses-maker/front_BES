@@ -65,7 +65,15 @@ export type BenchProbeName =
   /** A Cosmograph `setConfig` call settled (detail: durationMs, syncMs). */
   | "cosmograph-config-done"
   /** Cosmograph recomputed and uploaded the point colours (`pointColorUpdated`). */
-  | "cosmograph-colors-updated";
+  | "cosmograph-colors-updated"
+  /**
+   * The canvas repainted a round (#142; detail: round, repaintPath). `direct`: colour and size
+   * buffers pushed to cosmos.gl (+ buildMs, pushMs); `fallback`: new Cosmograph callbacks (the
+   * Cosmograph update is timed by `cosmograph-config-done`).
+   */
+  | "canvas-repaint"
+  /** The adaptive repaint cap skipped a round on the canvas (#142; detail: round). */
+  | "canvas-repaint-skipped";
 
 /**
  * Emitted once per round or per config update: no `performance.mark` and no history (a long
@@ -75,7 +83,12 @@ export const HIGH_FREQUENCY_PROBES: readonly BenchProbeName[] = [
   "canvas-frame-commit",
   "cosmograph-config-done",
   "cosmograph-colors-updated",
+  "canvas-repaint",
+  "canvas-repaint-skipped",
 ];
+
+/** How the canvas repaints a round (#142): buffers pushed to cosmos.gl, or Cosmograph callbacks. */
+export type BenchRepaintPath = "direct" | "fallback";
 
 export interface BenchProbeDetail {
   runId?: string;
@@ -90,6 +103,12 @@ export interface BenchProbeDetail {
   round?: number;
   /** Synchronous part of a Cosmograph setConfig call (cosmograph-config-done). */
   syncMs?: number;
+  /** Repaint path of a round (canvas-repaint). */
+  repaintPath?: BenchRepaintPath;
+  /** Direct repaint: colour/size buffer build (canvas-repaint). */
+  buildMs?: number;
+  /** Direct repaint: push of the buffers to cosmos.gl (canvas-repaint). */
+  pushMs?: number;
 }
 
 export interface BenchProbeEvent {

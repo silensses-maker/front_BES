@@ -1,4 +1,4 @@
-import type { ScenarioResult } from "../lib/result-schema";
+import type { RepaintBreakdown, ScenarioResult } from "../lib/result-schema";
 import "./bench.css";
 
 /**
@@ -10,6 +10,20 @@ const MB = 1024 * 1024;
 const f1 = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v.toFixed(1));
 const ms = (v: number | null | undefined) =>
   v === null || v === undefined ? "–" : Math.round(v).toLocaleString("en-US");
+
+/**
+ * Per-round update cost: on the direct path (#142) buffer build + push to cosmos.gl (and the
+ * rounds the repaint cap skipped), otherwise Cosmograph's setConfig update.
+ */
+function updatePerRound(b: RepaintBreakdown | null | undefined): string {
+  if (!b) return "";
+  if ((b.directRepaints ?? 0) > 0) {
+    const cost = (b.bufferBuildMs?.median ?? 0) + (b.bufferPushMs?.median ?? 0);
+    const skipped = b.skippedRounds ? ` · ${b.skippedRounds} skipped` : "";
+    return `${cost.toFixed(2)} direct${skipped}`;
+  }
+  return f1(b.cosmographUpdateMs.median);
+}
 
 function fpsClass(v: number | null): string {
   if (v === null) return "";
@@ -96,9 +110,7 @@ export function SuiteResultsTable({ scenarios }: { scenarios: readonly ScenarioR
                   {p.heap.maxBytes === null ? "n/a" : Math.round(p.heap.maxBytes / MB)}
                 </td>
                 <td className="px-2 py-1">{p.repaint ? f1(p.repaint.repaintsPerSecond) : ""}</td>
-                <td className="px-2 py-1">
-                  {p.repaint?.breakdown ? f1(p.repaint.breakdown.cosmographUpdateMs.median) : ""}
-                </td>
+                <td className="px-2 py-1">{updatePerRound(p.repaint?.breakdown)}</td>
               </tr>
             ));
           })}
