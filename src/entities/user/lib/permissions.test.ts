@@ -6,6 +6,7 @@ import {
   getRolePermissions,
   ROLE_LIMITS,
   resolveMaxNetworks,
+  resolveUsageLimits,
 } from "./permissions";
 
 describe("getRoleLimits", () => {
@@ -174,5 +175,30 @@ describe("getHighestRole", () => {
 
   it("falls back to Guest for an empty list", () => {
     expect(getHighestRole([])).toBe("Guest");
+  });
+});
+
+describe("resolveUsageLimits", () => {
+  it("uses the session's quotas over the role table", () => {
+    expect(
+      resolveUsageLimits({
+        roles: ["Guest"],
+        usageLimits: { maxAgents: 300, maxIterations: 250, densityFactor: 0.8, maxNetworks: 4 },
+      }),
+    ).toEqual({ maxAgents: 300, maxIterations: 250, densityFactor: 0.8, maxNetworks: 4 });
+  });
+
+  it("takes maxNetworks from the role table when the session predates it", () => {
+    expect(
+      resolveUsageLimits({
+        roles: ["Researcher"],
+        usageLimits: { maxAgents: 500, maxIterations: 500, densityFactor: 0.75 },
+      }),
+    ).toEqual({ maxAgents: 500, maxIterations: 500, densityFactor: 0.75, maxNetworks: 20 });
+  });
+
+  it("falls back to the role table without session quotas", () => {
+    expect(resolveUsageLimits({ roles: ["BaseUser"] })).toEqual(ROLE_LIMITS.BaseUser);
+    expect(resolveUsageLimits({ roles: [] })).toEqual(ROLE_LIMITS.Guest);
   });
 });

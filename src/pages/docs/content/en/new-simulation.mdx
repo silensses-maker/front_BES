@@ -1,0 +1,135 @@
+## The wizard
+
+A simulation is configured with the wizard on the dashboard's <Ui>New Simulation</Ui> tab. The wizard takes the side panel; the main area shows the <Ui>Live summary</Ui>, recomputed in your browser with every change. Nothing is sent to the server until you click <Ui>Launch simulation</Ui>.
+
+From top to bottom, the wizard has:
+
+- **Your quota**: your role and its caps (for example, <Ui>BaseUser · max 100 agents · max 100 iterations · max 5 networks</Ui>). The wizard validates the configuration against them.
+- **The network type**, in three tabs: <Ui>Generated</Ui>, <Ui>Custom</Ui> and <Ui>Load file</Ui>.
+- **The quick start**, with two templates.
+- **The steps** and their progress (<Ui>Step 1 of 3</Ui>). A step already completed is a link: one click goes back to it.
+- At the bottom, <Ui>Back</Ui> and <Ui>Next</Ui>; on the last step, <Ui>Launch simulation</Ui>.
+
+<Screenshot name="wizard-network-generated" alt="The wizard on the Network step of a generated network, with the quota at the top, the network type tabs, the quick start templates and the network fields; on the right, the live summary." />
+
+<Ui>Next</Ui> validates the current step. If something is wrong, the field is marked in red with the explanation and the notice <Ui>Fix the highlighted errors before continuing.</Ui> appears.
+
+### The draft
+
+The wizard saves what you type as a draft in this browser: if you close the tab or go elsewhere in the dashboard, you find it as you left it. <Ui>Discard draft</Ui>, next to the quota, resets every step to its default values after asking for confirmation (<Ui>Discard the draft?</Ui>; <Ui>Keep</Ui> leaves it as it is).
+
+### Quick start templates
+
+<Ui>Quick start:</Ui> offers two example configurations of a generated network with 10 agents. They fill in the fields of the <Ui>Generated</Ui> tab, which you can change afterwards:
+
+- <Ui>Consensus Pursuit</Ui>: agents with DeGroot dynamics that converge toward a shared opinion.
+- <Ui>Polarization</Ui>: confirmation bias and backfire create opposing clusters that resist consensus.
+
+If a template's iteration limit (100 or 200) is above your role's cap, it is lowered to your cap when you apply it, and the notice says so. The wizard's starting values are fitted to your quota the same way (the Guest role allows 10 iterations).
+
+## Generated network
+
+In a generated network the server builds the topology with the Barabási–Albert model from a few parameters. It has three steps: <Ui>Network</Ui>, <Ui>Agents</Ui> and <Ui>Review</Ui>.
+
+### Network step
+
+- <Ui>Number of networks</Ui>: how many independent networks are simulated with the same configuration. Each has its own topology and its own dynamics.
+- <Ui>Total agents</Ui>: agents in each network.
+- <Ui>Density</Ui>: average degree per agent (number of neighbors). At least 2 and lower than the total agents. Below it, the wizard says how many edges the network will have.
+- <Ui>Iteration limit</Ui>: maximum number of rounds.
+- <Ui>Stop threshold</Ui>: convergence criterion, a value between 0 and 1, both excluded. The simulation stops when the average belief change between rounds drops below this value. Typical: between 0.01 and 0.001.
+- <Ui>Seed</Ui>: with <Ui>Random</Ui> ticked, every launch draws a new seed. Untick it to type a whole number (from 0 to 9,007,199,254,740,991).
+
+The simulation ends when it reaches the iteration limit **or** when it converges, whichever comes first. Each field has an information icon with its full explanation.
+
+Below the fields your quota limits, the wizard shows your role's maximum (<Ui>Your plan allows up to 100 agents.</Ui>). If you go over it, the message turns into <Ui>Exceeds your plan's maximum (100).</Ui> and the <Ui>Adjust to maximum</Ui> link sets the allowed value.
+
+<Tip>
+The seed makes a run reproducible: the same configuration with the same seed builds the same networks and the same dynamics on the same server. On a server with another CPU the results may differ slightly. To repeat a run already launched, use <Ui>Re-launch</Ui> in [My experiments](/docs/my-experiments#re-launching-a-run).
+</Tip>
+
+### Agents step
+
+The Agents step splits the network's agents and edges into types.
+
+**<Ui>Agent types</Ui>.** Each row is a combination of <Ui>Silence strategy</Ui> and <Ui>Silence effect</Ui> with a number of agents, which you set with the slider or by typing it (its percentage is shown on the right). The rows must add up to the total agents; the <Ui>10 / 10 assigned</Ui> counter shows it.
+
+- The **strategy** decides whether the agent expresses its opinion each round: <Ui>DeGroot</Ui> (always speaks), <Ui>Majority</Ui> (speaks if most of its neighbors agree), <Ui>Threshold</Ui> (needs a minimum fraction of agreeing neighbors, fixed at 0.1 by the simulator) or <Ui>Confidence</Ui> (speaks when its certainty exceeds a threshold fixed at 0.1; the initial confidence is random).
+- The **effect** decides how a silent agent influences its neighbors: <Ui>DeGroot</Ui> (no silence, the classic model), <Ui>Memory</Ui> (neighbors use the last opinion it expressed) or <Ui>Memoryless</Ui> (neighbors ignore it).
+
+Each combination can appear only once: in the drop-downs, the options another row already uses carry an "in use" mark (for example, <Ui>Majority · in use</Ui>). <Ui>Add agent type</Ui> adds a row and each row's × button removes it.
+
+**<Ui>Bias distribution</Ui>.** Cognitive biases are assigned to edges, not to agents. Each row is a <Ui>Cognitive bias</Ui> with a number of edges, and they must add up to the network's total edges: d·(d−1) + (N−d)·2·d, with d the density and N the agents. The biases are <Ui>None</Ui> (pure averaging, DeGroot), <Ui>Confirmation</Ui> (gives more weight to the opinions that confirm its own), <Ui>Backfire</Ui> (rejects strongly disagreeing opinions and hardens its own), <Ui>Authority</Ui> (defers to the most influential neighbors) and <Ui>Insular</Ui> (ignores most outside opinions). <Ui>Add bias type</Ui> adds a row.
+
+<Screenshot name="wizard-agents-generated" alt="The Agents step of a generated network: two agent types with their strategy, effect and count, and the bias distribution over the edges with its assignment counters." />
+
+<Tip>
+If you change the total agents or the density on the Network step, the rows' counts are redistributed proportionally so they still add up to the total.
+</Tip>
+
+## Custom network
+
+In a custom network you define every agent and every edge yourself. It suits small networks and specific scenarios. It has the same three steps.
+
+The **Network** step has only three fields: <Ui>Network name</Ui> (up to 32 characters; it identifies the network in the history and the live run), <Ui>Iteration limit</Ui> and <Ui>Stop threshold</Ui>. A custom network has no seed.
+
+The **Agents** step has two lists:
+
+- **<Ui>Agents</Ui>**: each agent has a <Ui>Name</Ui> (unique, up to 32 characters; upper and lower case are different), <Ui>Strategy</Ui>, <Ui>Effect</Ui>, initial <Ui>Belief</Ui> (from 0 to 1), <Ui>Tol. radius</Ui> (the comfort zone: it supports neighbors whose opinion differs by at most this value, from 0 to 1) and <Ui>Tol. offset</Ui> (shifts the center of that window, from −1 to 1). <Ui>Add agent</Ui> adds one. The number of agents is also limited by your quota.
+- **<Ui>Edges</Ui>**: each edge goes from a <Ui>Source</Ui> to a <Ui>Target</Ui>, chosen by agent name, with an <Ui>Influence</Ui> (from 0 to 1) and a <Ui>Bias</Ui>. An edge from A to B means that **A influences B**. Each directed source → target pair can appear only once, and an edge from an agent to itself is its self-influence. <Ui>Add edge</Ui> needs at least two named agents.
+
+At least one agent and one edge are needed to launch.
+
+<Screenshot name="wizard-custom-agents" alt="The Agents step of a custom network: the agent list with name, strategy, effect, belief and tolerance, and below it the edge list with source, target, influence and bias." />
+
+## Review and launch
+
+The **Review** step sums up the whole configuration: the network type and its parameters, the agent distribution and the bias distribution (or, in a custom network, the agent list and the edge list). At the end comes the validation result: <Ui>✓ Configuration valid. Ready to launch.</Ui> or, if something fails, <Ui>Fix before launching</Ui> with the list of errors. If the configuration goes over your quota, it says which limit and by how much.
+
+<Screenshot name="wizard-review" alt="The Review step: the network summary, the agent and bias distribution tables, the Export JSON and Import JSON buttons and the valid configuration message." />
+
+<Ui>Launch simulation</Ui> sends the configuration. While the server receives it the button shows <Ui>Launching…</Ui>; then the run view opens and starts receiving rounds live (see [Run view](/docs/run-view)). If the configuration has errors, the launch is not sent and the notice asks you to review them.
+
+<Warning>
+In this version the configuration of every run is stored, but its round-by-round data is kept on the server for only about 60–90 minutes after the run ends. After that, the run shows only its final state.
+</Warning>
+
+## Configuration files
+
+A configuration can be saved to a JSON file and loaded again later, in this or another browser.
+
+<UiPreview label="The Review step's buttons to export and import the configuration">
+  <UiButton k="simulationConfig.exportJson" />
+  <UiButton k="simulationConfig.importJson" />
+</UiPreview>
+
+- <Ui>Export JSON</Ui>, on the Review step, downloads the wizard's current configuration (a `bes-config-generated-….json` or `bes-config-custom-….json` file).
+- <Ui>Import JSON</Ui> loads a file into the wizard and replaces whatever is there.
+
+### Loading a file
+
+The <Ui>Load file</Ui> tab starts the configuration from a file. Its steps are <Ui>Load</Ui>, <Ui>Agents</Ui> and <Ui>Review</Ui>:
+
+1. Drag the file onto the <Ui>Drop a simulation file here</Ui> area, or click <Ui>Browse file</Ui>. Only `.json` files exported from this application are accepted; CSV import is not supported.
+2. If the file is valid, the wizard switches to the <Ui>Generated</Ui> or <Ui>Custom</Ui> tab, depending on the file, and opens the Agents step with every field filled in. On the review, the network type shows as <Ui>Loaded from file</Ui>.
+3. Review the configuration and launch it like any other.
+
+If the file cannot be read or has invalid values, the wizard says so and changes nothing.
+
+<Screenshot name="wizard-load" alt="The Load file tab: the area to drop the file with the Browse file button, and the Download AI prompt and Download example buttons." />
+
+The same tab offers two aids for writing a file of your own:
+
+- <Ui>Download example</Ui> downloads `bes-config-example.json`, a complete example configuration.
+- <Ui>Download AI prompt</Ui> downloads `bes-llm-prompt.txt`, instructions for asking an AI assistant to generate a network in this format.
+
+## Live summary and quotas
+
+While you configure, the <Ui>Live summary</Ui> in the main area shows:
+
+- <Ui>Network</Ui>: the network's parameters and, in a generated network, the number of edges (<Ui>Edges (Barabási-Albert)</Ui>).
+- <Ui>Agent composition</Ui> and <Ui>Biases on edges</Ui>: how the types are split.
+- <Ui>Your quota · BaseUser</Ui>: how much of each cap the configuration uses (<Ui>Agents</Ui>, <Ui>Iterations</Ui>, <Ui>Networks</Ui>).
+- <Ui>Validation</Ui>: whether the configuration is ready to launch, or what is missing.
+
+Each role's caps are in [Getting started](/docs/getting-started#roles-and-quotas). The server checks them again when it receives the launch: if they are exceeded, the run is not created and the wizard shows <Ui>Your plan limit was exceeded. Reduce the configuration and try again.</Ui>

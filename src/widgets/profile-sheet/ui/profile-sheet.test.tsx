@@ -29,11 +29,16 @@ function user(overrides: Partial<User>): User {
   };
 }
 
+/** Value shown next to a label of the usage limits. */
+function limitValue(labelKey: string): string | null {
+  const row = screen.getByText(labelKey).parentElement;
+  if (!row) throw new Error(`${labelKey} row not found`);
+  return within(row).getByText((_, el) => el?.classList.contains("font-mono") ?? false).textContent;
+}
+
 /** Value shown next to the "Networks" label of the usage limits. */
 function networksValue(): string | null {
-  const row = screen.getByText("profile.networksUsed").parentElement;
-  if (!row) throw new Error("networks row not found");
-  return within(row).getByText((_, el) => el?.classList.contains("font-mono") ?? false).textContent;
+  return limitValue("profile.networksUsed");
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -109,5 +114,46 @@ describe("ProfileSheet — networks quota (#122)", () => {
       "profile.networksUsed",
       "profile.densityFactorLabel",
     ]);
+  });
+});
+
+describe("ProfileSheet — usage limits", () => {
+  beforeEach(() => {
+    useProfileSheetStore.setState({ isOpen: true });
+  });
+
+  it("shows the session's quotas, the ones the wizard validates, over the role table", () => {
+    useAuthStore.setState({
+      user: user({
+        roles: ["Guest"],
+        usageLimits: { maxAgents: 300, maxIterations: 250, densityFactor: 0.8, maxNetworks: 4 },
+      }),
+    });
+
+    render(<ProfileSheet />);
+
+    expect(limitValue("profile.agentsUsed")).toBe("300");
+    expect(limitValue("profile.iterationsUsed")).toBe("250");
+    expect(limitValue("profile.networksUsed")).toBe("4");
+    expect(limitValue("profile.densityFactorLabel")).toBe("0.80");
+  });
+
+  it("falls back to the role table without session quotas", () => {
+    useAuthStore.setState({ user: user({ roles: ["BaseUser"] }) });
+
+    render(<ProfileSheet />);
+
+    expect(limitValue("profile.agentsUsed")).toBe("100");
+    expect(limitValue("profile.iterationsUsed")).toBe("100");
+    expect(limitValue("profile.densityFactorLabel")).toBe("0.50");
+  });
+
+  it("shows the caps as values, with no usage meter (they do not run out with use)", () => {
+    useAuthStore.setState({ user: user({ roles: ["Guest"] }) });
+
+    render(<ProfileSheet />);
+
+    expect(screen.queryAllByRole("progressbar")).toHaveLength(0);
+    expect(screen.getAllByRole("term")).toHaveLength(4);
   });
 });

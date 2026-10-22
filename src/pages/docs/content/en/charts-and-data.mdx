@@ -1,0 +1,63 @@
+## The charts
+
+Below the timeline of the [run view](/docs/run-view), a card gathers the charts of the network you are viewing, each on its own tab. The charts over time draw only the rounds already received and mark the round you are viewing with a vertical line; while the run goes on live, they grow with each new round.
+
+<Screenshot name="charts-evolution" alt="The charts card on the Belief evolution tab: one line per agent with its public belief over the rounds and the vertical line of the viewed round." />
+
+The corner button (<Ui>Maximize the charts to the whole area</Ui>) extends the card to the whole main area; <Kbd>Esc</Kbd> or the same button restores it. Hovering over a chart shows each round's values.
+
+### Belief evolution
+
+One line per agent with its public belief round by round. Each line's color is its initial belief, so you can see where each agent starts and where it goes. In a network with more than 50 agents a uniform sample of 50 is drawn, and the chart says so (<Ui>Showing 50 of 200 agents · uniform sampling · color = initial belief</Ui>).
+
+### Distribution
+
+A histogram of the public beliefs at the round you are viewing (<Ui>Public belief · round 25</Ui>), in 20 intervals of 0.05 between 0 and 1. As you move along the timeline you can see the opinions cluster or spread apart.
+
+### Public vs. private
+
+The mean public belief and the mean private belief of the whole network, round by round. The distance between the two lines is the divergence between what the agents express and what they think: the Spiral of Silence effect.
+
+### Participation
+
+The percentage of agents speaking in each round. A drop means many agents are falling silent.
+
+### Variance
+
+The spread of the beliefs around their mean in each round, over all agents: the public one with a solid line and the private one with a dashed line. The tab's selector switches between <Ui>Std. dev. σ</Ui> and <Ui>Variance σ²</Ui> (σ² = (1/n) Σ (bᵢ − μ)²).
+
+<Screenshot name="charts-variance" alt="The Variance tab with the public and private standard deviation over the rounds and the selector between standard deviation and variance." />
+
+<WithPolarization>
+
+### Polarization
+
+The <Ui>Polarization</Ui> tab measures round by round how polarized the beliefs are, with measures from the literature and those proposed by PROMUEVA. It has its own section: [Polarization](/docs/polarization).
+
+</WithPolarization>
+
+## The data table
+
+<Ui>Table</Ui>, in the selector above the graph, swaps the graph for a table with the run's exact values. It has up to three datasets:
+
+- <Ui>Agents</Ui>: one row per agent, with its values at the round you are viewing (<Ui>Exact values at round 25 · follows the timeline</Ui>). Columns: <Ui>Agent</Ui>, <Ui>Name</Ui>, <Ui>Strategy</Ui>, <Ui>Effect</Ui>, <Ui>Public</Ui>, <Ui>Private</Ui>, <Ui>Divergence</Ui>, <Ui>State</Ui> (<Ui>Speaking</Ui> or <Ui>Silent</Ui>), <Ui>In-degree</Ui> and <Ui>Out-degree</Ui>. The <Ui>All</Ui>, <Ui>Speaking</Ui> and <Ui>Silent</Ui> filters choose which agents to list. Clicking a row selects that agent, like clicking its node.
+- <Ui>Rounds</Ui>: one row per round of this network, with <Ui>Round</Ui>, <Ui>Mean public</Ui>, <Ui>Mean private</Ui>, <Ui>Spread</Ui> (the difference between the largest and the smallest private belief) and <Ui>Participation</Ui>. Clicking a row takes the timeline to that round.
+- <Ui>Networks</Ui>, in a run with several networks: one row per network, with <Ui>Network</Ui>, <Ui>Result</Ui> (<Ui>Consensus</Ui> or <Ui>No consensus</Ui>), <Ui>Final round</Ui> and <Ui>Final spread</Ui>. The <Ui>All</Ui>, <Ui>Consensus</Ui> and <Ui>No consensus</Ui> filters choose which networks to list, and clicking a row opens that network.
+
+<Screenshot name="data-table" alt="The data table on the Agents dataset: the bar with the datasets, the filters and the Export CSV button; each agent's columns and the pagination at the bottom." />
+
+Clicking a column title sorts the table by it; another click reverses the order. At the bottom, <Ui>Rows per page</Ui> chooses 25, 50 or 100 rows, and the page buttons go through the rest (<Ui>Page 1 of 8</Ui>).
+
+<Tip>
+The <Ui>Rounds</Ui> dataset disappears once the run's round-by-round data has expired on the server; <Ui>Agents</Ui> stays available with the final state.
+</Tip>
+
+### Exporting to CSV
+
+<Ui>Export CSV</Ui> downloads the rows of the current dataset and filter, all of them and not only those on the page you see, in the table's current order. The file:
+
+- uses `;` as the separator and a dot as the decimal separator, with 6 decimals;
+- is encoded in UTF-8 with a BOM, so that Excel opens it with accents intact;
+- is named `silensess-<id>-agentes-ronda25.csv`, `silensess-<id>-rondas.csv` or `silensess-<id>-redes.csv` (agents, rounds, networks; the names are the same in both languages), with `-red3` after the identifier in a run with several networks.
+
+When it finishes, a notice confirms how many rows were exported and the file name.

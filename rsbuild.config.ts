@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from '@rsbuild/core';
+import { pluginMdx } from '@rsbuild/plugin-mdx';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { RsdoctorRspackPlugin } from '@rsdoctor/rspack-plugin';
 
@@ -27,6 +28,29 @@ if (BENCHMARK && (process.env.CI || process.env.VERCEL)) {
 // (APP_POLARIZATION). The default lives HERE, not in a .env file (Rsbuild gives .env.production
 // priority).
 const POLARIZATION = process.env.PUBLIC_ENABLE_POLARIZATION !== 'false';
+
+// ── Firebase Auth Emulator: dev only ─────────────────────────────────────────────────────────
+// PUBLIC_AUTH_EMULATOR=true makes `rsbuild dev` connect Firebase Auth to a local emulator
+// (PUBLIC_AUTH_EMULATOR_URL, default http://127.0.0.1:9099; see README, "Local auth emulator").
+// `__AUTH_EMULATOR__` is a build-time literal like `__BENCHMARK__`: it is true ONLY in a
+// development build (the Rsbuild CLI sets NODE_ENV=development for `rsbuild dev`, before it loads
+// the .env files and this config), so `rsbuild build` drops the emulator call as dead code even
+// when the variable is set. Like the bench flag, it is refused outright in CI and on Vercel.
+const AUTH_EMULATOR_REQUESTED = process.env.PUBLIC_AUTH_EMULATOR === 'true';
+
+if (AUTH_EMULATOR_REQUESTED && (process.env.CI || process.env.VERCEL)) {
+  throw new Error(
+    '[auth-emulator] PUBLIC_AUTH_EMULATOR=true is refused in CI/Vercel builds: the Firebase Auth emulator is local development only.',
+  );
+}
+
+const AUTH_EMULATOR = AUTH_EMULATOR_REQUESTED && process.env.NODE_ENV === 'development';
+
+if (AUTH_EMULATOR_REQUESTED && !AUTH_EMULATOR) {
+  console.warn(
+    '[auth-emulator] PUBLIC_AUTH_EMULATOR=true is ignored outside `rsbuild dev`: this build uses the real Firebase Auth.',
+  );
+}
 
 /**
  * Application version from package.json, read once per build and compiled in as `__APP_VERSION__`
@@ -70,7 +94,9 @@ const BENCH_ISOLATION_HEADERS =
     : undefined;
 
 export default defineConfig({
-  plugins: [pluginReact()],
+  // MDX: the user manual (src/pages/docs/content/{es,en}/*.mdx), each section its own lazy chunk.
+  // Only .mdx: the repo's README.md files are documentation, never modules.
+  plugins: [pluginReact(), pluginMdx({ extensions: ['.mdx'] })],
 
   html: {
     template: './index.html',
@@ -86,6 +112,8 @@ export default defineConfig({
       __BENCH_BUILD__: JSON.stringify(BENCHMARK ? benchBuildInfo() : null),
       // polarization (#129): remove with src/shared/lib/polarization + src/features/run-polarization
       __POLARIZATION__: JSON.stringify(POLARIZATION),
+      // Dev only: see "Firebase Auth Emulator" above (src/shared/api/firebase/config.ts)
+      __AUTH_EMULATOR__: JSON.stringify(AUTH_EMULATOR),
     },
   },
 

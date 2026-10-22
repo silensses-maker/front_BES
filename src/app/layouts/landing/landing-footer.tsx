@@ -6,6 +6,7 @@ import { Logo } from "@/shared/ui/logo";
 const NAV_LINKS = [
   { to: "/home", labelKey: "home" },
   { to: "/wiki", labelKey: "wiki" },
+  { to: "/docs", labelKey: "manual" },
   { to: "/results", labelKey: "previousResults" },
 ] as const;
 

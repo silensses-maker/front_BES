@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
@@ -10,6 +10,7 @@ vi.mock("firebase/app", () => ({
 
 vi.mock("firebase/auth", () => ({
   getAuth: vi.fn(),
+  connectAuthEmulator: vi.fn(),
 }));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -92,6 +93,20 @@ describe("firebase/config", () => {
         messagingSenderId: mockEnv.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
         appId: mockEnv.PUBLIC_FIREBASE_APP_ID,
       });
+    });
+
+    it("does not connect to the Auth emulator: only `rsbuild dev` with PUBLIC_AUTH_EMULATOR=true compiles it in", async () => {
+      for (const [key, value] of Object.entries(mockEnv)) {
+        vi.stubEnv(key, value);
+      }
+      // The env variables alone change nothing: the build-time flag (false here, as in every
+      // production build) decides, and its branch is dead code.
+      vi.stubEnv("PUBLIC_AUTH_EMULATOR", "true");
+      vi.stubEnv("PUBLIC_AUTH_EMULATOR_URL", "http://127.0.0.1:9099");
+      await import("./config");
+
+      expect(__AUTH_EMULATOR__).toBe(false);
+      expect(connectAuthEmulator).not.toHaveBeenCalled();
     });
 
     it("chains getAuth on the initialized app", async () => {

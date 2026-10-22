@@ -1,0 +1,69 @@
+## Qué es SiLEnSeSS
+
+SiLEnSeSS es una plataforma web para simular cómo evolucionan las opiniones en una red de agentes. Combina el modelo de DeGroot, en el que cada agente actualiza su creencia a partir de las de sus vecinos, con la teoría de la Espiral del Silencio: un agente puede dejar de expresar su opinión cuando no percibe suficiente apoyo a su alrededor.
+
+Por eso cada agente tiene dos creencias: la **privada** (lo que piensa) y la **pública** (lo que expresa). Con SiLEnSeSS configuras redes, lanzas simulaciones, las sigues ronda a ronda y analizas sus resultados sin escribir código. La teoría y las ecuaciones están en el [Wiki](/wiki).
+
+## Iniciar sesión
+
+Las páginas públicas (inicio, Wiki, este manual, preguntas frecuentes) no piden cuenta. Para crear y consultar simulaciones debes iniciar sesión con una cuenta de Google:
+
+1. Pulsa <Ui>Registrarse / Iniciar sesión</Ui> en la página de inicio, o <Ui>Tablero</Ui> en la barra superior.
+2. En la página de inicio de sesión pulsa <Ui>Iniciar sesión con Google</Ui> y elige tu cuenta en la ventana que se abre.
+3. Vuelves a la página de inicio con la sesión iniciada. <Ui>Tablero</Ui> abre la zona de simulaciones.
+
+Si solo quieres leer, <Ui>Continuar sin iniciar sesión</Ui> te lleva a las páginas públicas.
+
+<Screenshot name="login" alt="La página de inicio de sesión, con el botón «Iniciar sesión con Google» y el enlace «Continuar sin iniciar sesión»." />
+
+<Warning>
+El inicio de sesión abre una ventana emergente de Google. Si el navegador la bloquea, permite las ventanas emergentes de este sitio y vuelve a intentarlo.
+</Warning>
+
+## Roles y cuotas
+
+Tu cuenta tiene un rol, y cada rol limita el tamaño de las simulaciones que puedes lanzar: cuántos agentes tiene cada red, el límite de iteraciones (rondas) y cuántas redes genera una ejecución. Una cuenta nueva empieza como **Guest**; si necesitas simulaciones más grandes, pide un rol superior a los administradores de la plataforma (ver [Contacto](/contact)).
+
+<RoleQuotasTable />
+
+El **factor de densidad** también depende del rol: el servidor multiplica la densidad que pides en una red generada por ese factor (redondeando hacia abajo, con un mínimo de 1) para construirla.
+
+Tu cuota actual aparece en la parte superior del asistente de nueva simulación y en tu perfil (ver [Perfil](/docs/profile)). El asistente valida la configuración contra ella antes de lanzar.
+
+## Moverte por la plataforma
+
+La plataforma tiene dos zonas:
+
+- **Páginas públicas**: la barra superior lleva a <Ui>Wiki</Ui>, <Ui>Manual</Ui>, <Ui>Resultados anteriores</Ui> y <Ui>Tablero</Ui>; el pie de página, además, a <Ui>Preguntas frecuentes</Ui>, <Ui>Contacto</Ui> y <Ui>Acerca de</Ui>.
+- **Tablero**: donde configuras y analizas simulaciones. Requiere sesión iniciada.
+
+En el tablero, la barra superior tiene, de izquierda a derecha:
+
+- **El logo**, que siempre te devuelve a la página de inicio pública (su etiqueta es <Ui>Inicio</Ui>). Desde allí vuelves con <Ui>Tablero</Ui>.
+- **La ruta** en la que estás (por ejemplo <Ui>Tablero</Ui> › <Ui>Nueva Simulación</Ui>); sus partes son enlaces.
+- **Las pestañas** <Ui>Nueva Simulación</Ui> y <Ui>Mis Experimentos</Ui>.
+- **El chip de ejecución**: <Ui>En ejecución · Ronda 12</Ui> mientras corre tu última simulación, o <Ui>Ver última ejecución</Ui> cuando ya terminó. Un clic la abre.
+- Tres botones de icono: el del tema (<Ui>Cambiar tema claro / oscuro</Ui>), el de pantalla completa, que oculta el panel lateral para dejar más espacio a la visualización, y el que contrae o expande ese panel (<Ui>Expandir o contraer el panel lateral</Ui>).
+- **Tu avatar**, que abre el menú de usuario.
+
+<Screenshot name="dashboard-overview" alt="El tablero con el asistente de nueva simulación en el panel lateral y el resumen en vivo en el área principal; arriba, el logo, la ruta, las pestañas y los botones de la barra." />
+
+El panel lateral cambia según dónde estés: el asistente en <Ui>Nueva Simulación</Ui>, el historial en <Ui>Mis Experimentos</Ui> y el estado de la corrida cuando abres una. Contraído, muestra una columna de botones para volver a cada panel.
+
+### El menú de usuario
+
+Tu avatar, arriba a la derecha, abre el menú de usuario, disponible en el tablero y en las páginas públicas. Desde él:
+
+- <Ui>Perfil y límites de uso</Ui> abre tu perfil.
+- <Ui>Manual de usuario</Ui> abre este manual.
+- <Ui>Idioma</Ui> cambia entre <Ui>Inglés</Ui> y <Ui>Español</Ui>; la elección se recuerda en este navegador.
+- <Ui>Tema</Ui> elige <Ui>Claro</Ui>, <Ui>Oscuro</Ui> o <Ui>Sistema</Ui> (el del sistema operativo).
+- <Ui>Cerrar sesión</Ui> termina tu sesión.
+
+Sin sesión iniciada, el menú solo ofrece el idioma y el tema.
+
+<Screenshot name="user-menu" alt="El menú de usuario abierto: nombre, correo y rol; «Perfil y límites de uso», «Manual de usuario», los selectores de idioma y tema y «Cerrar sesión»." />
+
+<Tip>
+Este manual se muestra en el idioma elegido en el menú de usuario. Si cambias el idioma mientras lo lees, la sección actual se vuelve a cargar en el nuevo idioma.
+</Tip>

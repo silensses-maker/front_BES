@@ -7,6 +7,7 @@ import { SettingsDropdown } from "@/widgets/settings-dropdown";
 
 const NAV_LINKS = [
   { to: "/wiki", labelKey: "nav.wiki" },
+  { to: "/docs", labelKey: "nav.manual" },
   { to: "/results", labelKey: "nav.previousResults" },
   { to: "/board", labelKey: "nav.board" },
 ] as const;

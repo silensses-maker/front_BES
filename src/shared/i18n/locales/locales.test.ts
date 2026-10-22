@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import docsEn from "./docs.en";
+import docsEs from "./docs.es";
 import en from "./en";
 import es from "./es";
 
@@ -52,5 +54,32 @@ describe("locales", () => {
       })
       .map(([key]) => key);
     expect(mismatches).toEqual([]);
+  });
+});
+
+// The user manual's strings, registered at runtime by the manual's page (pages/docs)
+describe("docs locales", () => {
+  const docsEnEntries = flatten(docsEn);
+  const docsEsEntries = flatten(docsEs);
+
+  it("en and es define exactly the same keys", () => {
+    expect(docsEsEntries.map(([key]) => key).sort()).toEqual(
+      docsEnEntries.map(([key]) => key).sort(),
+    );
+  });
+
+  it("have no empty strings and the same placeholders and markup tags per key", () => {
+    const tokens = (value: string) => (value.match(/{{\w+}}|<\/?\w+>/g) ?? []).sort().join();
+    const esByKey = new Map(docsEsEntries);
+    expect([...docsEnEntries, ...docsEsEntries].filter(([, value]) => value.trim() === "")).toEqual(
+      [],
+    );
+    expect(
+      docsEnEntries.filter(([key, value]) => tokens(esByKey.get(key) ?? "") !== tokens(value)),
+    ).toEqual([]);
+  });
+
+  it("do not clash with the app's own keys", () => {
+    expect(enEntries.filter(([key]) => key.startsWith("docs."))).toEqual([]);
   });
 });

@@ -1,0 +1,72 @@
+## La pestaña Polarización
+
+La pestaña <Ui>Polarización</Ui> de la tarjeta de gráficas (ver [Gráficos y datos](/docs/charts-and-data)) mide, ronda a ronda, qué tan polarizadas están las creencias de los agentes de la red que estás viendo. Ofrece las medidas de la literatura y las propuestas por el grupo PROMUEVA, y permite comparar varias en la misma gráfica.
+
+Los valores no se calculan en tu navegador: los calcula el servidor con pol_measures, el paquete de medidas de polarización de PROMUEVA. Para cada ronda, la plataforma agrupa las creencias en un histograma de k categorías y el paquete calcula la medida sobre él. Mientras tanto, la gráfica muestra <Ui>Calculando…</Ui> y se va completando; en una corrida en vivo crece con cada ronda.
+
+<Screenshot name="polarization-chart" alt="La pestaña Polarización con una serie Esteban–Ray: los ajustes de la medida arriba, la curva por ronda con las líneas punteadas de los umbrales y el nivel de la ronda vista." />
+
+Qué mide cada medida, sus parámetros y sus referencias están en el [Wiki](/wiki#polarization).
+
+## Ajustar una medida
+
+Cada curva de la gráfica es una **serie**, con sus propios ajustes:
+
+- <Ui>Medida de polarización</Ui>: la medida, en dos grupos, <Ui>Literatura</Ui> y <Ui>Propuestas (PROMUEVA)</Ui>. Las marcadas <Ui>BETA</Ui> aún las están desarrollando sus autores. La primera serie empieza con Esteban–Ray.
+- **Los parámetros** de la medida, si tiene: cada campo indica su valor por defecto y su rango al pasar el cursor. Un valor fuera de rango no se aplica y el campo lo indica (por ejemplo, el α de Esteban–Ray: <Ui>No aplicado: rango permitido (0, 1.6]</Ui>). La constante de normalización K, en las medidas que la tienen, se puede dejar vacía (<Ui>auto</Ui>) para usar la normalización por defecto del paquete. Las medidas generalizadas añaden la <Ui>Función de alienación f(d)</Ui>. El botón de restaurar vuelve a los valores por defecto del paquete.
+- **k**, el número de categorías del histograma: 3, 5 (por defecto), 7 o 10. Las creencias se agrupan en k categorías de igual ancho sobre [0, 1].
+- **El tipo de creencia**: <Ui>Privada</Ui> (lo que los agentes creen; por defecto) o <Ui>Pública</Ui> (lo que expresan).
+
+No todas las medidas están definidas para todo k: Experts, por ejemplo, solo para k = 5. En el selector de medidas, las que no admiten el k elegido lo indican (<Ui>no para k = 3</Ui>). Si eliges una combinación no definida, la gráfica lo dice (<Ui>Experts no está definida para k = 3.</Ui>) y ofrece cambiar a un k válido (<Ui>Usar k = 5</Ui>).
+
+Los ajustes se mantienen durante la sesión, aunque cambies de pestaña, de ronda o de red.
+
+### Niveles
+
+Con una sola serie, para las medidas que el paquete publica umbrales, la gráfica los dibuja como líneas punteadas y clasifica la ronda que estás viendo como de nivel <Ui>bajo</Ui>, <Ui>medio</Ui> o <Ui>alto</Ui>. Los umbrales solo valen para los parámetros con los que se publicaron: con otros valores no se muestra nivel. El icono de información (<Ui>Acerca de esta medida</Ui>) indica si la medida tiene umbrales con los ajustes actuales.
+
+## Comparar medidas
+
+La gráfica puede superponer hasta diez series, cada una con su propia medida, parámetros, k y tipo de creencia. Sobre la gráfica, cada serie tiene una ficha:
+
+- Un clic en una ficha la selecciona y muestra sus ajustes; otro clic los oculta. Una ficha marcada <Ui>requiere atención</Ui> tiene una combinación que no se puede calcular.
+- El botón **+** añade una copia de la serie seleccionada (hasta diez, <Ui>Hasta 10 series</Ui>): cambia lo que quieras comparar, por ejemplo la medida, k o el tipo de creencia.
+- La × de una ficha quita esa serie (siempre queda al menos una).
+- <Ui>Superponer todas las medidas</Ui> reemplaza las series por cada medida definida para el k de la serie seleccionada, con los parámetros por defecto del paquete y su mismo tipo de creencia. El aviso que aparece permite <Ui>Deshacer</Ui>.
+
+Las series se distinguen por color y estilo de línea: primero continuas y luego discontinuas y punteadas, algunas con marcadores. Así se ven las diez:
+
+<PolarizationLineStyles />
+
+<Screenshot name="polarization-compare" alt="La comparación de varias medidas en la misma gráfica: las fichas de las series arriba, cada curva con su color y estilo de línea y el eje en modo Normalizado (forma)." />
+
+El eje Y tiene dos modos:
+
+- <Ui>Valores</Ui>: todas las series en el mismo eje, con sus valores reales.
+- <Ui>Normalizado (forma)</Ui>: cada serie se reescala a [0, 1] según su propio mínimo y máximo en las rondas calculadas hasta ahora. Sirve para comparar la forma de medidas con escalas distintas; al pasar el cursor se ve el valor real. Una serie constante se dibuja plana en 0,5.
+
+Con varias series no se dibujan los umbrales: al pasar el cursor por la gráfica se listan el valor y el nivel de cada serie en esa ronda.
+
+## La tabla de polarización
+
+<Ui>Gráfica</Ui> y <Ui>Tabla</Ui> cambian entre la gráfica y una tabla de los mismos valores, calculados una sola vez en el servidor. La tabla tiene dos contenidos:
+
+- <Ui>Series</Ui>: las series comparadas, como las muestra la gráfica.
+- <Ui>Todas las medidas</Ui>: cada medida con los parámetros por defecto del paquete, para el k y el tipo de creencia que elijas en sus propios selectores.
+
+Hay una fila por ronda, con el valor de cada serie y, si tiene umbrales, su <Ui>Nivel</Ui>. Al pasar el cursor sobre un valor se ve el valor exacto. Una celda puede estar <Ui>Aún no calculado</Ui>, sin valor en esa ronda, o señalar que el paquete no pudo calcularla. Un clic en una fila lleva la línea de tiempo a esa ronda.
+
+<Screenshot name="polarization-table" alt="La tabla de polarización en modo Series: una fila por ronda con el valor y el nivel de cada serie, y el menú Exportar CSV abierto con los formatos largo y ancho." />
+
+### Exportar a CSV
+
+<Ui>Exportar CSV</Ui> descarga la tabla tal como se ve (con el contenido <Ui>Series</Ui> o <Ui>Todas las medidas</Ui>), en uno de dos formatos:
+
+- <Ui>Largo (R / pandas)</Ui>: una fila por ronda y serie.
+- <Ui>Ancho (Excel)</Ui>: una fila por ronda y una columna por serie.
+
+El archivo sigue las mismas convenciones que el de la tabla de datos (`;` como separador, punto decimal, UTF-8 con BOM). Los valores conservan toda su precisión, los encabezados están en inglés y cada fila registra la versión de pol_measures con la que se calcularon, para que el resultado sea reproducible. El nombre del archivo indica el contenido, el formato, la ejecución, la red y la fecha, por ejemplo `polarization-series-long-run<id>-net<red>-20261021-1530.csv`.
+
+<Tip>
+Si la corrida sigue en vivo o el servidor aún está calculando, el menú lo advierte con la marca <Ui>Parcial</Ui>: la exportación contiene solo las rondas calculadas hasta ese momento.
+</Tip>

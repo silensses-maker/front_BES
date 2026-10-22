@@ -21,6 +21,13 @@ export const WikiPage = lazy(() =>
   })),
 );
 
+/** The user manual (`/docs`, `/docs/:section`); each section's MDX is its own chunk again. */
+export const DocsPage = lazy(() =>
+  import(/* webpackChunkName: "page-docs" */ "@/pages/docs/docs-page").then((m) => ({
+    default: m.DocsPage,
+  })),
+);
+
 export const ResultsPage = lazy(() =>
   import(/* webpackChunkName: "page-results" */ "@/pages/results/results-page").then((m) => ({
     default: m.ResultsPage,

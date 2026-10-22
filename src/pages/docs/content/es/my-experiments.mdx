@@ -1,0 +1,72 @@
+## El historial
+
+La pestaña <Ui>Mis Experimentos</Ui> del tablero reúne todas las ejecuciones que has lanzado, de la más reciente a la más antigua. La lista ocupa el panel lateral; al elegir una ejecución, sus detalles se muestran en el área principal. Mientras no eliges ninguna, el área principal muestra <Ui>Ningún experimento seleccionado</Ui>.
+
+Cada ejecución de la lista muestra su nombre y su estado; debajo, el comienzo de su identificador, su tipo (<Ui>Generado</Ui> o <Ui>Personalizado</Ui>) y su número de redes, y en la última línea la fecha de creación. Una ejecución sin nombre aparece como <Ui>Ejecución sin nombre</Ui>.
+
+<Screenshot name="experiments-list" alt="La pestaña Mis Experimentos: en el panel lateral, la búsqueda, los filtros por estado, tipo y fecha y la lista de ejecuciones; en el área principal, los detalles de la ejecución elegida." />
+
+La lista se carga de 20 en 20 ejecuciones (<Ui>20 por página</Ui>): <Ui>Cargar más</Ui>, al final, trae las siguientes.
+
+## Buscar y filtrar
+
+Sobre la lista tienes:
+
+- **La búsqueda** (<Ui>Buscar por nombre o ID…</Ui>): encuentra una ejecución por su nombre o por su identificador, completo o en parte.
+- **Los filtros por estado**: <Ui>Todos</Ui>, <Ui>En ejecución</Ui>, <Ui>Completados</Ui>, <Ui>Error</Ui> y <Ui>Cancelados</Ui>. Cada uno indica cuántas ejecuciones tiene.
+- **El filtro por tipo** (<Ui>Todos los tipos</Ui>, <Ui>Generado</Ui> o <Ui>Personalizado</Ui>) y **el rango de fechas** de creación (<Ui>Creados desde</Ui> y <Ui>Creados hasta</Ui>). El botón × junto a ellos (<Ui>Quitar los filtros de tipo y fecha</Ui>) los deja como al principio.
+
+<Tip>
+El filtro y la búsqueda aplican sobre las ejecuciones ya cargadas. Si no encuentras una ejecución antigua, pulsa <Ui>Cargar más</Ui> hasta que aparezca.
+</Tip>
+
+## Detalles de una ejecución
+
+Un clic en una ejecución abre sus <Ui>Detalles del experimento</Ui>: el nombre, el estado y el comienzo del identificador (al pasar el cursor sobre él se ve completo), y los datos <Ui>Tipo</Ui>, <Ui>Redes</Ui>, <Ui>Límite de iteraciones</Ui>, <Ui>Creado</Ui> y, en una ejecución generada, su <Ui>Semilla</Ui>.
+
+<Screenshot name="experiment-details" alt="Los detalles de una ejecución generada: nombre, estado, identificador, tipo, redes, límite de iteraciones, fecha y semilla, con los botones Abrir ejecución, Relanzar y Exportar configuración." />
+
+Debajo están las acciones:
+
+- <Ui>Abrir ejecución</Ui> abre la vista de la corrida (ver [Vista de corrida](/docs/run-view)): en vivo si aún se está ejecutando, o para repetirla si ya terminó.
+- <Ui>Relanzar</Ui>, en las ejecuciones generadas, prepara una nueva ejecución con la misma configuración (ver abajo).
+- <Ui>Exportar configuración</Ui> descarga la configuración de la ejecución como archivo JSON.
+
+Al pie se recuerda cuánto tiempo conserva el servidor los datos de una ejecución terminada: <Ui>Los frames de ejecuciones terminadas se conservan unos 60–90 min en el servidor.</Ui>
+
+## Relanzar una ejecución
+
+<Ui>Relanzar</Ui> abre el asistente de nueva simulación en la pestaña <Ui>Generada</Ui>, directamente en el paso Revisión, con la configuración y la semilla de la ejecución elegida. No se inicia nada hasta que pulses <Ui>Lanzar simulación</Ui>, y tus cuotas aplican como siempre. Antes de lanzar puedes cambiar lo que quieras; lanzada tal cual, repite la ejecución en este servidor.
+
+La revisión indica de qué ejecución viene la configuración y con qué semilla, y avisa en estos casos:
+
+- Las ejecuciones creadas antes de que las semillas fueran reproducibles obtienen la misma configuración, pero con otros sorteos aleatorios.
+- Si la semilla original queda fuera del rango que admite el asistente, se usará una semilla aleatoria y la ejecución no se repetirá exactamente.
+- La densidad que se pidió no siempre está guardada: el asistente rellena la que da la misma densidad efectiva con tus cuotas actuales. Si tu rol cambió desde entonces, la densidad efectiva puede ser otra y las redes no serán las mismas.
+
+Las ejecuciones **personalizadas** no tienen <Ui>Relanzar</Ui>: se repiten cargando su archivo de configuración en el asistente (pestaña <Ui>Cargar archivo</Ui>; ver [Nueva simulación](/docs/new-simulation#archivos-de-configuracion)).
+
+## Exportar la configuración
+
+<Ui>Exportar configuración</Ui> descarga como JSON la configuración con la que se lanzó la ejecución, junto con su identificador y su semilla. Cargar ese archivo en el asistente y lanzarlo repite la ejecución en este servidor.
+
+<Warning>
+El botón solo aparece en la **última ejecución lanzada desde este navegador**, porque es el navegador el que conserva su configuración completa. Para guardar la de cualquier otra ejecución, expórtala desde el paso Revisión del asistente (<Ui>Exportar JSON</Ui>) antes de lanzarla.
+</Warning>
+
+## Cancelar una ejecución
+
+Una ejecución <Ui>En ejecución</Ui> tiene un botón <Ui>Cancelar</Ui> en su fila de la lista; la vista de la corrida tiene el suyo, <Ui>Cancelar simulación</Ui>. Ambos piden confirmación (<Ui>¿Cancelar la simulación?</Ui>): <Ui>Sí, cancelar la simulación</Ui> la detiene en la ronda actual y <Ui>Seguir ejecutando</Ui> la deja seguir.
+
+Los datos recibidos hasta ese momento se conservan, y la ejecución pasa al estado <Ui>Cancelado</Ui>. Si terminó justo antes de que la canceles, solo se actualiza su estado.
+
+## Estados de una ejecución
+
+<RunStatusBadges label="Los cuatro estados de una ejecución, como aparecen en el historial" />
+
+- <Ui>En ejecución</Ui>: el servidor sigue calculando rondas. La puedes seguir en vivo.
+- <Ui>Completado</Ui>: terminó, al converger o al llegar al límite de iteraciones.
+- <Ui>Cancelado</Ui>: la detuviste antes de terminar. Conserva las rondas calculadas hasta entonces.
+- <Ui>Error</Ui>: el servidor no pudo completarla.
+
+El chip de ejecución de la barra superior sigue siempre tu última ejecución: <Ui>En ejecución · Ronda 12</Ui> mientras corre y <Ui>Ver última ejecución</Ui> cuando termina (ver [Primeros pasos](/docs/getting-started#moverte-por-la-plataforma)).

@@ -1,0 +1,142 @@
+## The run view
+
+The run view shows a run round by round. It opens by itself when you launch a simulation, and also from <Ui>Open run</Ui> in [My experiments](/docs/my-experiments) or from the run chip in the top bar.
+
+It has four parts:
+
+- **The side panel**, with the run's status, the network's data and the selected agent.
+- **The graph or the table**, in the main area: <Ui>Graph</Ui> draws the network and <Ui>Table</Ui> shows its data (see [Charts and data](/docs/charts-and-data#the-data-table)).
+- **The timeline**, to move between rounds.
+- **The charts**, below (see [Charts and data](/docs/charts-and-data)).
+
+<Screenshot name="run-view-overview" alt="The view of a run: the status and the network's data in the side panel; in the main area, the network graph, the timeline and the charts." />
+
+The maximize button, to the right of the <Ui>Graph</Ui> / <Ui>Table</Ui> selector, extends that panel to the whole area (<Ui>Maximize this panel to the whole area</Ui>); the charts have their own. <Kbd>Esc</Kbd> or the same button restores the view.
+
+### The side panel
+
+From top to bottom, the run's side panel shows:
+
+- **The status**: <Ui>Running</Ui>, <Ui>Completed</Ui>, <Ui>Cancelled</Ui> or <Ui>Error</Ui>, with the round you are viewing and a progress bar. While the run goes on it says how many rounds have arrived (<Ui>received 40 / 100</Ui>); once it ends, how many it had in total.
+- **The verdict**, when the run ends: <Ui>✓ Consensus reached</Ui> or <Ui>◇ No consensus — divided opinion</Ui>, with the final round and the final difference between beliefs.
+- <Ui>Network</Ui>: its <Ui>Agents</Ui> and its <Ui>Edges</Ui> and, if the run has several networks, which one you are viewing (<Ui>Network 3 of 20</Ui>).
+- <Ui>Composition</Ui>: how many agents there are of each strategy and each effect (<Ui>By strategy</Ui>, <Ui>By effect</Ui>).
+- **The selected agent**, when you click a node (see below).
+- <Ui>Cancel simulation</Ui> while the run goes on (see [My experiments](/docs/my-experiments#cancelling-a-run)), and <Ui>Back to board</Ui>.
+
+If the connection to the server drops, the status shows <Ui>Connection lost — retrying…</Ui> and reconnects by itself.
+
+## The network graph
+
+Each node in the graph is an agent and each edge an influence relation. While the network downloads you see <Ui>Loading network…</Ui> (on a large network, with its progress by pages) and then <Ui>Computing layout…</Ui> while the nodes settle.
+
+<Screenshot name="run-view-graph" alt="The graph of a network with the nodes colored by public belief, the Color by and Group controls at the top, the legend and the zoom and links buttons at the bottom." />
+
+### Colors, sizes and legend
+
+<Ui>Color by</Ui> chooses what each node's color shows:
+
+- <Ui>Public belief</Ui>: the opinion the agent expresses, from 0 to 1.
+- <Ui>Private belief</Ui>: the one it actually holds, from 0 to 1.
+- <Ui>Public-private divergence</Ui>: the difference between the two; the scale goes up to 0.2 or more.
+- <Ui>Strategy</Ui>: one color per silence strategy.
+
+The size shows whether the agent speaks in the round you are viewing: large nodes are <Ui>Speaking</Ui> and small ones <Ui>Silent</Ui>. Square nodes are agents with self-influence, that is, they take their own opinion into account when they update.
+
+The graph's floating legend sums all this up and can be collapsed. This is how it looks with <Ui>Public belief</Ui> and with <Ui>Public-private divergence</Ui>:
+
+<CanvasLegendPreview mode="belief" />
+<CanvasLegendPreview mode="divergence" />
+
+### Grouping
+
+<Ui>Group</Ui> gathers the nodes by <Ui>Strategy</Ui>, <Ui>Belief</Ui> (in four bands, from very low to very high) or <Ui>Effect</Ui>; <Ui>None</Ui> goes back to the normal drawing. Grouping is not available while rounds advance by themselves: pause the playback to group.
+
+<Warning>
+On Windows, clustering may be unstable; the control warns about it with a warning icon.
+</Warning>
+
+### Moving around the graph
+
+- Drag to pan and use the mouse wheel to zoom in or out; you can also use the <Ui>Zoom in</Ui> and <Ui>Zoom out</Ui> buttons.
+- <Ui>Fit to screen</Ui> frames the whole network again.
+- <Ui>Hide links</Ui> leaves only the nodes, useful in dense networks; <Ui>Show links</Ui> draws them again.
+
+### Inspecting an agent
+
+Clicking a node selects it and shows its data in the side panel, at the round you are viewing:
+
+- Its name, strategy, effect and whether it is <Ui>Speaking</Ui> or <Ui>Silent</Ui>.
+- Its <Ui>Public belief</Ui>, its <Ui>Private belief</Ui> and the <Ui>Public-private divergence</Ui> between them.
+- Its fixed properties: <Ui>Initial belief</Ui>, <Ui>Tolerance radius</Ui> and <Ui>Tolerance offset</Ui>.
+- Its edges: whom it influences (<Ui>Influences (3)</Ui>) and who influences it (<Ui>Influenced by (2)</Ui>), with each edge's influence and bias. The first five are listed; the title gives the total.
+
+The values change as you move along the timeline. The panel's × button (<Ui>Deselect node</Ui>) clears the selection.
+
+## The timeline
+
+The timeline, below the graph, controls which round you are viewing. The graph, the agents table, the selected agent and the charts follow that round.
+
+<Screenshot name="run-view-timeline" alt="The timeline: the playback buttons, the speed, the current round, the rounds bar with the event markers, the detail view and the Go to round field." />
+
+- **The buttons**: play or pause, go to round 0, previous event, previous round, next round, next event and go to the last round received.
+- <Ui>Speed</Ui>: ×1, ×4, ×16 or ×64 rounds per playback step.
+- **The round** you are viewing, and the total (<Ui>Round 25 of 100</Ui>).
+- **The rounds bar**: a click or a drag on it goes to that round; hovering shows which round it is. Rounds that have not arrived yet are marked <Ui>not received yet</Ui>.
+- **The detail view**, below, zooms in on the rounds around the current one so you can move one by one by dragging (<Ui>Detail · rounds 15-35 (drag for 1-round precision)</Ui>).
+- <Ui>Go to round</Ui>: type a number and click <Ui>Go</Ui>.
+
+### Events
+
+The platform detects the run's notable moments in your browser and marks them on the rounds bar with three colors:
+
+<TimelineEventLegend />
+
+- <Ui>Change</Ui>: the round with the <Ui>Biggest mean-opinion shift</Ui> and the one where the <Ui>Spread halved</Ui> compared with the start.
+- <Ui>Silence</Ui>: the first round with <Ui>Fewer than 60 % of agents speaking</Ui>, and the one with the minimum participation.
+- <Ui>End</Ui>: the last round, with consensus (<Ui>Convergence · consensus</Ui>) or without it (<Ui>Last round · no consensus</Ui>).
+
+The previous and next event buttons jump from one event to another.
+
+### Keyboard shortcuts
+
+With the focus outside text fields:
+
+- <Kbd>←</Kbd> and <Kbd>→</Kbd>: one round back or forward; with <Kbd>Shift</Kbd>, ten.
+- <Kbd>PgUp</Kbd> and <Kbd>PgDn</Kbd>: a big jump, of 10 rounds or a twentieth of the run if that is larger.
+- <Kbd>,</Kbd> and <Kbd>.</Kbd>: previous and next event.
+- <Kbd>Home</Kbd> and <Kbd>End</Kbd>: round 0 and the last round received.
+- <Kbd>Space</Kbd>: play or pause.
+- <Kbd>Esc</Kbd>: restore a maximized panel.
+
+The timeline itself lists the shortcuts below the bar.
+
+## Live or replay
+
+A run can be watched while the server computes it (live) or after it has finished (replay). The label next to the round tells you which mode you are in.
+
+**Live.** When you open a running run, the view follows the latest round received: <Ui>● Following live</Ui>. If you go to an earlier round, rounds keep arriving without moving you from where you are: <Ui>⏸ Reviewing · still arriving</Ui>. <Ui>Back to live</Ui> returns to the latest round. You can also play back the rounds already received (<Ui>▶ Playing</Ui>).
+
+**Replay.** A finished run shows <Ui>Playback</Ui>: all its rounds are available and playback goes through them at the chosen speed.
+
+<Tip>
+While live, the server sometimes does not have the past rounds available yet. The view tells you so and keeps following the run live; you can review them once the run finishes.
+</Tip>
+
+<Warning>
+A finished run's round-by-round data is kept on the server for about 60–90 minutes. After that, the view shows only the final state, without timeline, rounds table or evolution charts, and says so with a notice. If the server no longer keeps even the networks, the view shows <Ui>This run's data is no longer available</Ui>; its general data is still in My experiments.
+</Warning>
+
+If the connection to the simulation fails and cannot recover, the view shows <Ui>The connection to the simulation failed</Ui> with the <Ui>Retry</Ui> button.
+
+## Runs with several networks
+
+A generated run can simulate several networks with the same configuration (<Ui>Number of networks</Ui> in the wizard). When you open it, the main area shows <Ui>Select a network</Ui> and the side panel, the network browser, <Ui>Networks (20)</Ui>:
+
+- **The summary**: how many networks reached consensus (<Ui>12 of 20 networks reached consensus</Ui>).
+- **The filters** <Ui>All</Ui>, <Ui>Consensus</Ui> and <Ui>No consensus</Ui>, and the search by number (<Ui>Go to network number…</Ui>).
+- **The networks**: up to 24 are listed as cards, with their number, their result, their agents, the round they ended at and their final spread. With more than 24 they are drawn as a grid of squares: green if the network reached consensus, amber if not and gray while it is <Ui>Pending</Ui>. Hovering over a square shows its data.
+
+<Screenshot name="run-view-networks" alt="The network browser of a run with many networks: the consensus summary, the filters, the search by number and the grid of networks colored by result." />
+
+Clicking a network opens it in the run view. From there, the browser shows which network you are viewing (<Ui>Viewing</Ui>), with arrows to move to the previous or next network of the filtered list; <Ui>Show all networks</Ui> and <Ui>Hide list</Ui> expand or fold the list. The path in the top bar also shows the network (<Ui>Network 3</Ui>).

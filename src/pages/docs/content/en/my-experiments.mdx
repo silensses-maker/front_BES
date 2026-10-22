@@ -1,0 +1,72 @@
+## The history
+
+The dashboard's <Ui>My Experiments</Ui> tab gathers every run you have launched, newest first. The list takes the side panel; when you pick a run, its details are shown in the main area. Until you pick one, the main area shows <Ui>No experiment selected</Ui>.
+
+Each run in the list shows its name and its status; below, the start of its identifier, its type (<Ui>Generated</Ui> or <Ui>Custom</Ui>) and its number of networks, and on the last line its creation date. A run without a name shows as <Ui>Unnamed run</Ui>.
+
+<Screenshot name="experiments-list" alt="The My Experiments tab: in the side panel, the search, the status, type and date filters and the list of runs; in the main area, the details of the chosen run." />
+
+The list loads 20 runs at a time (<Ui>20 per page</Ui>): <Ui>Load more</Ui>, at the end, brings the next ones.
+
+## Searching and filtering
+
+Above the list you have:
+
+- **The search** (<Ui>Search by name or ID…</Ui>): finds a run by its name or by its identifier, whole or in part.
+- **The status filters**: <Ui>All</Ui>, <Ui>Running</Ui>, <Ui>Completed</Ui>, <Ui>Error</Ui> and <Ui>Cancelled</Ui>. Each one shows how many runs it has.
+- **The type filter** (<Ui>All types</Ui>, <Ui>Generated</Ui> or <Ui>Custom</Ui>) and **the creation date range** (<Ui>Created from</Ui> and <Ui>Created until</Ui>). The × button next to them (<Ui>Clear type and date filters</Ui>) resets them.
+
+<Tip>
+The filters and the search apply to the runs already loaded. If you cannot find an older run, click <Ui>Load more</Ui> until it shows up.
+</Tip>
+
+## Run details
+
+Clicking a run opens its <Ui>Experiment details</Ui>: the name, the status and the start of the identifier (hover over it to see it whole), and the <Ui>Type</Ui>, <Ui>Networks</Ui>, <Ui>Iteration limit</Ui>, <Ui>Created</Ui> and, for a generated run, <Ui>Seed</Ui> fields.
+
+<Screenshot name="experiment-details" alt="The details of a generated run: name, status, identifier, type, networks, iteration limit, date and seed, with the Open run, Re-launch and Export configuration buttons." />
+
+Below are the actions:
+
+- <Ui>Open run</Ui> opens the run view (see [Run view](/docs/run-view)): live if it is still running, or to replay it if it has finished.
+- <Ui>Re-launch</Ui>, on generated runs, prepares a new run with the same configuration (see below).
+- <Ui>Export configuration</Ui> downloads the run's configuration as a JSON file.
+
+The footer reminds you how long the server keeps a finished run's data: <Ui>Frames of finished runs are kept about 60–90 min on the server.</Ui>
+
+## Re-launching a run
+
+<Ui>Re-launch</Ui> opens the new simulation wizard on the <Ui>Generated</Ui> tab, straight on the Review step, with the chosen run's configuration and seed. Nothing starts until you click <Ui>Launch simulation</Ui>, and your quotas apply as usual. You can change anything before launching; launched as it is, it repeats the run on this server.
+
+The review says which run the configuration comes from and with which seed, and warns you in these cases:
+
+- Runs created before seeds were reproducible get the same configuration, but with different random draws.
+- If the original seed is outside the range the wizard accepts, a random seed is used and the run will not repeat exactly.
+- The requested density is not always stored: the wizard fills in the one that gives the same effective density with your current quotas. If your role has changed since then, the effective density may differ and the networks will not be the same.
+
+**Custom** runs have no <Ui>Re-launch</Ui>: they are repeated by loading their configuration file into the wizard (the <Ui>Load file</Ui> tab; see [New simulation](/docs/new-simulation#configuration-files)).
+
+## Exporting the configuration
+
+<Ui>Export configuration</Ui> downloads as JSON the configuration the run was launched with, together with its identifier and its seed. Loading that file into the wizard and launching it repeats the run on this server.
+
+<Warning>
+The button only appears on the **latest run launched from this browser**, because it is the browser that keeps its full configuration. To keep the configuration of any other run, export it from the wizard's Review step (<Ui>Export JSON</Ui>) before launching it.
+</Warning>
+
+## Cancelling a run
+
+A <Ui>Running</Ui> run has a <Ui>Cancel</Ui> button on its row in the list; the run view has its own, <Ui>Cancel simulation</Ui>. Both ask for confirmation (<Ui>Cancel the simulation?</Ui>): <Ui>Yes, cancel the simulation</Ui> stops it at the current round and <Ui>Keep running</Ui> lets it go on.
+
+The data received up to that moment is kept, and the run moves to the <Ui>Cancelled</Ui> status. If it finished just before you cancelled it, only its status is updated.
+
+## Run statuses
+
+<RunStatusBadges label="The four statuses of a run, as the history shows them" />
+
+- <Ui>Running</Ui>: the server is still computing rounds. You can follow it live.
+- <Ui>Completed</Ui>: it finished, by converging or by reaching the iteration limit.
+- <Ui>Cancelled</Ui>: you stopped it before it finished. It keeps the rounds computed until then.
+- <Ui>Error</Ui>: the server could not complete it.
+
+The run chip in the top bar always follows your latest run: <Ui>Running · Round 12</Ui> while it runs and <Ui>View last run</Ui> once it ends (see [Getting started](/docs/getting-started#getting-around-the-platform)).

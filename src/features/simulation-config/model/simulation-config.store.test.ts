@@ -167,6 +167,28 @@ describe("useSimulationConfigStore", () => {
     });
   });
 
+  describe("fitDraftsToQuota", () => {
+    it("caps both drafts' iteration limit at the quota", () => {
+      useSimulationConfigStore.getState().fitDraftsToQuota(10);
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues).toEqual({ ...DEFAULT_FORM, iterationLimit: 10 });
+      expect(customValues).toEqual({ ...DEFAULT_CUSTOM_FORM, iterationLimit: 10 });
+    });
+
+    it("caps only the draft over the quota", () => {
+      useSimulationConfigStore.getState().fitDraftsToQuota(500);
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues.iterationLimit).toBe(DEFAULT_FORM.iterationLimit);
+      expect(customValues.iterationLimit).toBe(500);
+    });
+
+    it.each([null, undefined, Infinity])("keeps the state without a cap (%s)", (cap) => {
+      const before = useSimulationConfigStore.getState();
+      useSimulationConfigStore.getState().fitDraftsToQuota(cap);
+      expect(useSimulationConfigStore.getState()).toBe(before);
+    });
+  });
+
   describe("reset", () => {
     it("resets all state back to initial values after modifications", () => {
       useSimulationConfigStore.getState().setNetworkType("custom");

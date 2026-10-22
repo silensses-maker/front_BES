@@ -1,0 +1,72 @@
+## The Polarization tab
+
+The <Ui>Polarization</Ui> tab of the charts card (see [Charts and data](/docs/charts-and-data)) measures, round by round, how polarized the beliefs of the agents in the network you are viewing are. It offers the measures from the literature and those proposed by the PROMUEVA group, and lets you compare several of them on the same chart.
+
+The values are not computed in your browser: the server computes them with pol_measures, PROMUEVA's package of polarization measures. For each round, the platform groups the beliefs into a histogram of k categories and the package computes the measure over it. Meanwhile, the chart shows <Ui>Computing…</Ui> and fills in; on a live run it grows with each round.
+
+<Screenshot name="polarization-chart" alt="The Polarization tab with an Esteban–Ray series: the measure's settings at the top, the per-round curve with the dotted threshold lines and the viewed round's level." />
+
+What each measure measures, its parameters and its references are in the [Wiki](/wiki#polarization).
+
+## Setting up a measure
+
+Each curve on the chart is a **series**, with its own settings:
+
+- <Ui>Polarization measure</Ui>: the measure, in two groups, <Ui>Literature</Ui> and <Ui>Proposed (PROMUEVA)</Ui>. Those marked <Ui>BETA</Ui> are still being developed by their authors. The first series starts with Esteban–Ray.
+- **The measure's parameters**, if it has any: hovering over each field shows its default value and its range. A value out of range is not applied and the field says so (for example, Esteban–Ray's α: <Ui>Not applied: allowed range (0, 1.6]</Ui>). The normalization constant K, in the measures that have it, can be left empty (<Ui>auto</Ui>) to use the package's default normalization. The generalized measures add the <Ui>Alienation function f(d)</Ui>. The reset button goes back to the package's default values.
+- **k**, the number of categories of the histogram: 3, 5 (the default), 7 or 10. The beliefs are grouped into k categories of equal width over [0, 1].
+- **The belief type**: <Ui>Private</Ui> (what the agents believe; the default) or <Ui>Public</Ui> (what they express).
+
+Not every measure is defined for every k: Experts, for example, only for k = 5. In the measure selector, those that do not support the chosen k say so (<Ui>not for k = 3</Ui>). If you choose a combination that is not defined, the chart says so (<Ui>Experts is not defined for k = 3.</Ui>) and offers to switch to a valid k (<Ui>Use k = 5</Ui>).
+
+The settings are kept for the session, even if you change tab, round or network.
+
+### Levels
+
+With a single series, for the measures whose thresholds the package publishes, the chart draws them as dotted lines and rates the round you are viewing as <Ui>low</Ui>, <Ui>medium</Ui> or <Ui>high</Ui>. The thresholds only hold for the parameters they were published with: with other values no level is shown. The information icon (<Ui>About this measure</Ui>) tells whether the measure has thresholds with the current settings.
+
+## Comparing measures
+
+The chart can overlay up to ten series, each with its own measure, parameters, k and belief type. Above the chart, each series has a chip:
+
+- Clicking a chip selects it and shows its settings; another click hides them. A chip marked <Ui>needs attention</Ui> has a combination that cannot be computed.
+- The **+** button adds a copy of the selected series (up to ten, <Ui>Up to 10 series</Ui>): change whatever you want to compare, for example the measure, k or the belief type.
+- A chip's × removes that series (at least one always remains).
+- <Ui>Overlay all measures</Ui> replaces the series with every measure defined for the selected series' k, with the package's default parameters and the same belief type. The notice that appears lets you <Ui>Undo</Ui>.
+
+The series are told apart by color and line style: solid first, then dashed and dotted, some with markers. This is how the ten look:
+
+<PolarizationLineStyles />
+
+<Screenshot name="polarization-compare" alt="Several measures compared on the same chart: the series chips at the top, each curve with its color and line style and the axis in Normalized (shape) mode." />
+
+The Y axis has two modes:
+
+- <Ui>Values</Ui>: every series on the same axis, with its real values.
+- <Ui>Normalized (shape)</Ui>: each series is rescaled to [0, 1] by its own minimum and maximum over the rounds computed so far. It helps compare the shape of measures with different scales; hovering shows the real value. A constant series is drawn flat at 0.5.
+
+With several series the thresholds are not drawn: hovering over the chart lists each series' value and level at that round.
+
+## The polarization table
+
+<Ui>Chart</Ui> and <Ui>Table</Ui> switch between the chart and a table of the same values, computed only once on the server. The table has two contents:
+
+- <Ui>Series</Ui>: the compared series, as the chart shows them.
+- <Ui>All measures</Ui>: every measure with the package's default parameters, for the k and belief type you choose in its own selectors.
+
+There is one row per round, with each series' value and, if it has thresholds, its <Ui>Level</Ui>. Hovering over a value shows the exact value. A cell can be <Ui>Not computed yet</Ui>, have no value at that round, or show that the package could not compute it. Clicking a row takes the timeline to that round.
+
+<Screenshot name="polarization-table" alt="The polarization table in Series mode: one row per round with each series' value and level, and the Export CSV menu open with the long and wide formats." />
+
+### Exporting to CSV
+
+<Ui>Export CSV</Ui> downloads the table as you see it (with the <Ui>Series</Ui> or <Ui>All measures</Ui> content), in one of two formats:
+
+- <Ui>Long (R / pandas)</Ui>: one row per round and series.
+- <Ui>Wide (Excel)</Ui>: one row per round and one column per series.
+
+The file follows the same conventions as the data table's (`;` as the separator, dot decimals, UTF-8 with a BOM). The values keep their full precision, the headers are in English and every row records the pol_measures version they were computed with, so the result is reproducible. The file name gives the content, the format, the run, the network and the date, for example `polarization-series-long-run<id>-net<network>-20261021-1530.csv`.
+
+<Tip>
+If the run is still live or the server is still computing, the menu warns you with the <Ui>Partial</Ui> mark: the export holds only the rounds computed up to that moment.
+</Tip>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLastRunStore, useLaunchedConfigStore, useSimulationStore } from "@/entities/simulation";
@@ -20,7 +20,7 @@ import {
 } from "@/shared/lib/simulation-export";
 import { useSimulationWsManager } from "@/shared/lib/ws-manager";
 import { rebalanceCounts } from "../lib/rebalance";
-import { RUN_SAVE_MODE } from "../lib/templates";
+import { fitIterationLimit, RUN_SAVE_MODE } from "../lib/templates";
 import {
   computeMaxEdges,
   customSimSchema,
@@ -108,6 +108,15 @@ export function useSimulationConfig() {
   const loadedFromFile = useSimulationConfigStore((s) => s.loadedFromFile);
   const relaunchedFrom = useSimulationConfigStore((s) => s.relaunchedFrom);
   const storeClearRelaunchedFrom = useSimulationConfigStore((s) => s.clearRelaunchedFrom);
+  const storeFitDraftsToQuota = useSimulationConfigStore((s) => s.fitDraftsToQuota);
+
+  // The defaults (100 / 1000 iterations) are over the lower roles' caps (Guest: 10), so a draft
+  // the user never typed would fail on the first Next: once the quota is known, and whenever it
+  // changes, the drafts' iteration limit is capped at it. A value typed above the cap afterwards
+  // still gets the field error.
+  useEffect(() => {
+    storeFitDraftsToQuota(maxIterations);
+  }, [maxIterations, storeFitDraftsToQuota]);
 
   // Non-persistent local state
   const [errors, setErrors] = useState<SimConfigValidationErrors>({});
@@ -312,7 +321,8 @@ export function useSimulationConfig() {
   };
 
   const applyTemplate = (key: string, template: GeneratedSimFormValues) => {
-    storeUpdateGeneratedValues(template);
+    const fitted = fitIterationLimit(template, maxIterations);
+    storeUpdateGeneratedValues(fitted);
     storeSetActiveTemplate(key);
     storeClearRelaunchedFrom();
     setErrors({});
@@ -321,12 +331,17 @@ export function useSimulationConfig() {
       key === "consensus-pursuit"
         ? t("simulationConfig.templateConsensusPursuit")
         : t("simulationConfig.templatePolarization");
-    toast.success(t("simulationConfig.templateAppliedToast", { name }));
+    toast.success(
+      fitted === template
+        ? t("simulationConfig.templateAppliedToast", { name })
+        : t("simulationConfig.templateAppliedCappedToast", { name, limit: fitted.iterationLimit }),
+    );
   };
 
   /** Discards the persisted draft and restores wizard defaults (mockup quota strip). */
   const resetDraft = () => {
     storeReset();
+    storeFitDraftsToQuota(maxIterations);
     setErrors({});
     setUsageLimitError(null);
     toast.success(t("simulationConfig.discardSuccessToast"));

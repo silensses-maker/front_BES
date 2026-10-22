@@ -1,0 +1,135 @@
+## El asistente
+
+Una simulación se configura con el asistente de la pestaña <Ui>Nueva Simulación</Ui> del tablero. El asistente ocupa el panel lateral; el área principal muestra el <Ui>Resumen en vivo</Ui>, que se recalcula en tu navegador con cada cambio. Nada se envía al servidor hasta que pulses <Ui>Lanzar simulación</Ui>.
+
+De arriba abajo, el asistente tiene:
+
+- **Tu cuota**: tu rol y sus topes (por ejemplo, <Ui>BaseUser · máx. 100 agentes · máx. 100 iteraciones · máx. 5 redes</Ui>). El asistente valida la configuración contra ellos.
+- **El tipo de red**, en tres pestañas: <Ui>Generada</Ui>, <Ui>Personalizada</Ui> y <Ui>Cargar archivo</Ui>.
+- **El inicio rápido**, con dos plantillas.
+- **Los pasos** y su progreso (<Ui>Paso 1 de 3</Ui>). Un paso ya completado es un enlace: un clic vuelve a él.
+- Al pie, <Ui>Atrás</Ui> y <Ui>Siguiente</Ui>; en el último paso, <Ui>Lanzar simulación</Ui>.
+
+<Screenshot name="wizard-network-generated" alt="El asistente en el paso Red de una red generada, con la cuota arriba, las pestañas de tipo de red, las plantillas de inicio rápido y los campos de la red; a la derecha, el resumen en vivo." />
+
+<Ui>Siguiente</Ui> valida el paso actual. Si algo está mal, el campo se marca en rojo con la explicación y aparece el aviso <Ui>Corrige los errores marcados antes de continuar.</Ui>
+
+### El borrador
+
+El asistente guarda lo que escribes como borrador en este navegador: si cierras la pestaña o vas a otra parte del tablero, lo encuentras como lo dejaste. <Ui>Descartar borrador</Ui>, junto a la cuota, restablece todos los pasos a sus valores por defecto tras pedir confirmación (<Ui>¿Descartar el borrador?</Ui>; <Ui>Conservar</Ui> lo deja como está).
+
+### Plantillas de inicio rápido
+
+<Ui>Inicio rápido:</Ui> ofrece dos configuraciones de ejemplo de una red generada de 10 agentes. Rellenan los campos de la pestaña <Ui>Generada</Ui>, que después puedes cambiar:
+
+- <Ui>Búsqueda de consenso</Ui>: agentes con dinámica DeGroot que convergen hacia una opinión compartida.
+- <Ui>Polarización</Ui>: el sesgo de confirmación y el efecto rebote crean grupos opuestos que resisten el consenso.
+
+Si el límite de iteraciones de una plantilla (100 o 200) supera el tope de tu rol, al aplicarla se reduce a tu tope y el aviso lo indica. Los valores iniciales del asistente se ajustan a tu cuota de la misma forma (el rol Guest permite 10 iteraciones).
+
+## Red generada
+
+En una red generada el servidor construye la topología con el modelo de Barabási–Albert a partir de unos pocos parámetros. Tiene tres pasos: <Ui>Red</Ui>, <Ui>Agentes</Ui> y <Ui>Revisión</Ui>.
+
+### Paso Red
+
+- <Ui>Número de redes</Ui>: cuántas redes independientes se simulan con la misma configuración. Cada una tiene su propia topología y su propia dinámica.
+- <Ui>Total de agentes</Ui>: agentes de cada red.
+- <Ui>Densidad</Ui>: grado promedio por agente (número de vecinos). Mínimo 2 y menor que el total de agentes. Debajo se indica cuántas aristas tendrá la red.
+- <Ui>Límite de iteraciones</Ui>: máximo de rondas.
+- <Ui>Umbral de parada</Ui>: criterio de convergencia, un valor entre 0 y 1 sin incluirlos. La simulación se detiene cuando el cambio promedio de las creencias entre rondas baja de este valor. Típico: entre 0.01 y 0.001.
+- <Ui>Semilla</Ui>: con <Ui>Aleatoria</Ui> marcada, cada lanzamiento sortea una semilla nueva. Desmárcala para escribir un número entero (de 0 a 9.007.199.254.740.991).
+
+La simulación termina al alcanzar el límite de iteraciones **o** al converger, lo que ocurra primero. Cada campo tiene un icono de información con su explicación completa.
+
+Bajo los campos limitados por tu cuota se indica el máximo de tu rol (<Ui>Tu plan permite hasta 100 agentes.</Ui>). Si lo superas, el mensaje pasa a <Ui>Supera el máximo de tu plan (100).</Ui> y el enlace <Ui>Ajustar al máximo</Ui> pone el valor permitido.
+
+<Tip>
+La semilla hace reproducible una ejecución: la misma configuración con la misma semilla construye las mismas redes y la misma dinámica en el mismo servidor. En un servidor con otra CPU los resultados pueden variar levemente. Para repetir una ejecución ya lanzada usa <Ui>Relanzar</Ui> en [Mis experimentos](/docs/my-experiments#relanzar-una-ejecucion).
+</Tip>
+
+### Paso Agentes
+
+El paso Agentes reparte los agentes y las aristas de la red entre tipos.
+
+**<Ui>Tipos de agente</Ui>.** Cada fila es una combinación de <Ui>Estrategia de silencio</Ui> y <Ui>Efecto de silencio</Ui> con una cantidad de agentes, que fijas con el control deslizante o escribiéndola (a la derecha se muestra su porcentaje). La suma de las filas debe ser igual al total de agentes; el contador <Ui>10 / 10 asignados</Ui> lo muestra.
+
+- La **estrategia** decide si el agente expresa su opinión en cada ronda: <Ui>DeGroot</Ui> (siempre habla), <Ui>Mayoría</Ui> (habla si la mayoría de sus vecinos está de acuerdo), <Ui>Umbral</Ui> (necesita una fracción mínima de vecinos de acuerdo, fijada en 0.1 por el simulador) o <Ui>Confianza</Ui> (habla cuando su certeza supera un umbral fijo de 0.1; la confianza inicial es aleatoria).
+- El **efecto** decide cómo influye un agente callado en sus vecinos: <Ui>DeGroot</Ui> (sin silencio, el modelo clásico), <Ui>Memoria</Ui> (los vecinos usan la última opinión que expresó) o <Ui>Sin memoria</Ui> (los vecinos lo ignoran).
+
+Cada combinación puede aparecer una sola vez: en los desplegables, las opciones que ya usa otra fila llevan la marca «en uso» (por ejemplo, <Ui>Mayoría · en uso</Ui>). <Ui>Agregar tipo de agente</Ui> añade una fila y el botón × de cada fila la quita.
+
+**<Ui>Distribución de sesgos</Ui>.** Los sesgos cognitivos se asignan a las aristas, no a los agentes. Cada fila es un <Ui>Sesgo cognitivo</Ui> con un número de aristas, y la suma debe ser igual al total de aristas de la red: d·(d−1) + (N−d)·2·d, con d la densidad y N los agentes. Los sesgos son <Ui>Ninguno</Ui> (promedio puro, DeGroot), <Ui>Confirmación</Ui> (pondera más las opiniones que confirman la propia), <Ui>Efecto rebote</Ui> (rechaza las opiniones muy distintas y endurece la propia), <Ui>Autoridad</Ui> (se apoya en los vecinos de mayor influencia) e <Ui>Insular</Ui> (ignora la mayoría de las opiniones externas). <Ui>Agregar tipo de sesgo</Ui> añade una fila.
+
+<Screenshot name="wizard-agents-generated" alt="El paso Agentes de una red generada: dos tipos de agente con su estrategia, efecto y cantidad, y la distribución de sesgos sobre las aristas con sus contadores de asignación." />
+
+<Tip>
+Si cambias el total de agentes o la densidad en el paso Red, las cantidades de las filas se reparten de nuevo en proporción para seguir sumando el total.
+</Tip>
+
+## Red personalizada
+
+En una red personalizada defines tú cada agente y cada arista. Sirve para redes pequeñas y escenarios concretos. Tiene los mismos tres pasos.
+
+En el paso **Red** solo hay tres campos: <Ui>Nombre de la red</Ui> (hasta 32 caracteres; identifica la red en el historial y en la ejecución en vivo), <Ui>Límite de iteraciones</Ui> y <Ui>Umbral de parada</Ui>. Una red personalizada no tiene semilla.
+
+El paso **Agentes** tiene dos listas:
+
+- **<Ui>Agentes</Ui>**: cada agente tiene <Ui>Nombre</Ui> (único, hasta 32 caracteres; se distinguen mayúsculas y minúsculas), <Ui>Estrategia</Ui>, <Ui>Efecto</Ui>, <Ui>Creencia</Ui> inicial (de 0 a 1), <Ui>Radio de tol.</Ui> (la zona de confort: apoya a los vecinos cuya opinión difiere como mucho este valor, de 0 a 1) y <Ui>Despl. de tol.</Ui> (desplaza el centro de esa ventana, de −1 a 1). <Ui>Agregar agente</Ui> añade uno. El número de agentes también está limitado por tu cuota.
+- **<Ui>Aristas</Ui>**: cada arista va de un <Ui>Origen</Ui> a un <Ui>Destino</Ui>, elegidos por nombre de agente, con una <Ui>Influencia</Ui> (de 0 a 1) y un <Ui>Sesgo</Ui>. Una arista de A a B significa que **A influye en B**. Cada par dirigido origen → destino puede aparecer una sola vez, y una arista de un agente a sí mismo es su auto-influencia. <Ui>Agregar arista</Ui> necesita al menos dos agentes con nombre.
+
+Se necesitan al menos un agente y una arista para lanzar.
+
+<Screenshot name="wizard-custom-agents" alt="El paso Agentes de una red personalizada: la lista de agentes con nombre, estrategia, efecto, creencia y tolerancia, y debajo la lista de aristas con origen, destino, influencia y sesgo." />
+
+## Revisión y lanzamiento
+
+El paso **Revisión** resume toda la configuración: el tipo de red y sus parámetros, la distribución de agentes y la de sesgos (o, en una red personalizada, la lista de agentes y la de aristas). Al final aparece el resultado de la validación: <Ui>✓ Configuración válida. Lista para lanzar.</Ui> o, si algo falla, <Ui>Corrige antes de lanzar</Ui> con la lista de errores. Si la configuración supera tu cuota, se indica qué límite y en cuánto.
+
+<Screenshot name="wizard-review" alt="El paso Revisión: el resumen de la red, las tablas de distribución de agentes y de sesgos, los botones Exportar JSON e Importar JSON y el mensaje de configuración válida." />
+
+<Ui>Lanzar simulación</Ui> envía la configuración. Mientras el servidor la recibe el botón muestra <Ui>Lanzando…</Ui>; después se abre la vista de la corrida, que empieza a recibir rondas en vivo (ver [Vista de corrida](/docs/run-view)). Si la configuración tiene errores, el lanzamiento no se envía y el aviso te lleva a revisarlos.
+
+<Warning>
+En esta versión se guarda la configuración de cada ejecución, pero sus datos ronda a ronda solo se conservan en el servidor unos 60–90 minutos después de que termine. Pasado ese tiempo, la corrida solo muestra su estado final.
+</Warning>
+
+## Archivos de configuración
+
+Una configuración se puede guardar en un archivo JSON y volver a cargar más tarde, en este u otro navegador.
+
+<UiPreview label="Los botones del paso Revisión para exportar e importar la configuración">
+  <UiButton k="simulationConfig.exportJson" />
+  <UiButton k="simulationConfig.importJson" />
+</UiPreview>
+
+- <Ui>Exportar JSON</Ui>, en el paso Revisión, descarga la configuración actual del asistente (un archivo `bes-config-generated-….json` o `bes-config-custom-….json`).
+- <Ui>Importar JSON</Ui> carga un archivo en el asistente y reemplaza lo que haya.
+
+### Cargar un archivo
+
+La pestaña <Ui>Cargar archivo</Ui> empieza la configuración desde un archivo. Sus pasos son <Ui>Carga</Ui>, <Ui>Agentes</Ui> y <Ui>Revisión</Ui>:
+
+1. Arrastra el archivo a la zona <Ui>Suelta un archivo de simulación aquí</Ui>, o pulsa <Ui>Buscar archivo</Ui>. Solo se aceptan archivos `.json` exportados desde esta aplicación; la importación CSV no está soportada.
+2. Si el archivo es válido, el asistente pasa a la pestaña <Ui>Generada</Ui> o <Ui>Personalizada</Ui>, según el archivo, y abre el paso Agentes con todos los campos rellenados. En la revisión, el tipo de red aparece como <Ui>Cargada desde archivo</Ui>.
+3. Revisa la configuración y lánzala como cualquier otra.
+
+Si el archivo no se puede leer o tiene valores no válidos, el asistente lo indica y no cambia nada.
+
+<Screenshot name="wizard-load" alt="La pestaña Cargar archivo: la zona para soltar el archivo con el botón Buscar archivo y los botones Descargar prompt para IA y Descargar ejemplo." />
+
+La misma pestaña ofrece dos ayudas para escribir un archivo propio:
+
+- <Ui>Descargar ejemplo</Ui> descarga `bes-config-example.json`, una configuración completa de ejemplo.
+- <Ui>Descargar prompt para IA</Ui> descarga `bes-llm-prompt.txt`, unas instrucciones para pedir a un asistente de IA que genere una red en este formato.
+
+## Resumen en vivo y cuotas
+
+Mientras configuras, el <Ui>Resumen en vivo</Ui> del área principal muestra:
+
+- <Ui>Red</Ui>: los parámetros de la red y, en una red generada, el número de aristas (<Ui>Aristas (Barabási-Albert)</Ui>).
+- <Ui>Composición de agentes</Ui> y <Ui>Sesgos sobre aristas</Ui>: cómo se reparten los tipos.
+- <Ui>Tu cuota · BaseUser</Ui>: cuánto de cada tope usa la configuración (<Ui>Agentes</Ui>, <Ui>Iteraciones</Ui>, <Ui>Redes</Ui>).
+- <Ui>Validación</Ui>: si la configuración está lista para lanzar o qué falta.
+
+Los topes de cada rol están en [Primeros pasos](/docs/getting-started#roles-y-cuotas). El servidor vuelve a comprobarlos al recibir el lanzamiento: si los supera, la ejecución no se crea y el asistente muestra <Ui>Se superó el límite de tu plan. Reduce la configuración e intenta de nuevo.</Ui>
