@@ -266,13 +266,13 @@ const en = {
   results: {
     pageTitle: "Previous Results",
     pageIntro:
-      "This archive collects simulation experiments published by the PROMUEVA research group. Each entry documents the model configuration, network topology, and key findings. Results are presented as they are validated; entries marked as placeholder will be replaced with real data as the platform matures.",
-    featuredLabel: "Featured Study",
-    allResultsHeading: "All Experiments",
-    readMore: "Read full report",
-    publishedOn: "Published",
-    backToList: "Back to results",
-    emptyState: "No results have been published yet. Check back soon.",
+      "This section will publish replications of experiments from the literature on opinion dynamics and the spiral of silence, such as those in David Gaona's work, recreated with SiLEnSeSS.",
+    comingSoonBadge: "Coming soon",
+    comingSoonTitle: "This section is in preparation",
+    comingSoonBody:
+      "No results have been published yet. In the meantime, you can read how the model works in the Wiki or create your own simulations.",
+    ctaWiki: "Go to the Wiki",
+    ctaBoard: "Create a simulation",
   },
   dashboard: {
     userMenuTrigger: "User menu",

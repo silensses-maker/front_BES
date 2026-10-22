@@ -270,13 +270,13 @@ const es = {
   results: {
     pageTitle: "Resultados anteriores",
     pageIntro:
-      "Este archivo recopila experimentos de simulación publicados por el grupo de investigación PROMUEVA. Cada entrada documenta la configuración del modelo, la topología de red y los hallazgos clave. Los resultados se presentan a medida que se validan; las entradas marcadas como marcadores de posición serán reemplazadas con datos reales a medida que la plataforma madure.",
-    featuredLabel: "Estudio destacado",
-    allResultsHeading: "Todos los experimentos",
-    readMore: "Leer el informe completo",
-    publishedOn: "Publicado",
-    backToList: "Volver a resultados",
-    emptyState: "Aún no se han publicado resultados. Vuelve pronto.",
+      "En esta sección se publicarán réplicas de experimentos de la literatura sobre dinámicas de opinión y espiral del silencio, como los del trabajo de David Gaona, recreadas con SiLEnSeSS.",
+    comingSoonBadge: "Próximamente",
+    comingSoonTitle: "Esta sección está en preparación",
+    comingSoonBody:
+      "Todavía no hay resultados publicados. Mientras tanto, puedes leer cómo funciona el modelo en la Wiki o crear tus propias simulaciones.",
+    ctaWiki: "Ir a la Wiki",
+    ctaBoard: "Crear una simulación",
   },
   dashboard: {
     userMenuTrigger: "Menú de usuario",

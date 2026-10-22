@@ -89,16 +89,17 @@ export function DashboardHeader({
       <div className="flex min-w-0 items-center gap-3">
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* The logo always leads out of the dashboard to the public home (wiki, FAQ…) */}
             <Link
-              to="/board"
-              aria-label={t("dashboard.breadcrumbBoard")}
+              to="/home"
+              aria-label={t("nav.home")}
               className="flex shrink-0 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Logo className="h-7 w-7" aria-hidden="true" />
             </Link>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p className="text-xs">{t("dashboard.breadcrumbBoard")}</p>
+            <p className="text-xs">{t("nav.home")}</p>
           </TooltipContent>
         </Tooltip>
 
