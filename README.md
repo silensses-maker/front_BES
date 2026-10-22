@@ -227,6 +227,7 @@ Replaces ESLint + Prettier (~100x faster). Key rules:
 - Theme variables defined in `src/shared/styles/globals.css`
 - Base color: **zinc** (OKLCH format)
 - Dark mode ready via `.dark` class
+- Text contrast: the dark theme's text tokens meet WCAG AA, and its secondary text (`--muted-foreground`) reaches ≥ 7:1 on the page, card and sidebar; `src/shared/styles/theme-contrast.test.ts` guards them. Don't lower secondary text with opacity modifiers (`text-muted-foreground/60`…): use `text-muted-foreground` as is
 
 ### Vitest
 

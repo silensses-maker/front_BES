@@ -28,7 +28,7 @@ export function DocsSidebar({ lang }: { lang: DocLang }) {
       aria-label={t("docs.sectionsLabel")}
       className="xl:sticky xl:top-24 xl:w-56 xl:shrink-0 xl:self-start"
     >
-      <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+      <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("docs.pageTitle")}
       </p>
       <ol className="flex flex-wrap gap-1 xl:flex-col xl:gap-0.5">
@@ -40,7 +40,7 @@ export function DocsSidebar({ lang }: { lang: DocLang }) {
         {DOC_SECTIONS.map((section) => (
           <li key={section.id}>
             <NavLink to={docPath(section.id)} className={itemClass}>
-              <span className="mr-1.5 font-mono text-xs text-muted-foreground/70">
+              <span className="mr-1.5 font-mono text-xs text-muted-foreground">
                 {section.order}.
               </span>
               {section.title[lang]}

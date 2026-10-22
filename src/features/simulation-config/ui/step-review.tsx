@@ -279,7 +279,7 @@ export function StepReview({
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">
             {t("simulationConfig.customAgentsTableTitle")}
-            <span className="ml-1 text-muted-foreground/60">({custom.agents.length})</span>
+            <span className="ml-1 text-muted-foreground">({custom.agents.length})</span>
           </p>
           <Card className="gap-0 py-0">
             <CardContent className="max-h-48 overflow-y-auto px-0 py-0">
@@ -321,7 +321,7 @@ export function StepReview({
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">
             {t("simulationConfig.customEdgesTableTitle")}
-            <span className="ml-1 text-muted-foreground/60">({custom.edges.length})</span>
+            <span className="ml-1 text-muted-foreground">({custom.edges.length})</span>
           </p>
           <Card className="gap-0 py-0">
             <CardContent className="max-h-48 overflow-y-auto px-0 py-0">

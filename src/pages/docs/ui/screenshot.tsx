@@ -33,7 +33,7 @@ export function Screenshot({ name, alt, caption }: ScreenshotProps) {
           <ImageOff className="size-6 text-muted-foreground" aria-hidden="true" />
           <p className="text-sm font-medium text-foreground">{t("docs.screenshotPending")}</p>
           <p className="max-w-md text-xs leading-relaxed text-muted-foreground">{alt}</p>
-          <p className="font-mono text-[11px] text-muted-foreground/80">
+          <p className="font-mono text-[11px] text-muted-foreground">
             {t("docs.screenshotFile", { file: src })}
           </p>
         </div>

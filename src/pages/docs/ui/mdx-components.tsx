@@ -103,13 +103,13 @@ export const MDX_COMPONENTS: MdxComponents = {
   em: (props: ComponentProps<"em">) => <em {...props} />,
   ul: (props: ComponentProps<"ul">) => (
     <ul
-      className="ml-5 flex list-disc flex-col gap-1.5 leading-relaxed text-muted-foreground marker:text-muted-foreground/60"
+      className="ml-5 flex list-disc flex-col gap-1.5 leading-relaxed text-muted-foreground marker:text-muted-foreground"
       {...props}
     />
   ),
   ol: (props: ComponentProps<"ol">) => (
     <ol
-      className="ml-5 flex list-decimal flex-col gap-1.5 leading-relaxed text-muted-foreground marker:text-muted-foreground/80"
+      className="ml-5 flex list-decimal flex-col gap-1.5 leading-relaxed text-muted-foreground marker:text-muted-foreground"
       {...props}
     />
   ),

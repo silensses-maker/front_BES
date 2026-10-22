@@ -15,7 +15,7 @@ export function TableOfContents({ containerSelector = "main", className }: Table
 
   return (
     <nav aria-label={t("nav.onThisPage")} className={cn("w-56 shrink-0", className)}>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("nav.onThisPage")}
       </p>
       <ul className="space-y-1">
@@ -25,7 +25,7 @@ export function TableOfContents({ containerSelector = "main", className }: Table
               href={`#${entry.id}`}
               className={cn(
                 "block truncate text-sm transition-colors hover:text-foreground",
-                activeId === entry.id ? "font-medium text-foreground" : "text-foreground/50",
+                activeId === entry.id ? "font-medium text-foreground" : "text-muted-foreground",
               )}
             >
               {entry.text}

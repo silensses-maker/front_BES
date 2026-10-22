@@ -65,7 +65,7 @@ function EdgeRow({ label, influence, bias, biasLabel, isSelf }: EdgeRowProps) {
       <span className="flex shrink-0 items-baseline gap-1.5">
         <span className="font-mono text-xs text-foreground">{influence.toFixed(3)}</span>
         {bias !== 0 && (
-          <span className="font-sans text-[10px] text-muted-foreground/70">{biasLabel}</span>
+          <span className="font-sans text-[10px] text-muted-foreground">{biasLabel}</span>
         )}
       </span>
     </div>
@@ -74,7 +74,7 @@ function EdgeRow({ label, influence, bias, biasLabel, isSelf }: EdgeRowProps) {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-sans text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+    <p className="font-sans text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
       {children}
     </p>
   );

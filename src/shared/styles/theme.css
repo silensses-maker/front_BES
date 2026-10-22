@@ -99,7 +99,7 @@ mjx-container svg {
   --secondary: oklch(0.18 0.015 265);
   --secondary-foreground: oklch(0.96 0.008 264);
   --muted: oklch(0.18 0.015 265);
-  --muted-foreground: oklch(0.60 0.030 264);
+  --muted-foreground: oklch(0.70 0.030 264);
   --accent: oklch(0.20 0.018 265);
   --accent-foreground: oklch(0.96 0.008 264);
   --destructive: oklch(0.40 0.150 25.723);
