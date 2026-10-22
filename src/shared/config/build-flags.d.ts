@@ -33,3 +33,11 @@ declare const __BENCH_BUILD__: {
   gitDirty: boolean | null;
   builtAt: string;
 } | null;
+
+/**
+ * True only in a development build (`rsbuild dev`) with `PUBLIC_AUTH_EMULATOR=true`: Firebase Auth
+ * then talks to a local Auth emulator (src/shared/api/firebase/config.ts; README, "Local auth
+ * emulator"). Every other build, and Vitest, compiles it to `false`, so the emulator call is dead
+ * code there; the flag is refused in CI and on Vercel (rsbuild.config.ts).
+ */
+declare const __AUTH_EMULATOR__: boolean;

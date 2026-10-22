@@ -1,0 +1,63 @@
+## Las gráficas
+
+Bajo la línea de tiempo de la [vista de corrida](/docs/run-view), una tarjeta reúne las gráficas de la red que estás viendo, cada una en su pestaña. Las gráficas en el tiempo dibujan solo las rondas ya recibidas y marcan con una línea vertical la ronda que estás viendo; mientras la corrida avanza en vivo, crecen con cada ronda nueva.
+
+<Screenshot name="charts-evolution" alt="La tarjeta de gráficas en la pestaña Evolución de creencias: una línea por agente con su creencia pública a lo largo de las rondas y la línea vertical de la ronda vista." />
+
+El botón de la esquina (<Ui>Ampliar las gráficas a toda el área</Ui>) extiende la tarjeta a toda el área principal; <Kbd>Esc</Kbd> o el mismo botón la restauran. Al pasar el cursor sobre una gráfica se ven los valores de cada ronda.
+
+### Evolución de creencias
+
+Una línea por agente con su creencia pública ronda a ronda. El color de cada línea es su creencia inicial, así que se ve de dónde parte cada agente y hacia dónde va. En una red de más de 50 agentes se dibuja una muestra uniforme de 50, y la gráfica lo indica (<Ui>Mostrando 50 de 200 agentes · muestreo uniforme · color = creencia inicial</Ui>).
+
+### Distribución
+
+Un histograma de las creencias públicas en la ronda que estás viendo (<Ui>Creencia pública · ronda 25</Ui>), en 20 intervalos de 0.05 entre 0 y 1. Al moverte por la línea de tiempo se ve cómo se agrupan o se separan las opiniones.
+
+### Pública vs. privada
+
+La creencia media pública y la privada de toda la red, ronda a ronda. La distancia entre las dos líneas es la divergencia entre lo que los agentes expresan y lo que piensan, el efecto de la Espiral del Silencio.
+
+### Participación
+
+El porcentaje de agentes que habla en cada ronda. Una caída indica que muchos agentes se están silenciando.
+
+### Varianza
+
+La dispersión de las creencias alrededor de su media en cada ronda, sobre todos los agentes: la pública con línea continua y la privada con línea discontinua. El selector de la pestaña cambia entre <Ui>Desv. estándar σ</Ui> y <Ui>Varianza σ²</Ui> (σ² = (1/n) Σ (bᵢ − μ)²).
+
+<Screenshot name="charts-variance" alt="La pestaña Varianza con la desviación estándar pública y privada a lo largo de las rondas y el selector entre desviación estándar y varianza." />
+
+<WithPolarization>
+
+### Polarización
+
+La pestaña <Ui>Polarización</Ui> mide ronda a ronda qué tan polarizadas están las creencias, con medidas de la literatura y las propuestas por PROMUEVA. Tiene su propia sección: [Polarización](/docs/polarization).
+
+</WithPolarization>
+
+## La tabla de datos
+
+<Ui>Tabla</Ui>, en el selector sobre el grafo, cambia el grafo por una tabla con los valores exactos de la corrida. Tiene hasta tres conjuntos de datos:
+
+- <Ui>Agentes</Ui>: una fila por agente, con sus valores en la ronda que estás viendo (<Ui>Valores exactos de la ronda 25 · sigue la línea de tiempo</Ui>). Columnas: <Ui>Agente</Ui>, <Ui>Nombre</Ui>, <Ui>Estrategia</Ui>, <Ui>Efecto</Ui>, <Ui>Pública</Ui>, <Ui>Privada</Ui>, <Ui>Divergencia</Ui>, <Ui>Estado</Ui> (<Ui>Hablando</Ui> o <Ui>En silencio</Ui>), <Ui>Grado in</Ui> y <Ui>Grado out</Ui>. Los filtros <Ui>Todos</Ui>, <Ui>Hablando</Ui> y <Ui>En silencio</Ui> eligen qué agentes listar. Un clic en una fila selecciona ese agente, como un clic en su nodo.
+- <Ui>Rondas</Ui>: una fila por ronda de esta red, con <Ui>Ronda</Ui>, <Ui>Media pública</Ui>, <Ui>Media privada</Ui>, <Ui>Dispersión</Ui> (la diferencia entre la mayor y la menor creencia privada) y <Ui>Participación</Ui>. Un clic en una fila lleva la línea de tiempo a esa ronda.
+- <Ui>Redes</Ui>, en una ejecución con varias redes: una fila por red, con <Ui>Red</Ui>, <Ui>Resultado</Ui> (<Ui>Consenso</Ui> o <Ui>Sin consenso</Ui>), <Ui>Ronda final</Ui> y <Ui>Dispersión final</Ui>. Los filtros <Ui>Todas</Ui>, <Ui>Consenso</Ui> y <Ui>Sin consenso</Ui> eligen qué redes listar, y un clic en una fila abre esa red.
+
+<Screenshot name="data-table" alt="La tabla de datos en el conjunto Agentes: la barra con los conjuntos de datos, los filtros y el botón Exportar CSV; las columnas de cada agente y la paginación abajo." />
+
+Un clic en el título de una columna ordena la tabla por ella; otro clic invierte el orden. Abajo, <Ui>Filas por página</Ui> elige 25, 50 o 100 filas, y los botones de página recorren el resto (<Ui>Página 1 de 8</Ui>).
+
+<Tip>
+El conjunto <Ui>Rondas</Ui> desaparece cuando los datos ronda a ronda de la corrida ya expiraron en el servidor; <Ui>Agentes</Ui> sigue disponible con el estado final.
+</Tip>
+
+### Exportar a CSV
+
+<Ui>Exportar CSV</Ui> descarga las filas del conjunto y el filtro actuales, todas y no solo las de la página que ves, en el orden en que está la tabla. El archivo:
+
+- usa `;` como separador y punto como separador decimal, con 6 decimales;
+- está codificado en UTF-8 con BOM, para que Excel lo abra con los acentos bien;
+- se llama `silensess-<id>-agentes-ronda25.csv`, `silensess-<id>-rondas.csv` o `silensess-<id>-redes.csv`, con `-red3` tras el identificador en una ejecución con varias redes.
+
+Al terminar, un aviso confirma cuántas filas se exportaron y el nombre del archivo.

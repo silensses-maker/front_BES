@@ -58,6 +58,18 @@ export function resolveMaxNetworks(user: Pick<User, "roles" | "usageLimits">): n
   return user.usageLimits?.maxNetworks ?? getRoleLimits(user.roles ?? []).maxNetworks;
 }
 
+/**
+ * The user's quotas as the wizard validates them: the session's (backend), with the role table
+ * for what the session lacks (no backend, or no `maxNetworks` before #122).
+ */
+export function resolveUsageLimits(
+  user: Pick<User, "roles" | "usageLimits">,
+): Required<UsageLimits> {
+  const roleLimits = getRoleLimits(user.roles ?? []);
+  if (!user.usageLimits) return roleLimits;
+  return { ...roleLimits, ...user.usageLimits, maxNetworks: resolveMaxNetworks(user) };
+}
+
 export function getRolePermissions(roles: UserRole[]): string[] {
   const allPermissions = roles.flatMap((role) => ROLE_PERMISSIONS[role]);
   return [...new Set(allPermissions)];

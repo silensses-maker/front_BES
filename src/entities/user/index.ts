@@ -6,6 +6,7 @@ export {
   ROLE_LIMITS,
   ROLE_PERMISSIONS,
   resolveMaxNetworks,
+  resolveUsageLimits,
 } from "./lib/permissions";
 export { usePermissions } from "./model/use-permissions";
 export { useAuthStore } from "./model/user.store";

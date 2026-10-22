@@ -29,7 +29,11 @@ import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
 } from "../types/simulation-config.types";
-import { useSimulationConfigStore } from "./simulation-config.store";
+import {
+  DEFAULT_CUSTOM_FORM,
+  DEFAULT_FORM,
+  useSimulationConfigStore,
+} from "./simulation-config.store";
 import { useSimulationConfig } from "./use-simulation-config";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
@@ -265,6 +269,49 @@ describe("useSimulationConfig", () => {
     it("starts with activeTemplate null", () => {
       const { result } = renderHook(() => useSimulationConfig());
       expect(result.current.activeTemplate).toBeNull();
+    });
+  });
+
+  // ── Drafts over the iteration quota ───────────────────────────────────────
+
+  describe("drafts over the iteration quota", () => {
+    it("caps the default drafts once the quota is known (Guest: 10)", () => {
+      setupMocks({ maxIterations: 10 });
+      renderHook(() => useSimulationConfig());
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues.iterationLimit).toBe(10);
+      expect(customValues.iterationLimit).toBe(10);
+    });
+
+    it("leaves the defaults as they are without a cap", () => {
+      renderHook(() => useSimulationConfig());
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues.iterationLimit).toBe(DEFAULT_FORM.iterationLimit);
+      expect(customValues.iterationLimit).toBe(DEFAULT_CUSTOM_FORM.iterationLimit);
+    });
+
+    it("caps again when the quota changes", () => {
+      setupMocks({ maxIterations: 100 });
+      const { rerender } = renderHook(() => useSimulationConfig());
+      expect(useSimulationConfigStore.getState().customValues.iterationLimit).toBe(100);
+
+      setupMocks({ maxIterations: 20 });
+      rerender();
+
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues.iterationLimit).toBe(20);
+      expect(customValues.iterationLimit).toBe(20);
+    });
+
+    it("keeps a value typed above the cap, for the field error to report", () => {
+      setupMocks({ maxIterations: 50 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ iterationLimit: 80 });
+      });
+
+      expect(useSimulationConfigStore.getState().generatedValues.iterationLimit).toBe(80);
     });
   });
 
@@ -1374,6 +1421,32 @@ describe("useSimulationConfig", () => {
       );
     });
 
+    it("keeps a template that fits the quota and confirms it", () => {
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+
+      expect((result.current.values as GeneratedSimFormValues).iterationLimit).toBe(
+        alternativeTemplate.iterationLimit,
+      );
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.templateAppliedToast");
+    });
+
+    it("caps the template's iteration limit at the quota and says so", () => {
+      setupMocks({ maxIterations: 10 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.applyTemplate("polarization", alternativeTemplate);
+      });
+
+      expect((result.current.values as GeneratedSimFormValues).iterationLimit).toBe(10);
+      expect(result.current.activeTemplate).toBe("polarization");
+      expect(toast.success).toHaveBeenCalledWith("simulationConfig.templateAppliedCappedToast");
+    });
+
     it("sets activeTemplate to the given key", () => {
       const { result } = renderHook(() => useSimulationConfig());
 
@@ -1409,6 +1482,8 @@ describe("useSimulationConfig", () => {
 
       act(() => {
         result.current.updateValues(overLimitGeneratedValues);
+      });
+      act(() => {
         result.current.validateAndAdvance();
       });
       expect(result.current.errors.iterationLimitExceeded).toBe(true);
@@ -1804,6 +1879,22 @@ describe("useSimulationConfig", () => {
       expect(toast.success).toHaveBeenCalledWith("simulationConfig.discardSuccessToast");
       expect(result.current.errors).toEqual({});
       expect(result.current.usageLimitError).toBeNull();
+    });
+
+    it("caps the restored defaults at the quota", () => {
+      setupMocks({ maxIterations: 10 });
+      const { result } = renderHook(() => useSimulationConfig());
+
+      act(() => {
+        result.current.updateValues({ iterationLimit: 5 });
+      });
+      act(() => {
+        result.current.resetDraft();
+      });
+
+      const { generatedValues, customValues } = useSimulationConfigStore.getState();
+      expect(generatedValues.iterationLimit).toBe(10);
+      expect(customValues.iterationLimit).toBe(10);
     });
   });
 

@@ -1,10 +1,9 @@
-import { getRoleLimits, resolveMaxNetworks, useAuthStore } from "@/entities/user";
+import { resolveUsageLimits, useAuthStore } from "@/entities/user";
 import { DeactivateButton } from "@/features/profile/deactivate-account";
 import { EditNameForm } from "@/features/profile/edit-display-name";
 import { useTranslation } from "@/shared/i18n";
 import { useProfileSheetStore } from "@/shared/model/profile-sheet.store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
-import { Progress } from "@/shared/ui/progress";
 import { Separator } from "@/shared/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet";
 
@@ -16,19 +15,26 @@ export function ProfileSheet() {
 
   const displayName = user?.name || t("dashboard.guestName");
   const initials = displayName.slice(0, 2).toUpperCase();
-  const limits = user ? getRoleLimits(user.roles) : null;
-  // Session quota (backend), falling back to the role table when it predates maxNetworks (#122).
-  const maxNetworks = user ? resolveMaxNetworks(user) : Infinity;
-
-  const isUnlimited = (value: number) => value === Infinity;
-
-  const agentPercent =
-    limits && !isUnlimited(limits.maxAgents) ? Math.min(100, (0 / limits.maxAgents) * 100) : 100;
-  const iterationPercent =
-    limits && !isUnlimited(limits.maxIterations)
-      ? Math.min(100, (0 / limits.maxIterations) * 100)
-      : 100;
-  const networkPercent = !isUnlimited(maxNetworks) ? Math.min(100, (0 / maxNetworks) * 100) : 100;
+  // The quotas the wizard validates against. They are caps per run, not an allowance that runs
+  // out with use, so they read as plain values (no usage meter).
+  const limits = user ? resolveUsageLimits(user) : null;
+  const formatCap = (value: number) => (value === Infinity ? t("common.unlimited") : String(value));
+  const limitRows = limits
+    ? [
+        { key: "agents", label: t("profile.agentsUsed"), value: formatCap(limits.maxAgents) },
+        {
+          key: "iterations",
+          label: t("profile.iterationsUsed"),
+          value: formatCap(limits.maxIterations),
+        },
+        { key: "networks", label: t("profile.networksUsed"), value: formatCap(limits.maxNetworks) },
+        {
+          key: "density",
+          label: t("profile.densityFactorLabel"),
+          value: limits.densityFactor.toFixed(2),
+        },
+      ]
+    : [];
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -78,7 +84,7 @@ export function ProfileSheet() {
         <Separator />
 
         {/* ── Usage limits ────────────────────────────────── */}
-        {user && limits && (
+        {limits && (
           <>
             <section className="px-4 py-4 flex flex-col gap-3">
               <div className="flex flex-col gap-0.5">
@@ -90,55 +96,14 @@ export function ProfileSheet() {
                 </p>
               </div>
 
-              {/* Agents */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{t("profile.agentsUsed")}</span>
-                  <span className="text-sm font-mono font-medium">
-                    {isUnlimited(limits.maxAgents) ? t("common.unlimited") : limits.maxAgents}
-                  </span>
-                </div>
-                <Progress value={isUnlimited(limits.maxAgents) ? 100 : agentPercent} />
-              </div>
-
-              {/* Iterations */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {t("profile.iterationsUsed")}
-                  </span>
-                  <span className="text-sm font-mono font-medium">
-                    {isUnlimited(limits.maxIterations)
-                      ? t("common.unlimited")
-                      : limits.maxIterations}
-                  </span>
-                </div>
-                <Progress value={isUnlimited(limits.maxIterations) ? 100 : iterationPercent} />
-              </div>
-
-              {/* Networks */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{t("profile.networksUsed")}</span>
-                  <span className="text-sm font-mono font-medium">
-                    {isUnlimited(maxNetworks) ? t("common.unlimited") : maxNetworks}
-                  </span>
-                </div>
-                <Progress value={isUnlimited(maxNetworks) ? 100 : networkPercent} />
-              </div>
-
-              {/* Density factor */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {t("profile.densityFactorLabel")}
-                  </span>
-                  <span className="text-sm font-mono font-medium">
-                    {limits.densityFactor.toFixed(2)}
-                  </span>
-                </div>
-                <Progress value={limits.densityFactor * 100} />
-              </div>
+              <dl className="flex flex-col gap-2">
+                {limitRows.map((row) => (
+                  <div key={row.key} className="flex items-center justify-between">
+                    <dt className="text-sm text-muted-foreground">{row.label}</dt>
+                    <dd className="text-sm font-mono font-medium">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </section>
 
             <Separator />

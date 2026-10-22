@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
@@ -19,3 +19,13 @@ const app = initializeApp(firebaseConfig);
 
 // Firebase is only the identity bridge: Authentication, no Firestore.
 export const auth = getAuth(app);
+
+// Firebase Auth Emulator, local development only (README, "Local auth emulator"):
+// `__AUTH_EMULATOR__` is true only in `rsbuild dev` with PUBLIC_AUTH_EMULATOR=true
+// (rsbuild.config.ts), so every other build compiles this call out. The emulator's warnings stay
+// on: the SDK logs that it is in emulator mode and shows its banner on the page.
+if (__AUTH_EMULATOR__) {
+  connectAuthEmulator(auth, import.meta.env.PUBLIC_AUTH_EMULATOR_URL ?? "http://127.0.0.1:9099", {
+    disableWarnings: false,
+  });
+}

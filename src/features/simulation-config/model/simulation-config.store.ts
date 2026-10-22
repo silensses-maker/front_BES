@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CONSENSUS_PURSUIT_TEMPLATE, RUN_SAVE_MODE } from "../lib/templates";
+import { CONSENSUS_PURSUIT_TEMPLATE, fitIterationLimit, RUN_SAVE_MODE } from "../lib/templates";
 import type {
   CustomSimFormValues,
   GeneratedSimFormValues,
@@ -55,6 +55,8 @@ interface SimulationConfigActions {
   /** Replaces the generated draft with a past run's configuration and opens Review (#127). */
   applyRelaunch: (values: GeneratedSimFormValues, info: RelaunchInfo) => void;
   clearRelaunchedFrom: () => void;
+  /** Caps both drafts' iteration limit at the user's quota (`fitIterationLimit`). */
+  fitDraftsToQuota: (maxIterations: number | null | undefined) => void;
   reset: () => void;
 }
 
@@ -136,6 +138,15 @@ export const useSimulationConfigStore = create<SimulationConfigState & Simulatio
         }),
 
       clearRelaunchedFrom: () => set({ relaunchedFrom: null }),
+
+      fitDraftsToQuota: (maxIterations) =>
+        set((prev) => {
+          const generatedValues = fitIterationLimit(prev.generatedValues, maxIterations);
+          const customValues = fitIterationLimit(prev.customValues, maxIterations);
+          return generatedValues === prev.generatedValues && customValues === prev.customValues
+            ? prev
+            : { generatedValues, customValues };
+        }),
 
       reset: () => set(initialState),
     }),

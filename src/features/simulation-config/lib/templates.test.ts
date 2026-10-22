@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+// By file path: the entity index pulls the Firebase chain into the test environment.
+import { ROLE_LIMITS } from "@/entities/user/lib/permissions";
 import type { GeneratedSimFormValues } from "../types/simulation-config.types";
-import { CONSENSUS_PURSUIT_TEMPLATE, POLARIZATION_TEMPLATE } from "./templates";
+import { CONSENSUS_PURSUIT_TEMPLATE, fitIterationLimit, POLARIZATION_TEMPLATE } from "./templates";
 import { generatedSimSchema } from "./validation";
 
 describe("CONSENSUS_PURSUIT_TEMPLATE", () => {
@@ -82,5 +84,44 @@ describe("templates and the simulator-fixed values (#120)", () => {
     const result = generatedSimSchema.safeParse(template);
     expect(result.error?.issues).toBeUndefined();
     expect(result.success).toBe(true);
+  });
+});
+
+describe("templates and the role quotas", () => {
+  const templates = [
+    ["CONSENSUS_PURSUIT_TEMPLATE", CONSENSUS_PURSUIT_TEMPLATE],
+    ["POLARIZATION_TEMPLATE", POLARIZATION_TEMPLATE],
+  ] as const;
+
+  // Only the iteration limit is fitted to the quota when a template is applied; agents and
+  // networks must fit the lowest role as they are.
+  it.each(templates)("%s fits the Guest agent and network caps", (_, template) => {
+    expect(template.numberOfAgents).toBeLessThanOrEqual(ROLE_LIMITS.Guest.maxAgents);
+    expect(template.numberOfNetworks).toBeLessThanOrEqual(ROLE_LIMITS.Guest.maxNetworks);
+  });
+
+  it.each(templates)("%s passes generatedSimSchema with the Guest iteration cap", (_, template) => {
+    const fitted = fitIterationLimit(template, ROLE_LIMITS.Guest.maxIterations);
+    expect(fitted.iterationLimit).toBe(ROLE_LIMITS.Guest.maxIterations);
+    expect(generatedSimSchema.safeParse(fitted).success).toBe(true);
+  });
+});
+
+describe("fitIterationLimit", () => {
+  it("caps the iteration limit and keeps every other value", () => {
+    expect(fitIterationLimit(POLARIZATION_TEMPLATE, 10)).toEqual({
+      ...POLARIZATION_TEMPLATE,
+      iterationLimit: 10,
+    });
+  });
+
+  it.each([
+    null,
+    undefined,
+    Infinity,
+    200,
+    500,
+  ])("returns the same object when it fits (%s)", (cap) => {
+    expect(fitIterationLimit(POLARIZATION_TEMPLATE, cap)).toBe(POLARIZATION_TEMPLATE);
   });
 });

@@ -1,0 +1,142 @@
+## La vista de corrida
+
+La vista de corrida muestra una ejecución ronda a ronda. Se abre sola al lanzar una simulación, y también desde <Ui>Abrir ejecución</Ui> en [Mis experimentos](/docs/my-experiments) o desde el chip de ejecución de la barra superior.
+
+Tiene cuatro partes:
+
+- **El panel lateral**, con el estado de la corrida, los datos de la red y el agente seleccionado.
+- **El grafo o la tabla**, en el área principal: <Ui>Grafo</Ui> dibuja la red y <Ui>Tabla</Ui> muestra sus datos (ver [Gráficos y datos](/docs/charts-and-data#la-tabla-de-datos)).
+- **La línea de tiempo**, para moverte entre las rondas.
+- **Las gráficas**, debajo (ver [Gráficos y datos](/docs/charts-and-data)).
+
+<Screenshot name="run-view-overview" alt="La vista de una corrida: el estado y los datos de la red en el panel lateral; en el área principal, el grafo de la red, la línea de tiempo y las gráficas." />
+
+El botón de ampliar, a la derecha del selector <Ui>Grafo</Ui> / <Ui>Tabla</Ui>, extiende ese panel a toda el área (<Ui>Ampliar este panel a toda el área</Ui>); las gráficas tienen el suyo. <Kbd>Esc</Kbd> o el mismo botón restauran la vista.
+
+### El panel lateral
+
+De arriba abajo, el panel lateral de la corrida muestra:
+
+- **El estado**: <Ui>En ejecución</Ui>, <Ui>Completado</Ui>, <Ui>Cancelado</Ui> o <Ui>Error</Ui>, con la ronda que estás viendo y una barra de progreso. Mientras la corrida avanza indica cuántas rondas han llegado (<Ui>recibidas 40 / 100</Ui>); al terminar, cuántas tuvo en total.
+- **El veredicto**, cuando la corrida termina: <Ui>✓ Consenso alcanzado</Ui> o <Ui>◇ Sin consenso — opinión dividida</Ui>, con la ronda final y la diferencia final entre creencias.
+- <Ui>Red</Ui>: sus <Ui>Agentes</Ui> y sus <Ui>Aristas</Ui> y, si la ejecución tiene varias redes, cuál estás viendo (<Ui>Red 3 de 20</Ui>).
+- <Ui>Composición</Ui>: cuántos agentes hay de cada estrategia y de cada efecto (<Ui>Por estrategia</Ui>, <Ui>Por efecto</Ui>).
+- **El agente seleccionado**, cuando haces clic en un nodo (ver abajo).
+- <Ui>Cancelar simulación</Ui> mientras la corrida avanza (ver [Mis experimentos](/docs/my-experiments#cancelar-una-ejecucion)), y <Ui>Volver al tablero</Ui>.
+
+Si se pierde la conexión con el servidor, el estado muestra <Ui>Conexión perdida — reintentando…</Ui> y se reconecta solo.
+
+## El grafo de la red
+
+Cada nodo del grafo es un agente y cada arista una relación de influencia. Mientras se descarga la red se ve <Ui>Cargando red…</Ui> (en una red grande, con su progreso por páginas) y después <Ui>Calculando layout…</Ui> mientras se acomodan los nodos.
+
+<Screenshot name="run-view-graph" alt="El grafo de una red con los nodos coloreados por creencia pública, los controles Colorear por y Agrupar arriba, la leyenda y los botones de zoom y de aristas abajo." />
+
+### Colores, tamaños y leyenda
+
+<Ui>Colorear por</Ui> elige qué indica el color de cada nodo:
+
+- <Ui>Creencia pública</Ui>: la opinión que el agente expresa, de 0 a 1.
+- <Ui>Creencia privada</Ui>: la que realmente tiene, de 0 a 1.
+- <Ui>Divergencia púb-priv</Ui>: la diferencia entre ambas; la escala llega a 0.2 o más.
+- <Ui>Estrategia</Ui>: un color por estrategia de silencio.
+
+El tamaño indica si el agente habla en la ronda que estás viendo: los nodos grandes están <Ui>Hablando</Ui> y los pequeños <Ui>En silencio</Ui>. Los nodos cuadrados son agentes con auto-influencia, es decir, que tienen en cuenta su propia opinión al actualizarse.
+
+La leyenda flotante del grafo recoge todo esto y se puede contraer. Así se ve con <Ui>Creencia pública</Ui> y con <Ui>Divergencia púb-priv</Ui>:
+
+<CanvasLegendPreview mode="belief" />
+<CanvasLegendPreview mode="divergence" />
+
+### Agrupar
+
+<Ui>Agrupar</Ui> reúne los nodos por <Ui>Estrategia</Ui>, <Ui>Creencia</Ui> (en cuatro tramos, de muy baja a muy alta) o <Ui>Efecto</Ui>; <Ui>Ninguno</Ui> vuelve al dibujo normal. Agrupar no está disponible mientras las rondas avanzan solas: pausa la reproducción para agrupar.
+
+<Warning>
+En Windows el agrupamiento puede ser inestable; el control lo advierte con un icono de aviso.
+</Warning>
+
+### Moverte por el grafo
+
+- Arrastra para desplazarte y usa la rueda del ratón para acercarte o alejarte; también puedes usar los botones <Ui>Acercar</Ui> y <Ui>Alejar</Ui>.
+- <Ui>Ajustar a pantalla</Ui> vuelve a encuadrar toda la red.
+- <Ui>Ocultar aristas</Ui> deja solo los nodos, útil en redes densas; <Ui>Mostrar aristas</Ui> las vuelve a dibujar.
+
+### Inspeccionar un agente
+
+Un clic en un nodo lo selecciona y muestra sus datos en el panel lateral, en la ronda que estás viendo:
+
+- Su nombre, estrategia, efecto y si está <Ui>Hablando</Ui> o <Ui>En silencio</Ui>.
+- Su <Ui>Creencia pública</Ui>, su <Ui>Creencia privada</Ui> y la <Ui>Divergencia púb-priv</Ui> entre ambas.
+- Sus propiedades fijas: <Ui>Creencia inicial</Ui>, <Ui>Radio de tolerancia</Ui> y <Ui>Desplazamiento de tolerancia</Ui>.
+- Sus aristas: a quién influye (<Ui>Influye en (3)</Ui>) y quién lo influye (<Ui>Influenciado por (2)</Ui>), con la influencia y el sesgo de cada arista. Se listan las cinco primeras; el título indica el total.
+
+Los valores cambian al moverte por la línea de tiempo. El botón × del panel (<Ui>Deseleccionar nodo</Ui>) quita la selección.
+
+## La línea de tiempo
+
+La línea de tiempo, bajo el grafo, controla qué ronda estás viendo. El grafo, la tabla de agentes, el agente seleccionado y las gráficas siguen esa ronda.
+
+<Screenshot name="run-view-timeline" alt="La línea de tiempo: los botones de reproducción, la velocidad, la ronda actual, la barra de rondas con los marcadores de eventos, la vista de detalle y el campo Ir a ronda." />
+
+- **Los botones**: reproducir o pausar, ir a la ronda 0, evento anterior, ronda anterior, ronda siguiente, evento siguiente e ir a la última ronda recibida.
+- <Ui>Velocidad</Ui>: ×1, ×4, ×16 o ×64 rondas por paso de reproducción.
+- **La ronda** que estás viendo, y el total (<Ui>Ronda 25 de 100</Ui>).
+- **La barra de rondas**: un clic o un arrastre en ella va a esa ronda; al pasar el cursor se ve qué ronda es. Las rondas que aún no han llegado se marcan como <Ui>aún no recibida</Ui>.
+- **La vista de detalle**, debajo, amplía las rondas alrededor de la actual para moverte de una en una arrastrando (<Ui>Detalle · rondas 15-35 (arrastra para precisión de 1 ronda)</Ui>).
+- <Ui>Ir a ronda</Ui>: escribe un número y pulsa <Ui>Ir</Ui>.
+
+### Eventos
+
+La plataforma detecta en tu navegador los momentos destacados de la corrida y los marca en la barra de rondas con tres colores:
+
+<TimelineEventLegend />
+
+- <Ui>Cambio</Ui>: la ronda con el <Ui>Mayor cambio de la opinión media</Ui> y aquella en la que la <Ui>Dispersión reducida a la mitad</Ui> respecto al inicio.
+- <Ui>Silencio</Ui>: la primera ronda en la que hay <Ui>Menos del 60 % de agentes habla</Ui>, y la de participación mínima.
+- <Ui>Fin</Ui>: la última ronda, con consenso (<Ui>Convergencia · consenso</Ui>) o sin él (<Ui>Última ronda · sin consenso</Ui>).
+
+Los botones de evento anterior y siguiente saltan de un evento a otro.
+
+### Atajos de teclado
+
+Con el foco fuera de los campos de texto:
+
+- <Kbd>←</Kbd> y <Kbd>→</Kbd>: una ronda atrás o adelante; con <Kbd>Shift</Kbd>, diez.
+- <Kbd>PgUp</Kbd> y <Kbd>PgDn</Kbd> (<Kbd>RePág</Kbd> y <Kbd>AvPág</Kbd> en un teclado en español): un salto grande, de 10 rondas o la vigésima parte de la corrida si es mayor.
+- <Kbd>,</Kbd> y <Kbd>.</Kbd>: evento anterior y siguiente.
+- <Kbd>Inicio</Kbd> y <Kbd>Fin</Kbd>: la ronda 0 y la última recibida.
+- <Kbd>Espacio</Kbd>: reproducir o pausar.
+- <Kbd>Esc</Kbd>: restaurar un panel ampliado.
+
+La propia línea de tiempo recuerda los atajos debajo de la barra.
+
+## En vivo o en repetición
+
+Una corrida se puede ver mientras el servidor la calcula (en vivo) o después de terminar (en repetición). La etiqueta junto a la ronda indica en qué modo estás.
+
+**En vivo.** Al abrir una corrida en ejecución la vista sigue la última ronda recibida: <Ui>● Siguiendo en vivo</Ui>. Si vas a una ronda anterior, las rondas siguen llegando sin moverte de donde estás: <Ui>⏸ Revisando · sigue llegando</Ui>. <Ui>Volver al vivo</Ui> regresa a la última ronda. También puedes reproducir las rondas ya recibidas (<Ui>▶ Reproduciendo</Ui>).
+
+**En repetición.** Una corrida terminada muestra <Ui>Reproducción</Ui>: todas sus rondas están disponibles y la reproducción las recorre a la velocidad elegida.
+
+<Tip>
+En vivo, a veces el servidor aún no tiene disponibles las rondas pasadas. La vista te lo indica y sigue la corrida en vivo; podrás revisarlas cuando la ejecución termine.
+</Tip>
+
+<Warning>
+Los datos ronda a ronda de una corrida terminada se conservan en el servidor unos 60–90 minutos. Después, la vista solo muestra el estado final, sin línea de tiempo, tabla de rondas ni gráficas de evolución, y lo indica con un aviso. Si el servidor ya no conserva ni las redes, la vista muestra <Ui>Los datos de esta ejecución ya no están disponibles</Ui>; sus datos generales siguen en Mis experimentos.
+</Warning>
+
+Si la conexión con la simulación falla sin poder recuperarse, la vista muestra <Ui>La conexión con la simulación falló</Ui> con el botón <Ui>Reintentar</Ui>.
+
+## Ejecuciones con varias redes
+
+Una ejecución generada puede simular varias redes con la misma configuración (<Ui>Número de redes</Ui> en el asistente). Al abrirla, el área principal muestra <Ui>Selecciona una red</Ui> y el panel lateral, el navegador de redes, <Ui>Redes (20)</Ui>:
+
+- **El resumen**: cuántas redes alcanzaron consenso (<Ui>12 de 20 redes alcanzaron consenso</Ui>).
+- **Los filtros** <Ui>Todas</Ui>, <Ui>Consenso</Ui> y <Ui>Sin consenso</Ui>, y la búsqueda por número (<Ui>Ir al número de red…</Ui>).
+- **Las redes**: hasta 24 se listan como tarjetas, con su número, su resultado, sus agentes, la ronda en la que terminaron y su dispersión final. Con más de 24 se dibujan como una cuadrícula de cuadros: verde si la red alcanzó consenso, ámbar si no y gris mientras está <Ui>Pendiente</Ui>. Al pasar el cursor sobre un cuadro se ven sus datos.
+
+<Screenshot name="run-view-networks" alt="El navegador de redes de una ejecución con muchas redes: el resumen de consenso, los filtros, la búsqueda por número y la cuadrícula de redes coloreadas por resultado." />
+
+Un clic en una red la abre en la vista de corrida. Desde ahí, el navegador muestra qué red estás viendo (<Ui>Viendo</Ui>), con flechas para pasar a la red anterior o siguiente de la lista filtrada; <Ui>Ver todas las redes</Ui> y <Ui>Ocultar lista</Ui> despliegan o pliegan la lista. La ruta de la barra superior también indica la red (<Ui>Red 3</Ui>).

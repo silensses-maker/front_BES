@@ -4,6 +4,12 @@ import { initReactI18next } from "react-i18next";
 import en from "./locales/en";
 import es from "./locales/es";
 
+// <html lang> follows the UI language (screen readers, hyphenation, the browser's translation
+// offer); index.html ships "en". Registered before init so the detected language applies too.
+i18n.on("languageChanged", (lng) => {
+  document.documentElement.lang = i18n.resolvedLanguage ?? lng;
+});
+
 void i18n
   .use(LanguageDetector)
   .use(initReactI18next)

@@ -1,0 +1,69 @@
+## What SiLEnSeSS is
+
+SiLEnSeSS is a web platform for simulating how opinions evolve in a network of agents. It combines the DeGroot model, in which each agent updates its belief from those of its neighbors, with the Spiral of Silence theory: an agent may stop voicing its opinion when it does not perceive enough support around it.
+
+That is why every agent has two beliefs: the **private** one (what it thinks) and the **public** one (what it expresses). With SiLEnSeSS you configure networks, launch simulations, follow them round by round and analyze their results without writing code. The theory and the equations are in the [Wiki](/wiki).
+
+## Signing in
+
+The public pages (home, Wiki, this manual, FAQ) need no account. To create and look at simulations you must sign in with a Google account:
+
+1. Click <Ui>Register / Log In</Ui> on the home page, or <Ui>Dashboard</Ui> in the top bar.
+2. On the sign-in page click <Ui>Sign in with Google</Ui> and pick your account in the window that opens.
+3. You are back on the home page, signed in. <Ui>Dashboard</Ui> opens the simulation area.
+
+If you only want to read, <Ui>Continue without signing in</Ui> takes you to the public pages.
+
+<Screenshot name="login" alt="The sign-in page, with the “Sign in with Google” button and the “Continue without signing in” link." />
+
+<Warning>
+Signing in opens a Google pop-up window. If the browser blocks it, allow pop-ups for this site and try again.
+</Warning>
+
+## Roles and quotas
+
+Your account has a role, and each role limits the size of the simulations you can launch: how many agents each network has, the iteration (round) limit and how many networks a run generates. A new account starts as **Guest**; if you need larger simulations, ask the platform administrators for a higher role (see [Contact](/contact)).
+
+<RoleQuotasTable />
+
+The **density factor** also depends on the role: the server multiplies the density you ask for in a generated network by that factor (rounding down, with a minimum of 1) to build it.
+
+Your current quota is shown at the top of the new simulation wizard and in your profile (see [Profile](/docs/profile)). The wizard validates the configuration against it before launching.
+
+## Getting around the platform
+
+The platform has two areas:
+
+- **Public pages**: the top bar leads to <Ui>Wiki</Ui>, <Ui>Manual</Ui>, <Ui>Previous Results</Ui> and <Ui>Dashboard</Ui>; the footer also leads to <Ui>FAQ</Ui>, <Ui>Contact</Ui> and <Ui>About</Ui>.
+- **Dashboard**: where you configure and analyze simulations. It requires being signed in.
+
+In the dashboard, the top bar has, from left to right:
+
+- **The logo**, which always takes you back to the public home page (its label is <Ui>Home</Ui>). From there you come back with <Ui>Dashboard</Ui>.
+- **The path** you are on (for example <Ui>Dashboard</Ui> › <Ui>New Simulation</Ui>); its parts are links.
+- **The tabs** <Ui>New Simulation</Ui> and <Ui>My Experiments</Ui>.
+- **The run chip**: <Ui>Running · Round 12</Ui> while your latest simulation runs, or <Ui>View last run</Ui> once it has finished. One click opens it.
+- Three icon buttons: the theme one (<Ui>Switch light / dark theme</Ui>), the fullscreen one, which hides the side panel to leave more room for the visualization, and the one that collapses or expands that panel (<Ui>Expand or collapse the side panel</Ui>).
+- **Your avatar**, which opens the user menu.
+
+<Screenshot name="dashboard-overview" alt="The dashboard with the new simulation wizard in the side panel and the live summary in the main area; at the top, the logo, the path, the tabs and the bar's buttons." />
+
+The side panel changes with where you are: the wizard in <Ui>New Simulation</Ui>, the history in <Ui>My Experiments</Ui> and the run status when you open one. Collapsed, it shows a column of buttons to get back to each panel.
+
+### The user menu
+
+Your avatar, at the top right, opens the user menu, available in the dashboard and on the public pages. From it:
+
+- <Ui>Profile & usage limits</Ui> opens your profile.
+- <Ui>User manual</Ui> opens this manual.
+- <Ui>Language</Ui> switches between <Ui>English</Ui> and <Ui>Spanish</Ui>; the choice is remembered in this browser.
+- <Ui>Theme</Ui> picks <Ui>Light</Ui>, <Ui>Dark</Ui> or <Ui>System</Ui> (the operating system's).
+- <Ui>Sign out</Ui> ends your session.
+
+When you are not signed in, the menu only offers the language and the theme.
+
+<Screenshot name="user-menu" alt="The user menu open: name, email and role; “Profile & usage limits”, “User manual”, the language and theme selectors and “Sign out”." />
+
+<Tip>
+This manual is shown in the language chosen in the user menu. If you switch the language while reading it, the current section reloads in the new language.
+</Tip>

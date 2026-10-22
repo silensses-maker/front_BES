@@ -1,5 +1,6 @@
-import { LogOut, Monitor, Moon, Sun, User } from "lucide-react";
+import { BookOpen, LogOut, Monitor, Moon, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
+import { Link } from "react-router-dom";
 import { getHighestRole, useAuthStore } from "@/entities/user";
 import { useLogout } from "@/features/auth/logout";
 import { type Lang, useLanguageSwitch } from "@/features/language-switch";
@@ -87,6 +88,12 @@ export function SettingsDropdown() {
               >
                 <User className="h-4 w-4" />
                 <span>{t("dashboard.profile")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="flex items-center gap-2 cursor-pointer">
+                <Link to="/docs">
+                  <BookOpen className="h-4 w-4" />
+                  <span>{t("dashboard.manual")}</span>
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

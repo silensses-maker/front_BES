@@ -8,6 +8,19 @@ import type { GeneratedSimFormValues } from "../types/simulation-config.types";
  */
 export const RUN_SAVE_MODE: SaveMode = 1;
 
+/**
+ * The values with their iteration limit capped at the user's quota; the same object when there is
+ * no cap or it already fits. The templates and the wizard defaults carry 100–1000 iterations, over
+ * the lower roles' caps (Guest: 10); their agents and networks fit every role (templates.test.ts).
+ */
+export function fitIterationLimit<T extends { iterationLimit: number }>(
+  values: T,
+  maxIterations: number | null | undefined,
+): T {
+  if (maxIterations == null || values.iterationLimit <= maxIterations) return values;
+  return { ...values, iterationLimit: maxIterations };
+}
+
 export const CONSENSUS_PURSUIT_TEMPLATE: GeneratedSimFormValues = {
   networkType: "generated",
   numberOfAgents: 10,

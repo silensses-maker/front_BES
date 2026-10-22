@@ -262,5 +262,97 @@ describe("useTableOfContents", () => {
 
       expect(lastObserverHandle).toBeNull();
     });
+
+    it("stops following the container's content on unmount", () => {
+      const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
+      const container = makeContainer([makeHeading("H2", "Static", "static")]);
+      document.body.appendChild(container);
+      vi.spyOn(document, "querySelector").mockReturnValue(container);
+
+      const { unmount } = renderHook(() => useTableOfContents("main"));
+      unmount();
+
+      expect(disconnect).toHaveBeenCalled();
+    });
+  });
+
+  // A lazily loaded section (the user manual's MDX) renders its headings after the page, and a
+  // language switch changes their text in place.
+  describe("content that changes after mount", () => {
+    /** Lets the MutationObserver deliver its records, inside act (it sets state). */
+    const flushMutations = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+
+    function mountOn(container: HTMLElement) {
+      document.body.appendChild(container);
+      vi.spyOn(document, "querySelector").mockReturnValue(container);
+      return renderHook(() => useTableOfContents("main"));
+    }
+
+    it("lists headings that render after mount and observes them", async () => {
+      const container = makeContainer([]);
+      const { result } = mountOn(container);
+      expect(result.current.entries).toEqual([]);
+
+      const late = makeHeading("H2", "Late section", "late-section");
+      container.appendChild(late);
+      await flushMutations();
+
+      expect(result.current.entries).toEqual<TocEntry[]>([
+        { id: "late-section", text: "Late section", level: 2 },
+      ]);
+      expect(lastObserverHandle?.observe).toHaveBeenCalledWith(late);
+    });
+
+    it("follows a heading whose text changes (a language switch)", async () => {
+      const heading = makeHeading("H2", "Primeros pasos", "primeros-pasos");
+      const container = makeContainer([heading]);
+      const { result } = mountOn(container);
+      const firstObserver = lastObserverHandle;
+
+      heading.textContent = "Getting started";
+      await flushMutations();
+
+      expect(result.current.entries).toEqual<TocEntry[]>([
+        { id: "primeros-pasos", text: "Getting started", level: 2 },
+      ]);
+      // Same heading element: no new IntersectionObserver
+      expect(lastObserverHandle).toBe(firstObserver);
+    });
+
+    it("keeps the same entries when the change does not touch the headings", async () => {
+      const container = makeContainer([makeHeading("H3", "Detail", "detail")]);
+      const { result } = mountOn(container);
+      const before = result.current.entries;
+
+      container.appendChild(document.createElement("p"));
+      await flushMutations();
+
+      expect(result.current.entries).toBe(before);
+    });
+
+    it("replaces the IntersectionObserver when the headings are replaced", async () => {
+      const container = makeContainer([makeHeading("H2", "Old", "old")]);
+      const { result } = mountOn(container);
+      const firstObserver = lastObserverHandle;
+
+      container.replaceChildren(makeHeading("H2", "New", "new"));
+      await flushMutations();
+
+      expect(result.current.entries.map((entry) => entry.id)).toEqual(["new"]);
+      expect(firstObserver?.disconnect).toHaveBeenCalledOnce();
+      expect(lastObserverHandle).not.toBe(firstObserver);
+    });
+
+    it("drops the IntersectionObserver when every heading goes away", async () => {
+      const container = makeContainer([makeHeading("H2", "Gone", "gone")]);
+      const { result } = mountOn(container);
+      const firstObserver = lastObserverHandle;
+
+      container.replaceChildren();
+      await flushMutations();
+
+      expect(result.current.entries).toEqual([]);
+      expect(firstObserver?.disconnect).toHaveBeenCalledOnce();
+    });
   });
 });

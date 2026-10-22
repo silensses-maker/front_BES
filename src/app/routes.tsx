@@ -7,6 +7,7 @@ import {
   BenchPage,
   BoardPage,
   ContactPage,
+  DocsPage,
   FaqPage,
   LiveRunPage,
   ProfilePage,
@@ -44,6 +45,9 @@ export function AppRoutes() {
         <Route element={<LandingLayout />}>
           <Route path="/home" element={<HomePage />} />
           <Route path="/wiki" element={<WikiPage />} />
+          {/* User manual: an unknown section renders the same 404 page as the catch-all */}
+          <Route path="/docs" element={<DocsPage notFound={<NotFoundPage />} />} />
+          <Route path="/docs/:section" element={<DocsPage notFound={<NotFoundPage />} />} />
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/contact" element={<ContactPage />} />
