@@ -49,7 +49,7 @@ function FieldLabel({ label, tooltip }: { label: string; tooltip: string }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Info className="h-3 w-3 cursor-help text-muted-foreground/60" />
+          <Info className="h-3 w-3 cursor-help text-muted-foreground" />
         </TooltipTrigger>
         <TooltipContent side="top">
           <p>{tooltip}</p>

@@ -5,6 +5,9 @@ import {
   cognitiveBiasLabel,
   cognitiveBiasLabelKey,
   type EnumLabelKey,
+  ROLE_LABEL_KEYS,
+  type RoleLabelKey,
+  roleLabel,
   SILENCE_EFFECT_LABEL_KEYS,
   SILENCE_EFFECT_OPTIONS,
   SILENCE_STRATEGY_LABEL_KEYS,
@@ -130,5 +133,30 @@ describe("locale coverage", () => {
       const actual = Object.keys(locale.enums[name]).map((leaf) => `enums.${name}.${leaf}`);
       expect(actual.sort()).toEqual(expected);
     }
+  });
+});
+
+// ─── User roles ───────────────────────────────────────────────────────────────
+
+describe("roleLabel", () => {
+  const echoRole = (key: RoleLabelKey) => key;
+
+  it("maps every role to a key that both locales define", () => {
+    for (const key of Object.values(ROLE_LABEL_KEYS)) {
+      expect(resolve(en, key)).toBeTruthy();
+      expect(resolve(es, key)).toBeTruthy();
+    }
+  });
+
+  it("asks t for the role's key", () => {
+    expect(roleLabel(echoRole, "SuperAdministrator")).toBe("roles.SuperAdministrator");
+    expect(roleLabel(echoRole, "Guest")).toBe("roles.Guest");
+  });
+
+  it("renders an unknown role as itself without calling t", () => {
+    const t = vi.fn(echoRole);
+    expect(roleLabel(t, "Auditor")).toBe("Auditor");
+    expect(roleLabel(t, "toString")).toBe("toString");
+    expect(t).not.toHaveBeenCalled();
   });
 });

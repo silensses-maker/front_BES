@@ -4,7 +4,9 @@ import {
   getHighestRole,
   getRoleLimits,
   getRolePermissions,
+  isSuperAdmin,
   ROLE_LIMITS,
+  ROLE_PRIORITY,
   resolveMaxNetworks,
   resolveUsageLimits,
 } from "./permissions";
@@ -56,6 +58,39 @@ describe("getRoleLimits", () => {
     expect(getRoleLimits(["Researcher", "BaseUser"])).toEqual(ROLE_LIMITS.Researcher);
     expect(getRoleLimits(["BaseUser", "Guest"])).toEqual(ROLE_LIMITS.BaseUser);
     expect(getRoleLimits(["Administrator", "Guest"])).toEqual(ROLE_LIMITS.Administrator);
+  });
+
+  it("gives a SuperAdministrator the unlimited quotas", () => {
+    const limits = getRoleLimits(["Guest", "SuperAdministrator"]);
+    expect(limits).toEqual(ROLE_LIMITS.SuperAdministrator);
+    expect(limits.maxAgents).toBe(Infinity);
+    expect(limits.maxIterations).toBe(Infinity);
+    expect(limits.maxNetworks).toBe(Infinity);
+    expect(limits.densityFactor).toBe(1.0);
+  });
+});
+
+describe("ROLE_PRIORITY", () => {
+  it("ranks the five roles from SuperAdministrator down to Guest", () => {
+    expect(ROLE_PRIORITY).toEqual([
+      "SuperAdministrator",
+      "Administrator",
+      "Researcher",
+      "BaseUser",
+      "Guest",
+    ]);
+  });
+
+  it("covers every role of the quota table", () => {
+    expect([...ROLE_PRIORITY].sort()).toEqual(Object.keys(ROLE_LIMITS).sort());
+  });
+});
+
+describe("isSuperAdmin", () => {
+  it("is true only when SuperAdministrator is among the roles", () => {
+    expect(isSuperAdmin(["Guest", "SuperAdministrator"])).toBe(true);
+    expect(isSuperAdmin(["Guest", "Administrator"])).toBe(false);
+    expect(isSuperAdmin([])).toBe(false);
   });
 });
 
@@ -133,6 +168,14 @@ describe("getRolePermissions", () => {
     expect(permissions).toContain("manageUsers");
     expect(permissions).toContain("defineLimits");
     expect(permissions).toContain("runSimulations");
+    expect(permissions).not.toContain("manageRoles");
+  });
+
+  it("reserves manageRoles to the SuperAdministrator", () => {
+    const permissions = getRolePermissions(["SuperAdministrator"]);
+    expect(permissions).toContain("manageRoles");
+    expect(permissions).toContain("manageUsers");
+    expect(getRolePermissions(["Guest", "Researcher"])).not.toContain("manageRoles");
   });
 
   it("deduplicates permissions across multiple roles", () => {
@@ -167,6 +210,12 @@ describe("getHighestRole", () => {
   it("ignores the order of roles (promoted users keep Guest first)", () => {
     expect(getHighestRole(["Guest", "Researcher"])).toBe("Researcher");
     expect(getHighestRole(["Guest", "BaseUser", "Administrator"])).toBe("Administrator");
+  });
+
+  it("ranks SuperAdministrator above Administrator", () => {
+    expect(getHighestRole(["Guest", "Administrator", "SuperAdministrator"])).toBe(
+      "SuperAdministrator",
+    );
   });
 
   it("returns the single role when only one is present", () => {

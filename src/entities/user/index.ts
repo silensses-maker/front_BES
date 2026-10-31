@@ -3,8 +3,10 @@ export {
   getHighestRole,
   getRoleLimits,
   getRolePermissions,
+  isSuperAdmin,
   ROLE_LIMITS,
   ROLE_PERMISSIONS,
+  ROLE_PRIORITY,
   resolveMaxNetworks,
   resolveUsageLimits,
 } from "./lib/permissions";

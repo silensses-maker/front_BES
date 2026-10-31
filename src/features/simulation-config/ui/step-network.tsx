@@ -263,22 +263,10 @@ export function StepNetwork({
         )}
       </div>
 
-      {/* Cross-step validation errors that would otherwise silently disable Next */}
-      {(errors?.agentCountMismatch || errors?.biasCountMismatch || errors?.countsInvalid) && (
-        <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
-          {errors.agentCountMismatch && (
-            <p className="text-xs text-destructive">
-              {t("simulationConfig.errorAgentCountMismatchHint")}
-            </p>
-          )}
-          {errors.biasCountMismatch && (
-            <p className="text-xs text-destructive">
-              {t("simulationConfig.errorBiasCountMismatchHint")}
-            </p>
-          )}
-          {errors.countsInvalid && (
-            <p className="text-xs text-destructive">{t("simulationConfig.errorCountsInvalid")}</p>
-          )}
+      {/* Schema error on a count of this step (the agent / bias rows are the Agents step's) */}
+      {errors?.countsInvalid && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+          <p className="text-xs text-destructive">{t("simulationConfig.errorCountsInvalid")}</p>
         </div>
       )}
     </div>

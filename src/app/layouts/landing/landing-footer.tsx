@@ -36,7 +36,7 @@ export function LandingFooter() {
 
           {/* Navigation column */}
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("footer.navigation")}
             </p>
             <ul className="flex flex-col gap-2">
@@ -55,7 +55,7 @@ export function LandingFooter() {
 
           {/* More column */}
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("footer.more")}
             </p>
             <ul className="flex flex-col gap-2">

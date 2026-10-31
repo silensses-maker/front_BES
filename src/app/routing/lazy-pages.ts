@@ -72,7 +72,6 @@ export const ProfilePage = lazy(() =>
     default: m.ProfilePage,
   })),
 );
-
 // ── Benchmark harness (#126) ──────────────────────────────────────────────────
 
 /**

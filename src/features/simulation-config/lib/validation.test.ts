@@ -846,6 +846,66 @@ describe("validateGeneratedForm", () => {
     expect(errors.densityExceedsAgents).toBe(true);
     expect(errors.countsInvalid).toBeUndefined();
   });
+
+  describe('scope "network" (the Network step\'s Next)', () => {
+    /** Rows that do not match the totals and one row with an invalid count: the Agents step's. */
+    const brokenRows = {
+      agentTypes: [{ ...baseAgentType, count: 3 }],
+      biasTypes: [{ ...baseBiasType, count: 0 }],
+    };
+
+    it("ignores the agent and bias rows, their sums included", () => {
+      const values = makeGeneratedInput({
+        numberOfAgents: 10,
+        ...brokenRows,
+      }) as GeneratedSimFormValues;
+      expect(validateGeneratedForm(values, undefined, undefined)).toMatchObject({
+        agentCountMismatch: true,
+        biasCountMismatch: true,
+        countsInvalid: true,
+      });
+      expect(validateGeneratedForm(values, undefined, undefined, undefined, "network")).toEqual({});
+    });
+
+    it("still reports this step's own fields and quotas", () => {
+      const values = makeGeneratedInput({
+        numberOfAgents: 0,
+        numberOfNetworks: 9,
+        iterationLimit: 500,
+        stopThreshold: 1,
+        seed: -1,
+        ...brokenRows,
+      }) as GeneratedSimFormValues;
+      const errors = validateGeneratedForm(values, 100, 100, 5, "network");
+      // numberOfAgents 0 also trips the density rule (2 >= 0)
+      expect(errors).toEqual({
+        countsInvalid: true,
+        densityExceedsAgents: true,
+        stopThresholdOutOfRange: true,
+        seedInvalid: true,
+        iterationLimitExceeded: true,
+        networkLimitExceeded: true,
+      });
+      const density = makeGeneratedInput({
+        numberOfAgents: 5,
+        density: 5,
+      }) as GeneratedSimFormValues;
+      expect(validateGeneratedForm(density, undefined, undefined, undefined, "network")).toEqual({
+        densityExceedsAgents: true,
+      });
+    });
+
+    it("checks the agent quota against the step's total, not the rows' sum", () => {
+      const values = makeGeneratedInput({
+        numberOfAgents: 200,
+        ...brokenRows,
+      }) as GeneratedSimFormValues;
+      expect(validateGeneratedForm(values, 100, undefined, undefined, "network")).toEqual({
+        agentLimitExceeded: true,
+      });
+      expect(validateGeneratedForm(values, 200, undefined, undefined, "network")).toEqual({});
+    });
+  });
 });
 
 describe("validateCustomForm", () => {

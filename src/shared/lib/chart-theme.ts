@@ -142,7 +142,7 @@ export function readChartTheme(): ChartTheme {
     participation: rgba(warn),
     polarization: rgba(chart4),
     series: [rgba(chart4), rgba(chart6), rgba(chart7), rgba(chart8)],
-    text: rgba(muted, 0.9),
+    text: rgba(muted),
     axisLine: rgba(muted, 0.35),
     grid: rgba(muted, 0.12),
     playhead: rgba(muted, 0.5),

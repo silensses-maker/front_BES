@@ -77,6 +77,8 @@ describe("readChartTheme", () => {
     expect(theme.public).toBe("rgb(79, 107, 216)");
     expect(theme.private).toBe("rgb(124, 179, 66)");
     expect(theme.participation).toBe("rgb(201, 138, 46)");
+    // Axis and legend text: the muted token, opaque (WCAG AA; only lines keep an alpha)
+    expect(theme.text).toBe("rgb(88, 98, 130)");
     expect(theme.grid).toBe("rgba(88, 98, 130, 0.12)");
     expect(theme.playhead).toBe("rgba(88, 98, 130, 0.5)");
     expect(theme.key).toContain("79,107,216");
@@ -108,7 +110,7 @@ describe("readChartTheme", () => {
     resetColorProbe();
     const theme = readChartTheme();
     expect(theme.public).toBe("rgb(110, 130, 240)");
-    expect(theme.text).toBe("rgba(150, 160, 190, 0.9)");
+    expect(theme.text).toBe("rgb(150, 160, 190)");
     // Unset tokens keep their fallback
     expect(theme.private).toBe("rgb(124, 179, 66)");
   });

@@ -21,6 +21,8 @@ export type { DashboardOutletContext } from "@/shared/types/dashboard";
  *
  * The active panel lives in the URL (/board/new-simulation | /board/experiments)
  * so tabs, sidebar title and breadcrumb all derive from one navigable source.
+ * The sidebar belongs to the board: routes outside /board (profile, user administration)
+ * get the header and the main area only, with no sidebar and no sidebar/fullscreen toggles.
  * No business logic lives here — only structural toggle mechanics.
  */
 export function DashboardLayout() {
@@ -33,6 +35,8 @@ export function DashboardLayout() {
   const activePanel: SidebarPanel = pathname.startsWith("/board/experiments")
     ? "my-experiments"
     : "new-simulation";
+  // Only the board pages have a sidebar panel; elsewhere "New simulation" would be a lie.
+  const hasSidebar = pathname.startsWith("/board");
   const setActivePanel = (panel: SidebarPanel) =>
     navigate(panel === "my-experiments" ? "/board/experiments" : "/board/new-simulation");
 
@@ -59,13 +63,14 @@ export function DashboardLayout() {
           onFullscreenToggle={handleFullscreenToggle}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
+          sidebarAvailable={hasSidebar}
         />
 
         {/* ── Body row: Sidebar + MainContent ──────────────────── */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar — slides out when entering fullscreen mode */}
+          {/* Sidebar — board routes only; slides out when entering fullscreen mode */}
           <AnimatePresence initial={false}>
-            {!fullscreen && (
+            {hasSidebar && !fullscreen && (
               <motion.div
                 key="sidebar"
                 initial={{ opacity: 0, x: -24 }}
@@ -78,7 +83,6 @@ export function DashboardLayout() {
                   collapsed={sidebarCollapsed}
                   activePanel={activePanel}
                   onToggle={handleSidebarToggle}
-                  onPanelChange={setActivePanel}
                   panelContent={sidebarContent}
                 />
               </motion.div>

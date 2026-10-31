@@ -1,7 +1,13 @@
 import type { UsageLimits, User, UserRole } from "../types/user.types";
 
-/** Mirror of the backend role quotas (`DatabaseManager.getUsageLimits`). */
+/** Mirror of the backend role quotas (`Roles.usageLimits`). */
 export const ROLE_LIMITS: Record<UserRole, Required<UsageLimits>> = {
+  SuperAdministrator: {
+    maxAgents: Infinity,
+    maxIterations: Infinity,
+    densityFactor: 1.0,
+    maxNetworks: Infinity,
+  },
   Administrator: {
     maxAgents: Infinity,
     maxIterations: Infinity,
@@ -33,17 +39,39 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "manageUsers",
     "defineLimits",
   ],
+  SuperAdministrator: [
+    "viewDashboard",
+    "viewWiki",
+    "viewSampleResults",
+    "runLimitedSimulations",
+    "runExtendedSimulations",
+    "runSimulations",
+    "manageUsers",
+    "defineLimits",
+    "manageRoles",
+  ],
 };
 
-const ROLE_PRIORITY: UserRole[] = ["Administrator", "Researcher", "BaseUser", "Guest"];
+/** Roles from the highest to the lowest, the same order the backend ranks them (`Roles.priority`). */
+export const ROLE_PRIORITY: UserRole[] = [
+  "SuperAdministrator",
+  "Administrator",
+  "Researcher",
+  "BaseUser",
+  "Guest",
+];
 
 /**
- * Effective role, with the same priority the backend uses for quotas
- * (`DatabaseManager.getUsageLimits`). `roles` order is not guaranteed and promoted
- * users keep "Guest", so never display `roles[0]`.
+ * Effective role, with the same priority the backend uses for quotas (`Roles.usageLimits`).
+ * `roles` order is not guaranteed and promoted users keep "Guest", so never display `roles[0]`.
  */
 export function getHighestRole(roles: UserRole[]): UserRole {
   return ROLE_PRIORITY.find((role) => roles.includes(role)) ?? "Guest";
+}
+
+/** True when the user holds the SuperAdministrator role, the only one that manages roles. */
+export function isSuperAdmin(roles: UserRole[]): boolean {
+  return roles.includes("SuperAdministrator");
 }
 
 export function getRoleLimits(roles: UserRole[]): Required<UsageLimits> {

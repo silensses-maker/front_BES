@@ -2,6 +2,7 @@ import { resolveUsageLimits, useAuthStore } from "@/entities/user";
 import { DeactivateButton } from "@/features/profile/deactivate-account";
 import { EditNameForm } from "@/features/profile/edit-display-name";
 import { useTranslation } from "@/shared/i18n";
+import { roleLabel } from "@/shared/i18n/enum-labels";
 import { useProfileSheetStore } from "@/shared/model/profile-sheet.store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
 import { Separator } from "@/shared/ui/separator";
@@ -65,7 +66,7 @@ export function ProfileSheet() {
                     key={role}
                     className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium"
                   >
-                    {role}
+                    {roleLabel(t, role)}
                   </span>
                 ))}
               </div>

@@ -153,7 +153,12 @@ export function useSimulationConfig() {
     setUsageLimitError(null);
   };
 
-  const goToStep = (target: WizardStep) => setStep(target);
+  // Errors come from the Next / launch of the step that showed them; another step must not
+  // inherit them (the "Agents" mismatch used to follow the user back to "Network").
+  const goToStep = (target: WizardStep) => {
+    setStep(target);
+    setErrors({});
+  };
 
   const validateAndAdvance = (): boolean => {
     // "load" path: file was already parsed and loaded into generatedValues /
@@ -162,11 +167,14 @@ export function useSimulationConfig() {
 
     let errs: SimConfigValidationErrors;
     if (networkType === "generated") {
+      // The "Network" step validates its own fields; the agent / bias rows are the "Agents"
+      // step's and the launch's (see GeneratedValidationScope).
       errs = validateGeneratedForm(
         generatedValues,
         maxAgents ?? undefined,
         maxIterations ?? undefined,
         maxNetworks,
+        step === "network" ? "network" : "all",
       );
     } else if (step === "network") {
       // custom: step "network" only checks the header fields
