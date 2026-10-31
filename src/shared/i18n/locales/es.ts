@@ -313,7 +313,6 @@ const es = {
     // Run chip + connection status
     runChipRunning: "En ejecución · Ronda {{round}}",
     runChipLast: "Ver última ejecución",
-    railRunTip: "Ejecución: {{status}}",
     wsReconnecting: "Reconectando…",
     themeToggle: "Cambiar tema claro / oscuro",
     sidebarToggleHint: "Expandir o contraer el panel lateral",
@@ -602,10 +601,6 @@ const es = {
       "Los sesgos se asignan a las {{edges}} aristas de la red: d·(d−1) + (N−d)·2·d, con d = densidad ({{density}}) y N = agentes ({{agents}}).",
     errorAgentCountMismatch:
       "La suma de tipos de agente ({{actual}}) debe coincidir con el total de agentes ({{expected}}).",
-    errorAgentCountMismatchHint:
-      "Los tipos de agente no suman el total. Ajústalos en el paso de Agentes.",
-    errorBiasCountMismatchHint:
-      "Los tipos de sesgo no coinciden con el número de aristas. Ajústalos en el paso de Agentes.",
     errorStopThreshold: "El umbral de parada debe estar entre 0 y 1 (exclusivo).",
     errorIterationLimit: "El límite de iteraciones supera el máximo de tu plan ({{limit}}).",
     errorAgentLimit: "El total de agentes ({{requested}}) supera el máximo de tu plan ({{limit}}).",
@@ -1065,6 +1060,66 @@ const es = {
       consensusNotReached: "Sin consenso",
       summary: "{{count}} / {{total}} en consenso",
     },
+  },
+  // Roles de usuario, con el nombre que les da el backend (enum `user_role`)
+  roles: {
+    SuperAdministrator: "Superadministrador",
+    Administrator: "Administrador",
+    Researcher: "Investigador",
+    BaseUser: "Usuario base",
+    Guest: "Invitado",
+  },
+  // Panel lateral de administración de usuarios (menú de ajustes), solo superadministradores
+  adminUsers: {
+    navLabel: "Administrar usuarios",
+    title: "Usuarios",
+    description:
+      "Rol, cuotas y estado de cuenta de cada usuario. Solo un superadministrador puede cambiarlos; el cambio aplica en la siguiente solicitud del usuario.",
+    searchPlaceholder: "Buscar por correo o nombre",
+    pageSummary: "{{from}}–{{to}} de {{total}}",
+    prevPage: "Página anterior",
+    nextPage: "Página siguiente",
+    refresh: "Actualizar",
+    colUser: "Usuario",
+    colRole: "Rol",
+    colQuotas: "Cuotas",
+    quotasHint: "Agentes · iteraciones · redes · factor de densidad, por ejecución",
+    colStatus: "Estado",
+    colCreated: "Creado",
+    colActions: "Acciones",
+    you: "(tu cuenta)",
+    cannotEditSelf: "El rol y el estado de la cuenta propia no se cambian desde aquí.",
+    roleSelectLabel: "Rol de {{name}}",
+    statusActive: "Activa",
+    statusDeactivated: "Desactivada",
+    deactivate: "Desactivar",
+    reactivate: "Reactivar",
+    loading: "Cargando usuarios…",
+    empty: "Aún no hay usuarios.",
+    emptySearch: "Ningún usuario coincide con «{{query}}».",
+    confirmRoleTitle: "Cambiar rol",
+    confirmRoleBody:
+      "{{name}} pasará a ser {{role}}. Las cuotas del nuevo rol aplican en su siguiente solicitud.",
+    confirmGrantSuperAdmin:
+      "Un superadministrador también puede cambiar el rol y el estado de todos los demás usuarios, incluida tu cuenta.",
+    confirmRoleAction: "Cambiar rol",
+    confirmDeactivateTitle: "Desactivar cuenta",
+    confirmDeactivateBody:
+      "La plataforma rechazará todas las solicitudes de {{name}} hasta que la cuenta se reactive.",
+    confirmReactivateTitle: "Reactivar cuenta",
+    confirmReactivateBody: "{{name}} podrá iniciar sesión de nuevo, con el mismo rol.",
+    roleUpdated: "{{name}} ahora es {{role}}.",
+    deactivated: "La cuenta de {{name}} fue desactivada.",
+    reactivated: "La cuenta de {{name}} fue reactivada.",
+    errorLoad: "No se pudieron cargar los usuarios. Por favor intenta de nuevo.",
+    errorSetRole: "No se pudo cambiar el rol. Por favor intenta de nuevo.",
+    errorDeactivate: "No se pudo desactivar la cuenta. Por favor intenta de nuevo.",
+    errorReactivate: "No se pudo reactivar la cuenta. Por favor intenta de nuevo.",
+    errorForbidden: "Solo un superadministrador puede hacer esto.",
+    errorNotFound: "Ese usuario ya no existe. Actualiza la lista.",
+    legendTitle: "Roles y cuotas",
+    legendDescription:
+      "Lo que permite cada rol por ejecución. Todo usuario tiene además Invitado; aplica el rol más alto.",
   },
   enums: {
     silenceStrategy: {

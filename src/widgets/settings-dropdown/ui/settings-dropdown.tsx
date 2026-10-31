@@ -1,10 +1,12 @@
-import { BookOpen, LogOut, Monitor, Moon, Sun, User } from "lucide-react";
+import { BookOpen, LogOut, Monitor, Moon, Sun, User, Users } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Link } from "react-router-dom";
-import { getHighestRole, useAuthStore } from "@/entities/user";
+import { getHighestRole, isSuperAdmin, useAuthStore } from "@/entities/user";
 import { useLogout } from "@/features/auth/logout";
 import { type Lang, useLanguageSwitch } from "@/features/language-switch";
 import { useTranslation } from "@/shared/i18n";
+import { roleLabel } from "@/shared/i18n/enum-labels";
+import { useAdminUsersSheetStore } from "@/shared/model/admin-users-sheet.store";
 import { useProfileSheetStore } from "@/shared/model/profile-sheet.store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
 import {
@@ -43,6 +45,7 @@ export function SettingsDropdown() {
   const user = useAuthStore((state) => state.user);
   const { logout } = useLogout();
   const openProfileSheet = useProfileSheetStore((s) => s.open);
+  const openAdminUsersSheet = useAdminUsersSheetStore((s) => s.open);
 
   const displayName = user?.name || t("dashboard.guestName");
   const email = user?.email || t("dashboard.guestEmail");
@@ -70,7 +73,7 @@ export function SettingsDropdown() {
             <span className="truncate text-xs leading-none text-muted-foreground">{email}</span>
             {user && user.roles.length > 0 && (
               <span className="mt-1.5 w-fit rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-medium text-primary">
-                {getHighestRole(user.roles)}
+                {roleLabel(t, getHighestRole(user.roles))}
               </span>
             )}
           </div>
@@ -95,6 +98,16 @@ export function SettingsDropdown() {
                   <span>{t("dashboard.manual")}</span>
                 </Link>
               </DropdownMenuItem>
+              {/* User administration sheet — super administrators only */}
+              {isSuperAdmin(user.roles) && (
+                <DropdownMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={openAdminUsersSheet}
+                >
+                  <Users className="h-4 w-4" />
+                  <span>{t("adminUsers.navLabel")}</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />

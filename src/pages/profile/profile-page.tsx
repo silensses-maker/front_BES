@@ -2,6 +2,7 @@ import { resolveUsageLimits, useAuthStore, usePermissions } from "@/entities/use
 import { LanguageSwitcher } from "@/features/language-switch";
 import { DeactivateButton, EditNameForm } from "@/features/profile";
 import { useTranslation } from "@/shared/i18n";
+import { roleLabel } from "@/shared/i18n/enum-labels";
 
 export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
@@ -23,7 +24,8 @@ export function ProfilePage() {
           <span className="font-medium">{t("profile.email")}:</span> {user?.email}
         </p>
         <p className="text-sm">
-          <span className="font-medium">{t("profile.role")}:</span> {roles.join(", ")}
+          <span className="font-medium">{t("profile.role")}:</span>{" "}
+          {roles.map((role) => roleLabel(t, role)).join(", ")}
         </p>
       </section>
 

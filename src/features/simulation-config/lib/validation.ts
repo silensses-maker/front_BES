@@ -268,19 +268,41 @@ export function validateCustomForm(
   return errors;
 }
 
+/**
+ * Which part of the generated form a validation covers. `"network"` is the "Network" step's Next:
+ * only that step's fields (counts, density, iteration limit, stop threshold, seed) and quotas.
+ * The agent and bias rows — their sums included — belong to the "Agents" step, which shows
+ * them live and validates them with its own Next; the launch validates everything (`"all"`).
+ * Checking the rows from the "Network" step blocked its Next with an error the user could only
+ * fix one step ahead, and left that error on screen after coming back from "Agents".
+ */
+export type GeneratedValidationScope = "all" | "network";
+
+const AGENTS_STEP_PATHS = new Set<PropertyKey>(["agentTypes", "biasTypes"]);
+const AGENTS_STEP_MESSAGES = new Set(["agentCountMismatch", "biasCountMismatch"]);
+
 export function validateGeneratedForm(
   values: GeneratedSimFormValues,
   maxAgents: number | undefined,
   maxIterations: number | undefined,
   maxNetworks?: number,
+  scope: GeneratedValidationScope = "all",
 ): SimConfigValidationErrors {
   const errors: SimConfigValidationErrors = {};
   const result = generatedSimSchema.safeParse(values);
+  const networkStepOnly = scope === "network";
 
   if (!result.success) {
     for (const issue of result.error.issues) {
       const msg = issue.message;
       const path = issue.path[0];
+
+      if (
+        networkStepOnly &&
+        (AGENTS_STEP_MESSAGES.has(msg) || (path !== undefined && AGENTS_STEP_PATHS.has(path)))
+      ) {
+        continue;
+      }
 
       if (msg === "agentCountMismatch") {
         errors.agentCountMismatch = true;
@@ -298,7 +320,11 @@ export function validateGeneratedForm(
     }
   }
 
-  const totalAgents = values.agentTypes.reduce((sum, r) => sum + r.count, 0);
+  // The agent quota applies to the total the run will create: the rows' sum once they are
+  // validated, the "Network" step's own total before that (the rows may not match it yet).
+  const totalAgents = networkStepOnly
+    ? values.numberOfAgents
+    : values.agentTypes.reduce((sum, r) => sum + r.count, 0);
 
   if (
     maxIterations !== undefined &&

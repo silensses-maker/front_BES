@@ -1,4 +1,8 @@
-export type UserRole = "Administrator" | "Researcher" | "BaseUser" | "Guest";
+/**
+ * Mirror of the backend's `user_role` enum, highest first. Every user also holds `Guest`; the
+ * effective role is the highest one. Only a SuperAdministrator manages other users' roles.
+ */
+export type UserRole = "SuperAdministrator" | "Administrator" | "Researcher" | "BaseUser" | "Guest";
 
 export interface UsageLimits {
   maxAgents: number;

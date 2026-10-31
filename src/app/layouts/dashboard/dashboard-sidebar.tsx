@@ -1,7 +1,6 @@
-import { ChevronLeft, List, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { type LastRunStatus, useLastRunStore } from "@/entities/simulation";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/utils";
 import type { SidebarPanel } from "@/shared/types/dashboard";
@@ -16,8 +15,6 @@ interface DashboardSidebarProps {
   activePanel: SidebarPanel;
   /** Callback to toggle collapsed state */
   onToggle: () => void;
-  /** Switches the active panel (rail buttons) */
-  onPanelChange: (panel: SidebarPanel) => void;
   /**
    * Content to render inside the panel body.
    * Provided by the page layer (BoardPage) via DashboardLayout.
@@ -25,20 +22,6 @@ interface DashboardSidebarProps {
    */
   panelContent?: ReactNode;
 }
-
-const RAIL_DOT_CLASS: Record<LastRunStatus, string> = {
-  running: "bg-primary animate-pulse",
-  completed: "bg-muted-foreground",
-  cancelled: "bg-muted-foreground",
-  error: "bg-destructive",
-};
-
-const STATUS_LABEL_KEY = {
-  running: "simulationHistory.statusRunning",
-  completed: "simulationHistory.statusCompleted",
-  cancelled: "simulationHistory.statusCancelled",
-  error: "simulationHistory.statusError",
-} as const;
 
 const RAIL_BUTTON_CLASS = cn(
   "flex size-9 items-center justify-center rounded-md border border-border bg-card",
@@ -50,9 +33,10 @@ const RAIL_BUTTON_CLASS = cn(
  * DashboardSidebar — structural shell for the dashboard.
  *
  * Expanded (w-sidebar token): section title + inline "‹" collapse button +
- * `panelContent` slot. Collapsed (56px rail): three real buttons with
- * tooltips — new simulation, experiments, and the last-run status dot — each
- * un-collapses the sidebar. The header's panel toggle also expands/collapses.
+ * `panelContent` slot. Collapsed (56px rail): a single "›" button that expands it again.
+ * The mockup's rail had three more buttons (new simulation, experiments, last run); they were
+ * dropped on 2026-10-31 as duplicates of the header's panel tabs and run chip (deliberate
+ * deviation, see the bitácora). The header's panel toggle also expands/collapses.
  *
  * Motion rule (design-system.md): sidebar toggle uses transition-width only,
  * no layout animation with motion/react.
@@ -61,24 +45,12 @@ export function DashboardSidebar({
   collapsed,
   activePanel,
   onToggle,
-  onPanelChange,
   panelContent,
 }: DashboardSidebarProps) {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   // Mockup sideTitle: run routes show "Ejecución en vivo" instead of the tab name
   const isRunRoute = pathname.startsWith("/board/simulation/");
-  const lastRunId = useLastRunStore((s) => s.runId);
-  const lastRunStatus = useLastRunStore((s) => s.status);
-  const lastRunRound = useLastRunStore((s) => s.round);
-
-  // Mockup rail tooltip: "Ejecución: {estado}[ · Ronda N]"
-  const railRunStatusLabel =
-    lastRunStatus === "running"
-      ? t("dashboard.runChipRunning", { round: lastRunRound.toLocaleString(i18n.language) })
-      : t(STATUS_LABEL_KEY[lastRunStatus]);
-  const railRunTip = t("dashboard.railRunTip", { status: railRunStatusLabel });
 
   return (
     <aside
@@ -90,70 +62,24 @@ export function DashboardSidebar({
     >
       <div className="flex min-h-0 flex-1 flex-col">
         {collapsed ? (
-          /* ── Collapsed rail: real navigation buttons ─────────── */
-          <nav aria-label={t("nav.board")} className="flex flex-col items-center gap-2 py-3">
+          /* ── Collapsed rail: only the way back to the expanded panel ── */
+          <div className="flex flex-col items-center py-3">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-label={t("dashboard.tabNewSimulation")}
-                  onClick={() => {
-                    // onPanelChange navigates (panel lives in the URL) —
-                    // also leaves a run view, mockup railNueva
-                    onPanelChange("new-simulation");
-                    onToggle();
-                  }}
+                  aria-label={t("dashboard.sidebarToggleExpand")}
+                  onClick={onToggle}
                   className={RAIL_BUTTON_CLASS}
                 >
-                  <Plus className="size-4" aria-hidden="true" />
+                  <ChevronRight className="size-4" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p className="text-xs">{t("dashboard.tabNewSimulation")}</p>
+                <p className="text-xs">{t("dashboard.sidebarToggleExpand")}</p>
               </TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={t("dashboard.tabMyExperiments")}
-                  onClick={() => {
-                    onPanelChange("my-experiments");
-                    onToggle();
-                  }}
-                  className={RAIL_BUTTON_CLASS}
-                >
-                  <List className="size-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p className="text-xs">{t("dashboard.tabMyExperiments")}</p>
-              </TooltipContent>
-            </Tooltip>
-            {lastRunId !== null && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={railRunTip}
-                    onClick={() => {
-                      void navigate(`/board/simulation/${lastRunId}`);
-                      onToggle();
-                    }}
-                    className={RAIL_BUTTON_CLASS}
-                  >
-                    <span
-                      className={cn("size-2 rounded-full", RAIL_DOT_CLASS[lastRunStatus])}
-                      aria-hidden="true"
-                    />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p className="text-xs">{railRunTip}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </nav>
+          </div>
         ) : (
           <>
             {/* Section header: title + inline collapse button (mockup "‹") */}

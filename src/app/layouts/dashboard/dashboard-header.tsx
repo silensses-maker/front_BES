@@ -32,6 +32,11 @@ interface DashboardHeaderProps {
   sidebarCollapsed: boolean;
   /** Toggles the sidebar collapsed state */
   onSidebarToggle: () => void;
+  /**
+   * Whether the current route has a sidebar (board routes). Without one the fullscreen and
+   * sidebar toggles are not rendered: there is nothing for them to hide or show.
+   */
+  sidebarAvailable?: boolean;
 }
 
 const ICON_BUTTON_CLASS = cn(
@@ -64,7 +69,7 @@ function CrumbChip({ chip }: { chip: NonNullable<BreadcrumbSegment["chip"]> }) {
  * Left:   Logo (→ board) · Breadcrumb `Tablero › {run · id} › {red}`.
  * Center: Segmented panel tabs (inactive while inside a run, per mockup).
  * Right:  Run chip · WS reconnecting chip · theme toggle · fullscreen toggle ·
- *         sidebar collapse toggle · SettingsDropdown.
+ *         sidebar collapse toggle (both only while the route has a sidebar) · SettingsDropdown.
  */
 export function DashboardHeader({
   onPanelChange,
@@ -72,6 +77,7 @@ export function DashboardHeader({
   onFullscreenToggle,
   sidebarCollapsed,
   onSidebarToggle,
+  sidebarAvailable = true,
 }: DashboardHeaderProps) {
   const { t } = useTranslation();
   const breadcrumbs = useDashboardBreadcrumb();
@@ -145,10 +151,11 @@ export function DashboardHeader({
 
       {/* ── Center: Segmented panel tabs ──────────────────────────
           Absolutely centered so breadcrumb/chip width changes on the
-          sides never shift the tabs. */}
+          sides never shift the tabs. Shown at every width (compact below md): since the
+          collapsed sidebar rail lost its panel buttons, these are the panel navigation. */}
       <nav
         aria-label={t("nav.board")}
-        className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5 md:flex"
+        className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5"
       >
         {(
           [
@@ -176,7 +183,7 @@ export function DashboardHeader({
               // which also leaves a run view (mockup goNueva/goExp)
               onClick={() => onPanelChange(panel)}
               className={cn(
-                "rounded-md px-3 py-1 font-sans text-sm transition-colors",
+                "rounded-md px-2 py-1 font-sans text-xs transition-colors md:px-3 md:text-sm",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active
                   ? "bg-background font-semibold text-foreground ring-1 ring-inset ring-border"
@@ -218,36 +225,42 @@ export function DashboardHeader({
           </TooltipContent>
         </Tooltip>
 
-        <button
-          type="button"
-          aria-label={fullscreen ? t("dashboard.fullscreenExit") : t("dashboard.fullscreenEnter")}
-          aria-pressed={fullscreen}
-          onClick={onFullscreenToggle}
-          className={ICON_BUTTON_CLASS}
-        >
-          <FullscreenIcon className="size-4" aria-hidden="true" />
-        </button>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
+        {sidebarAvailable && (
+          <>
             <button
               type="button"
               aria-label={
-                sidebarCollapsed
-                  ? t("dashboard.sidebarToggleExpand")
-                  : t("dashboard.sidebarToggleCollapse")
+                fullscreen ? t("dashboard.fullscreenExit") : t("dashboard.fullscreenEnter")
               }
-              aria-pressed={!sidebarCollapsed}
-              onClick={onSidebarToggle}
+              aria-pressed={fullscreen}
+              onClick={onFullscreenToggle}
               className={ICON_BUTTON_CLASS}
             >
-              <SidebarIcon className="size-4" aria-hidden="true" />
+              <FullscreenIcon className="size-4" aria-hidden="true" />
             </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p className="text-xs">{t("dashboard.sidebarToggleHint")}</p>
-          </TooltipContent>
-        </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={
+                    sidebarCollapsed
+                      ? t("dashboard.sidebarToggleExpand")
+                      : t("dashboard.sidebarToggleCollapse")
+                  }
+                  aria-pressed={!sidebarCollapsed}
+                  onClick={onSidebarToggle}
+                  className={ICON_BUTTON_CLASS}
+                >
+                  <SidebarIcon className="size-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">{t("dashboard.sidebarToggleHint")}</p>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
 
         <SettingsDropdown />
       </div>

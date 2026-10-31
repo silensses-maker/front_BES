@@ -1,6 +1,7 @@
 export { backendClient } from "./client";
 export { simulationsApi } from "./simulations.api";
 export type {
+  AdminUser,
   AgentSpec,
   AgentType,
   BackendError,
@@ -32,9 +33,12 @@ export type {
   ResultsParams,
   ResultsResponse,
   RoleActionResponse,
+  RoleCatalogEntry,
+  RoleCatalogResponse,
   RunCancelledResponse,
   RunSummary,
   SaveMode,
+  SetRoleRequest,
   SilenceEffect,
   SilenceStrategy,
   SimCreated,
@@ -45,6 +49,8 @@ export type {
   TopologyResponse,
   UsageLimits,
   UserInfoResponse,
+  UserListParams,
+  UserListResponse,
   UserRole,
   UserSyncResponse,
 } from "./types/backend.types";

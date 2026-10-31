@@ -1,4 +1,4 @@
-import type { CognitiveBias, SilenceEffect, SilenceStrategy } from "@/shared/api/backend";
+import type { CognitiveBias, SilenceEffect, SilenceStrategy, UserRole } from "@/shared/api/backend";
 
 /**
  * Backend enum code → i18n key under `enums.*`: the single source of these labels (#94). Codes
@@ -98,3 +98,26 @@ export const SILENCE_EFFECT_OPTIONS = optionsOf(SILENCE_EFFECT_LABEL_KEYS);
 
 /** Every cognitive bias in code order, for selects. */
 export const COGNITIVE_BIAS_OPTIONS = optionsOf(COGNITIVE_BIAS_LABEL_KEYS);
+
+// ─── User roles ───────────────────────────────────────────────────────────────
+
+/** Backend role → i18n key under `roles.*`: the single source of the role names shown in the UI. */
+export const ROLE_LABEL_KEYS = {
+  SuperAdministrator: "roles.SuperAdministrator",
+  Administrator: "roles.Administrator",
+  Researcher: "roles.Researcher",
+  BaseUser: "roles.BaseUser",
+  Guest: "roles.Guest",
+} as const satisfies Record<UserRole, string>;
+
+export type RoleLabelKey = (typeof ROLE_LABEL_KEYS)[UserRole];
+
+/** The part of `t` (useTranslation) the role label helper needs. */
+export type RoleLabelTranslator = (key: RoleLabelKey) => string;
+
+/** Localized role name; a role this build does not know (a newer backend) renders as itself. */
+export function roleLabel(t: RoleLabelTranslator, role: string): string {
+  return Object.prototype.hasOwnProperty.call(ROLE_LABEL_KEYS, role)
+    ? t(ROLE_LABEL_KEYS[role as UserRole])
+    : role;
+}

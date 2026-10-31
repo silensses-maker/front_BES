@@ -309,7 +309,6 @@ const en = {
     // Run chip + connection status
     runChipRunning: "Running · Round {{round}}",
     runChipLast: "View last run",
-    railRunTip: "Run: {{status}}",
     wsReconnecting: "Reconnecting…",
     themeToggle: "Switch light / dark theme",
     sidebarToggleHint: "Expand or collapse the side panel",
@@ -596,10 +595,6 @@ const en = {
       "Biases are assigned to the network's {{edges}} edges: d·(d−1) + (N−d)·2·d, with d = density ({{density}}) and N = agents ({{agents}}).",
     errorAgentCountMismatch:
       "Agent type counts ({{actual}}) must match the total agents field ({{expected}}).",
-    errorAgentCountMismatchHint:
-      "Agent rows do not sum to the total. Adjust them in the Agents step.",
-    errorBiasCountMismatchHint:
-      "Bias rows do not match the network's edge count. Adjust them in the Agents step.",
     errorStopThreshold: "Stop threshold must be between 0 and 1 (exclusive).",
     errorIterationLimit: "The iteration limit exceeds your plan's maximum ({{limit}}).",
     errorAgentLimit: "Total agents ({{requested}}) exceed your plan's maximum ({{limit}}).",
@@ -1051,6 +1046,66 @@ const en = {
       consensusNotReached: "No consensus",
       summary: "{{count}} / {{total}} reached consensus",
     },
+  },
+  // User roles, as the backend names them (`user_role` enum)
+  roles: {
+    SuperAdministrator: "Super administrator",
+    Administrator: "Administrator",
+    Researcher: "Researcher",
+    BaseUser: "Base user",
+    Guest: "Guest",
+  },
+  // User administration sheet (settings menu), SuperAdministrator only
+  adminUsers: {
+    navLabel: "Manage users",
+    title: "Users",
+    description:
+      "Role, quotas and account status of every user. Only a super administrator can change them; a change applies on the user's next request.",
+    searchPlaceholder: "Search by email or name",
+    pageSummary: "{{from}}–{{to}} of {{total}}",
+    prevPage: "Previous page",
+    nextPage: "Next page",
+    refresh: "Refresh",
+    colUser: "User",
+    colRole: "Role",
+    colQuotas: "Quotas",
+    quotasHint: "Agents · iterations · networks · density factor, per run",
+    colStatus: "Status",
+    colCreated: "Created",
+    colActions: "Actions",
+    you: "(you)",
+    cannotEditSelf: "Your own role and status cannot be changed from here.",
+    roleSelectLabel: "Role of {{name}}",
+    statusActive: "Active",
+    statusDeactivated: "Deactivated",
+    deactivate: "Deactivate",
+    reactivate: "Reactivate",
+    loading: "Loading users…",
+    empty: "No users yet.",
+    emptySearch: "No users match “{{query}}”.",
+    confirmRoleTitle: "Change role",
+    confirmRoleBody:
+      "{{name}} will become {{role}}. The quotas of the new role apply on their next request.",
+    confirmGrantSuperAdmin:
+      "A super administrator can also change the role and status of every other user, yours included.",
+    confirmRoleAction: "Change role",
+    confirmDeactivateTitle: "Deactivate account",
+    confirmDeactivateBody:
+      "The platform will reject every request of {{name}} until the account is reactivated.",
+    confirmReactivateTitle: "Reactivate account",
+    confirmReactivateBody: "{{name}} will be able to sign in again, with the same role.",
+    roleUpdated: "{{name}} is now {{role}}.",
+    deactivated: "The account of {{name}} was deactivated.",
+    reactivated: "The account of {{name}} was reactivated.",
+    errorLoad: "Could not load the users. Please try again.",
+    errorSetRole: "Could not change the role. Please try again.",
+    errorDeactivate: "Could not deactivate the account. Please try again.",
+    errorReactivate: "Could not reactivate the account. Please try again.",
+    errorForbidden: "Only a super administrator can do this.",
+    errorNotFound: "That user no longer exists. Refresh the list.",
+    legendTitle: "Roles and quotas",
+    legendDescription:
+      "What each role allows per run. Every user also holds Guest; the highest role applies.",
   },
   enums: {
     silenceStrategy: {

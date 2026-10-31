@@ -7,7 +7,12 @@
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type UserRole = "Administrator" | "Researcher" | "BaseUser" | "Guest";
+/**
+ * Priority (highest first): SuperAdministrator > Administrator > Researcher > BaseUser > Guest.
+ * Every user also holds `Guest`; the effective role is the highest one. Only a SuperAdministrator
+ * manages the roles of other users.
+ */
+export type UserRole = "SuperAdministrator" | "Administrator" | "Researcher" | "BaseUser" | "Guest";
 
 export type SaveMode = 0 | 1 | 2;
 export type SilenceStrategy = 0 | 1 | 2 | 3;
@@ -81,6 +86,56 @@ export interface RoleActionResponse {
   uid: string;
   role: string;
   action: string;
+}
+
+/**
+ * One user as the SuperAdministrator endpoints return it (`GET /api/users`, `PUT
+ * /api/users/{uid}/role`, `POST /api/users/{uid}/deactivate|reactivate`). `effectiveRole` is the
+ * highest of `roles`; the quotas are that role's. Timestamps are ISO-8601 (UTC).
+ */
+export interface AdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  photo: string | null;
+  roles: UserRole[];
+  effectiveRole: UserRole;
+  usageLimits: UsageLimits;
+  deactivated: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Query of `GET /api/users`: `limit` 1..200 (default 50), `offset` ≥ 0, `q` matches email or name. */
+export interface UserListParams {
+  limit?: number;
+  offset?: number;
+  q?: string;
+}
+
+/** Shape returned by `GET /api/users` (SuperAdministrator only), newest users first. */
+export interface UserListResponse {
+  users: AdminUser[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** One role of the catalog, with the quotas it grants. */
+export interface RoleCatalogEntry {
+  role: UserRole;
+  priority: number;
+  usageLimits: UsageLimits;
+}
+
+/** Shape returned by `GET /api/users/roles` (any authenticated user), by priority desc. */
+export interface RoleCatalogResponse {
+  roles: RoleCatalogEntry[];
+}
+
+/** Body of `PUT /api/users/{uid}/role`: the user's roles become {Guest, role}. */
+export interface SetRoleRequest {
+  role: UserRole;
 }
 
 // ─── Simulations — shared sub-types ──────────────────────────────────────────

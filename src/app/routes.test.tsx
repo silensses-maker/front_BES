@@ -83,7 +83,9 @@ describe("AppRoutes — route-level code splitting (#130)", () => {
     );
     await screen.findByRole("heading", { level: 1, name: en.faq.pageTitle });
 
-    for (const page of ["board", "live-run", "profile"]) expect(pages.loaded.has(page)).toBe(false);
+    for (const page of ["board", "live-run", "profile"]) {
+      expect(pages.loaded.has(page)).toBe(false);
+    }
   });
 
   it("a protected deep link resolves its page chunk inside the dashboard shell", async () => {

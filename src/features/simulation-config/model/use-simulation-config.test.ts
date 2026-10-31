@@ -497,7 +497,7 @@ describe("useSimulationConfig", () => {
         expect(result.current.errors.agentLimitExceeded).toBe(true);
       });
 
-      it("sets agentCountMismatch when agentTypes counts don't sum to numberOfAgents", () => {
+      it("sets agentCountMismatch on the Agents step when agentTypes counts don't sum to numberOfAgents", () => {
         const { result } = renderHook(() => useSimulationConfig());
 
         act(() => {
@@ -506,6 +506,7 @@ describe("useSimulationConfig", () => {
             numberOfAgents: 10,
             agentTypes: [{ id: "a0", count: 3, silenceStrategy: 0, silenceEffect: 0 }],
           });
+          result.current.goToStep("agents");
         });
 
         let valid = false;
@@ -515,6 +516,52 @@ describe("useSimulationConfig", () => {
 
         expect(valid).toBe(false);
         expect(result.current.errors.agentCountMismatch).toBe(true);
+      });
+
+      it("the Network step's Next ignores the agent and bias rows: they belong to the Agents step", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            numberOfAgents: 10,
+            agentTypes: [{ id: "a0", count: 3, silenceStrategy: 0, silenceEffect: 0 }],
+            biasTypes: [{ id: "b0", count: 1, cognitiveBias: 0 }],
+          });
+        });
+        expect(result.current.step).toBe("network");
+
+        let valid = false;
+        act(() => {
+          valid = result.current.validateAndAdvance();
+        });
+
+        expect(valid).toBe(true);
+        expect(result.current.errors).toEqual({});
+      });
+
+      it("going to another step drops the errors of the step that produced them", () => {
+        const { result } = renderHook(() => useSimulationConfig());
+
+        act(() => {
+          result.current.updateValues({
+            ...validGeneratedValues,
+            numberOfAgents: 10,
+            agentTypes: [{ id: "a0", count: 3, silenceStrategy: 0, silenceEffect: 0 }],
+          });
+          result.current.goToStep("agents");
+        });
+        act(() => {
+          result.current.validateAndAdvance();
+        });
+        expect(result.current.errors.agentCountMismatch).toBe(true);
+
+        act(() => {
+          result.current.goToStep("network");
+        });
+
+        expect(result.current.step).toBe("network");
+        expect(result.current.errors).toEqual({});
       });
 
       it("sets stopThresholdOutOfRange when schema validation catches an out-of-range stopThreshold", () => {
