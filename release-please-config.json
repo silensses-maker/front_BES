@@ -5,6 +5,9 @@
   "include-component-in-tag": false,
   "bootstrap-sha": "8b98a080a25a1d918e28400a0bbbbf2cc9480cc9",
   "release-as": "2.0.22",
+  "extra-files": [
+    "README.md"
+  ],
   "packages": {
     ".": {}
   }
