@@ -2,8 +2,10 @@
 
 ## [2.0.0](https://github.com/silensses-maker/front_BES/compare/v1.0.0...v2.0.0) (2026-07-21)
 
-Primera versión estable de la 2.x (release manual; release-please sigue
-desactivado — ver issue #78).
+Primera versión estable de la 2.x (release manual, etiquetada retroactivamente como
+`v2.0.0` el 2026-11-10). Las versiones 2.0.1 a 2.0.21 fueron incrementos manuales de
+`package.json`, sin tag ni entrada propia; sus cambios se recogen en la entrada 2.0.22,
+la primera generada por release-please (ver issue #78).
 
 ### Highlights
 

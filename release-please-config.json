@@ -2,8 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "node",
   "versioning": "always-bump-patch",
-  "prerelease": true,
-  "prerelease-type": "alpha",
+  "include-component-in-tag": false,
+  "bootstrap-sha": "8b98a080a25a1d918e28400a0bbbbf2cc9480cc9",
+  "release-as": "2.0.22",
   "packages": {
     ".": {}
   }
