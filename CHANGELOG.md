@@ -1,5 +1,70 @@
 # Changelog
 
+## [2.0.22](https://github.com/silensses-maker/front_BES/compare/v2.0.0...v2.0.22) (2026-11-10)
+
+
+### Features
+
+* add LLM network prompt and download functionality; update various comments and documentation for consistency ([361aa71](https://github.com/silensses-maker/front_BES/commit/361aa710744789c193d51319faf24efea5a0aecd))
+* add step indicator component for simulation wizard ([dc9fa3c](https://github.com/silensses-maker/front_BES/commit/dc9fa3c740fda482c4a1c5a646e454732f9a374e))
+* add support for 'effect' clustering mode and update translations ([1c406ec](https://github.com/silensses-maker/front_BES/commit/1c406ec7ba528ee9eb1e2ee3ae0b4ed468b3977c))
+* **charts:** polarization measures (TypeScript replica of pol_measures behind PUBLIC_ENABLE_POLARIZATION), variance over time, theme-aware colors and frame-coalesced live updates ([#129](https://github.com/silensses-maker/front_BES/issues/129)) ([edcb5a6](https://github.com/silensses-maker/front_BES/commit/edcb5a627b308ebb3c922463a830a30b88113d92))
+* **docs:** in-app user manual (MDX, es/en, 84 screenshots), dev-only Auth emulator, and three front fixes ([c3c4bb6](https://github.com/silensses-maker/front_BES/commit/c3c4bb68e3f04e5fa7c2f37f699c5d79428e41bd))
+* enhance CSV tests with network row serialization and download functionality ([8cfa3d8](https://github.com/silensses-maker/front_BES/commit/8cfa3d8ce2363b3cc6ec3a042be5b2c5328adb48))
+* enhance dashboard components with tooltips, improve breadcrumb functionality, and update translations ([ed83646](https://github.com/silensses-maker/front_BES/commit/ed83646ade7e6ccd1f1aecf18f2e0fe920440c81))
+* enhance simulation canvas and run view with de-cluster animation and updated grouping logic ([bcf0d5f](https://github.com/silensses-maker/front_BES/commit/bcf0d5fdc18417972e4b61c1a5191e40e2431522))
+* enhance simulation configuration validation and user role management ([167e11d](https://github.com/silensses-maker/front_BES/commit/167e11d8f2765d53be969c2a40dae3a513e50af2))
+* enhance step network custom with tooltips and validation messages ([dc9fa3c](https://github.com/silensses-maker/front_BES/commit/dc9fa3c740fda482c4a1c5a646e454732f9a374e))
+* **history:** re-launch generated runs pre-filled, config export wit… ([4cce483](https://github.com/silensses-maker/front_BES/commit/4cce483c1d39b0b6c9103e9128c6dc77f01261ac))
+* **history:** re-launch generated runs pre-filled, config export with version, runId and seed, history filters ([#127](https://github.com/silensses-maker/front_BES/issues/127)) ([aa46e88](https://github.com/silensses-maker/front_BES/commit/aa46e888c7da1475207bc667e952594fb0b757ee))
+* implement network browser and selector for live run ([99f266c](https://github.com/silensses-maker/front_BES/commit/99f266cb40fecf4ee9f016723ce2e181a593c9f2))
+* implement replay engine and control bar for simulation replay ([1d2978d](https://github.com/silensses-maker/front_BES/commit/1d2978d962a41a69e5470f039c363a6becfa9c98))
+* implement RunView component for simulation playback and data visualization ([5c57cdc](https://github.com/silensses-maker/front_BES/commit/5c57cdcfc94dc1671205f3fa049451eb009a03d5))
+* improve step network with quota hints and save mode descriptions ([dc9fa3c](https://github.com/silensses-maker/front_BES/commit/dc9fa3c740fda482c4a1c5a646e454732f9a374e))
+* **landing:** about/contact/faq pages, translated 404, home copy via i18n and canvas loading state ([#125](https://github.com/silensses-maker/front_BES/issues/125)) ([0400305](https://github.com/silensses-maker/front_BES/commit/040030501185ba56216dc323475fa62d9154738e))
+* **polarization:** compare up to 4 independently configured measures on the same chart, with a values/normalized axis ([#129](https://github.com/silensses-maker/front_BES/issues/129)) ([32b1d0a](https://github.com/silensses-maker/front_BES/commit/32b1d0a7373798a66390ef9095947b4ab2c96eba))
+* **polarization:** table view (configured series or all measures) and CSV export in long and wide formats ([#129](https://github.com/silensses-maker/front_BES/issues/129)) ([07320ab](https://github.com/silensses-maker/front_BES/commit/07320ab5930991a03cb7b721bde2d50c3919fc61))
+* **polarization:** up to 10 overlaid series told apart by color, line style and markers, plus "overlay all measures" with undo ([#129](https://github.com/silensses-maker/front_BES/issues/129)) ([16c5436](https://github.com/silensses-maker/front_BES/commit/16c5436e98889ba317e5939347af4b4de6ae3e8b))
+* **quotas:** per-role network cap, custom-run quotas and validation … ([16e7d82](https://github.com/silensses-maker/front_BES/commit/16e7d825e69e97590b8ba93c4a3b8aa36d88657d))
+* **quotas:** per-role network cap, custom-run quotas and validation ([#122](https://github.com/silensses-maker/front_BES/issues/122)) ([1fc4306](https://github.com/silensses-maker/front_BES/commit/1fc43063aaba2eb3bb5665710dbf6baef72204fd))
+* refactor partner logos into a centralized configuration; add CNRS logo and update landing and login pages ([986772e](https://github.com/silensses-maker/front_BES/commit/986772e839e4be19d0634017243b1869330bac2c))
+* **results:** update results page to reflect upcoming content and remove placeholder data ([28b16ac](https://github.com/silensses-maker/front_BES/commit/28b16aca6adc01d9b03e7631e5b28266c8ba9c38))
+* simplify logo SVG and update to use currentColor for fill ([69120e7](https://github.com/silensses-maker/front_BES/commit/69120e7753e6c771f6371328e28635944c72798a))
+* **simulation-history:** enhance simulation history management with search and filter capabilities ([2835e6a](https://github.com/silensses-maker/front_BES/commit/2835e6ae5411ac40a29bacf4a8f89f1b5eac069e))
+* **simulation-stream:** refactor WebSocket management ([2835e6a](https://github.com/silensses-maker/front_BES/commit/2835e6ae5411ac40a29bacf4a8f89f1b5eac069e))
+* update de-cluster playback delay to ensure full animation completion before advancing rounds ([64e85fd](https://github.com/silensses-maker/front_BES/commit/64e85fd77d7a4704344f9fa5566611c77c85ae7e))
+* update step review to include formatted values and validation messages ([dc9fa3c](https://github.com/silensses-maker/front_BES/commit/dc9fa3c740fda482c4a1c5a646e454732f9a374e))
+* **wizard:** hide the save-mode selector; runs are saved in DEBUG mode by design ([#133](https://github.com/silensses-maker/front_BES/issues/133)) ([c806bd2](https://github.com/silensses-maker/front_BES/commit/c806bd252ee0f9859c842207dee0fdff70930504))
+
+
+### Bug Fixes
+
+* adjust board page to include live summary in new simulation panel ([dc9fa3c](https://github.com/silensses-maker/front_BES/commit/dc9fa3c740fda482c4a1c5a646e454732f9a374e))
+* **bench:** Sonar reliability and security issues on new code ([#126](https://github.com/silensses-maker/front_BES/issues/126)) ([302e1ef](https://github.com/silensses-maker/front_BES/commit/302e1ef2e82a04a502a4369f26b46dd63ea4d95a))
+* correct type imports and improve type safety in various components ([2835e6a](https://github.com/silensses-maker/front_BES/commit/2835e6ae5411ac40a29bacf4a8f89f1b5eac069e))
+* **frames:** read beliefs in the backend block layout ([#118](https://github.com/silensses-maker/front_BES/issues/118), [#95](https://github.com/silensses-maker/front_BES/issues/95)) ([36e4032](https://github.com/silensses-maker/front_BES/commit/36e403250ce6985e90a46757c0feec60921af6c8))
+* **i18n:** format retentionNote string for better readability in Spanish locale ([34d42e7](https://github.com/silensses-maker/front_BES/commit/34d42e7515f51653738c99326b42cd84a8771fbb))
+* **live-run:** handle 409 on cancel and finished runs without topology ([#124](https://github.com/silensses-maker/front_BES/issues/124)) ([4d4f79b](https://github.com/silensses-maker/front_BES/commit/4d4f79b749279e5ef18e73fbdb57288eac6c78a7))
+* mark intentional fire-and-forget promises with void (Sonar S9383) ([8a39747](https://github.com/silensses-maker/front_BES/commit/8a3974767de9705b06e0e392d481ecac57a46ccc))
+* **polarization:** Sonar reliability issues in the polarization tab and chart options ([#129](https://github.com/silensses-maker/front_BES/issues/129)) ([6ca08bb](https://github.com/silensses-maker/front_BES/commit/6ca08bbc8a3f0e877255b98098a4a2e48e03ae0e))
+* report version check under required context check-version; restore 2.0.0 ([e916cb5](https://github.com/silensses-maker/front_BES/commit/e916cb5ebd9ea7eeb24cd4eb94eb47aed4bef51a))
+* **run-view:** share topology downloads between the selector, the stream prefetch and the WS handler ([#140](https://github.com/silensses-maker/front_BES/issues/140)) ([af00ce2](https://github.com/silensses-maker/front_BES/commit/af00ce2a911038f471de10c992e53cd16adbcbfd))
+* **theme:** dark-mode secondary text reaches 7:1 contrast; no opacity-lowered text ([eeb8e07](https://github.com/silensses-maker/front_BES/commit/eeb8e078bccf57346426b0ae7fbbfa0827e06ae0))
+* **timeline:** keep the hover tooltip inside the timeline (no horizontal page scroll) ([624d114](https://github.com/silensses-maker/front_BES/commit/624d114b7fe14b4ae7cc02849fc595b0fcfebd55))
+* **topology:** Sonar reliability issues in the topology worker ([#128](https://github.com/silensses-maker/front_BES/issues/128)) ([1e429fe](https://github.com/silensses-maker/front_BES/commit/1e429feff7f4f4f86a237467d259025667d9d936))
+* update sonar coverage exclusions to include static config constants ([8fb08b2](https://github.com/silensses-maker/front_BES/commit/8fb08b2b5975558df59acea11b80ca2b63d6aab6))
+* **user:** tolerate backends without usageLimits so session restore never hangs ([4fe0436](https://github.com/silensses-maker/front_BES/commit/4fe043654bcfa5e36f3388f903028bc6dbb25dbd))
+* **wizard:** drop no-op threshold/confidence inputs and allow full enums in custom networks ([#120](https://github.com/silensses-maker/front_BES/issues/120)) ([9d07341](https://github.com/silensses-maker/front_BES/commit/9d0734173e9fda46538be6a1656baabca3cdd0b4))
+* **ws:** read finalRound, validate frame headers and route binary frames by runId ([#119](https://github.com/silensses-maker/front_BES/issues/119)) ([98e3642](https://github.com/silensses-maker/front_BES/commit/98e3642598524232410b301277e4c3f451159119))
+
+
+### Performance Improvements
+
+* **canvas:** per-round colors and sizes pushed straight to cosmos.gl (LUT buffers, create() instead of render()), session fallback and adaptive repaint cap ([#142](https://github.com/silensses-maker/front_BES/issues/142)) ([5de8dec](https://github.com/silensses-maker/front_BES/commit/5de8dec36ecfbce6e8b8b54d7cc25df49f5bceb9))
+* **routes:** lazy-load pages, split the visualization stack and load MathJax on demand ([#130](https://github.com/silensses-maker/front_BES/issues/130)) ([ed59e82](https://github.com/silensses-maker/front_BES/commit/ed59e82fc3588f565a75a58265c9c0bfaceba3e5))
+* **routes:** lazy-load pages, split the visualization stack and load… ([f9a1548](https://github.com/silensses-maker/front_BES/commit/f9a154823a46fab106c442e486e65004847f6675))
+* **topology:** fetch, parse and merge in a Web Worker, retried pages with a visible error instead of partial networks, load progress ([#128](https://github.com/silensses-maker/front_BES/issues/128)) ([16ab3cd](https://github.com/silensses-maker/front_BES/commit/16ab3cd176f774033a94f3a87910791e1216aaa0))
+
 ## [2.0.0](https://github.com/silensses-maker/front_BES/compare/v1.0.0...v2.0.0) (2026-07-21)
 
 Primera versión estable de la 2.x (release manual, etiquetada retroactivamente como
