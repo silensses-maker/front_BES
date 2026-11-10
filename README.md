@@ -1,4 +1,4 @@
-# SiLEnSeSS v2.0.21 <!-- x-release-please-version -->
+# SiLEnSeSS v2.0.22 <!-- x-release-please-version -->
 
 **S**imulat**i**on **L**aboratory of the **E**volution of Opi**n**ion in **S**ocial N**e**tworks under the influence of the **S**piral of **S**ilence.
 A multi-agent simulator that models opinion dynamics by incorporating the **Spiral of Silence** theory — exploring not just *what* people think, but *whether they say it*.
