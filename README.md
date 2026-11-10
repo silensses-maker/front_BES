@@ -1,9 +1,9 @@
-# SiLEnSeSS v2.0.0-alpha.1
+# SiLEnSeSS v2.0.21 <!-- x-release-please-version -->
 
 **S**imulat**i**on **L**aboratory of the **E**volution of Opi**n**ion in **S**ocial N**e**tworks under the influence of the **S**piral of **S**ilence.
 A multi-agent simulator that models opinion dynamics by incorporating the **Spiral of Silence** theory — exploring not just *what* people think, but *whether they say it*.
 
-> ⚠️ **Alpha release** — Active development. Expect breaking changes.
+> **Stable 2.0.x line.** Production instance: <https://silensess.lipn.univ-paris13.fr>. Releases and changelog: [GitHub Releases](https://github.com/silensses-maker/front_BES/releases) · [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -95,7 +95,7 @@ app → pages → widgets → features → entities → shared
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/silensses-maker/front_BES.git
 cd front_BES
 
 # Install dependencies
@@ -383,34 +383,20 @@ words joined by dashes, each used once in the manual.
 
 ## Versioning
 
-Follows Semantic Versioning with pre-release tags:
+Semantic Versioning on the `2.0.x` line (`v1.0.0` is the legacy frontend, February 2026; `v2.0.0` is the first stable release of the rewrite, July 2026).
 
-```
-2.0.0-alpha.X    ← Active development (current)
-2.0.0-beta.X     ← Feature complete
-2.0.0-rc.X       ← Release candidate
-2.0.0            ← Stable release
-```
+Releases are produced by [release-please](https://github.com/googleapis/release-please) from [Conventional Commits](https://www.conventionalcommits.org/) on `main`:
+
+1. Every push to `main` creates or updates a release PR (`chore(main): release X.Y.Z`) that bumps `package.json`, the version in this README and `.release-please-manifest.json`, and regenerates `CHANGELOG.md`.
+2. Merging that PR creates the tag `vX.Y.Z` and the GitHub Release.
+
+The version is compiled into every build as `__APP_VERSION__` and recorded in exported files. Versions 2.0.1–2.0.21 were manual bumps without tags; automated releases start at 2.0.22.
 
 ---
 
-## Roadmap
+## Project status
 
-- [x] Rsbuild + React + TypeScript base setup
-- [x] FSD architecture
-- [x] Biome configuration
-- [x] Vitest setup
-- [x] Tailwind CSS v4
-- [x] shadcn/ui integration
-- [ ] Theme provider (dark mode toggle)
-- [ ] Auth feature (login, protected routes)
-- [ ] API client with Axios
-- [ ] Zustand stores
-- [ ] Feature: cosmograph (network visualization)
-- [ ] Feature: users management
-- [ ] Landing page
-- [ ] Board/simulation pages
-- [ ] Wiki page (theory documentation)
+The scaffold roadmap (Rsbuild + React + TypeScript base, FSD architecture, Biome, Vitest, Tailwind CSS v4, shadcn/ui, theme provider, auth with protected routes, Axios API client, Zustand stores, Cosmograph network visualization, user administration, landing, board/simulation and wiki pages) is complete. Open work is tracked in the repository's [issues](https://github.com/silensses-maker/front_BES/issues) and [milestones](https://github.com/silensses-maker/front_BES/milestones).
 
 ---
 
@@ -421,6 +407,8 @@ Follows Semantic Versioning with pre-release tags:
 3. Write tests for business logic in `features/` and `entities/`
 4. Use `shadcn/ui` components from `@/shared/ui/` — don't create parallel UI primitives
 5. Keep components typed — avoid `any`
+6. Write commit messages as [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `perf:`, `refactor:`, `chore:`…) — release-please derives the changelog and the next version from them
+7. Do not bump `package.json` by hand — the release PR does it
 
 ---
 

@@ -1,39 +1,41 @@
 # ── Release Please ─────────────────────────────────────────────────────────────
-# DESACTIVADO — La versión se maneja manualmente mientras el proyecto está en
-# fase alpha (2.0.0-alpha.x). release-please bumpeaba el patch en vez del
-# número de alpha, lo que no corresponde al esquema de versioning del proyecto.
+# Activado el 2026-11-10 (issue #78). Cada push a `main` crea o actualiza un PR
+# de release ("chore(main): release X.Y.Z") con el bump de package.json, del
+# manifest y del CHANGELOG. Al fusionar ese PR, la acción crea el tag `vX.Y.Z`
+# y el GitHub Release correspondiente.
 #
-# Para activar cuando se esté cerca de la release estable 2.0.0:
-#   1. Descomentar el workflow completo.
-#   2. Asegurarse de que release-please-config.json y
-#      .release-please-manifest.json reflejen la versión actual.
-#   3. Verificar que GitHub Actions tenga permiso para crear PRs:
-#      Settings → Actions → General → "Allow GitHub Actions to create and
-#      approve pull requests".
-#   4. El primer PR de release generará el CHANGELOG.md automáticamente.
+# Versionado: `always-bump-patch` (2.0.x). El primer release automatizado es la
+# 2.0.22 (`release-as` en release-please-config.json) y recoge todo lo hecho
+# desde el release manual 2.0.0 (commit 8b98a08, 2026-07-21, tag retroactivo
+# `v2.0.0`). Tras fusionar ese primer PR hay que QUITAR `release-as` del config;
+# si no, los siguientes PRs seguirían proponiendo 2.0.22.
 #
-# Ver issue #78 para el tracking de esta activación.
+# Token: usa el secret `RELEASE_PLEASE_TOKEN` (PAT de un colaborador con push)
+# si existe; si no, `GITHUB_TOKEN`, que exige activar en el repo
+# Settings → Actions → General → "Allow GitHub Actions to create and approve
+# pull requests" (solo la cuenta admin, silensses-maker, puede hacerlo). Con el
+# PAT, además, el PR de release dispara el CI como cualquier otro PR.
 # ───────────────────────────────────────────────────────────────────────────────
+name: Release Please
 
-# name: Release Please
-#
-# on:
-#   push:
-#     branches: [refactor]
-#
-# permissions:
-#   contents: write
-#   pull-requests: write
-#
-# jobs:
-#   release-please:
-#     name: Release Please
-#     runs-on: ubuntu-latest
-#
-#     steps:
-#       - uses: googleapis/release-please-action@v4
-#         with:
-#           token: ${{ secrets.GITHUB_TOKEN }}
-#           target-branch: refactor
-#           config-file: release-please-config.json
-#           manifest-file: .release-please-manifest.json
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
